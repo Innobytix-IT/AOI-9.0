@@ -6,3 +6,4 @@ aoi_data/
 *.tmp
 dist/
 out/
+Webspace/aoi_token.php
