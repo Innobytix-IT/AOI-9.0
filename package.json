@@ -20,13 +20,30 @@
       "assets/**/*"
     ],
     "win": {
-      "target": [{ "target": "nsis", "arch": ["x64"] }],
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
       "icon": "assets/icon.ico"
     },
     "linux": {
       "target": [
-        { "target": "AppImage", "arch": ["x64"] },
-        { "target": "deb", "arch": ["x64"] }
+        {
+          "target": "AppImage",
+          "arch": [
+            "x64"
+          ]
+        },
+        {
+          "target": "deb",
+          "arch": [
+            "x64"
+          ]
+        }
       ],
       "icon": "assets/icon.png",
       "category": "Network"
@@ -34,12 +51,19 @@
     "nsis": {
       "oneClick": false,
       "allowToChangeInstallationDirectory": true,
-      "installerLanguages": ["de_DE", "en_US"],
+      "installerLanguages": [
+        "de_DE",
+        "en_US"
+      ],
       "language": "1031"
     }
   },
   "devDependencies": {
     "electron": "^32.0.0",
     "electron-builder": "^25.0.0"
+  },
+  "dependencies": {
+    "imapflow": "^2.0.8",
+    "nodemailer": "^10.0.11"
   }
 }

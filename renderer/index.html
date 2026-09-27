@@ -609,6 +609,63 @@ body {
                   <div style="color:#666;font-size:10px;margin-top:2px;margin-left:20px;">Deaktivieren für DSL-Nutzer</div>
                 </div>
               </div>
+              <div class="mein-aoi-section" id="email-settings-section">
+                <div class="mein-aoi-title">📧 E-Mail-Konto verbinden</div>
+                <div style="font-size:11px;display:flex;flex-direction:column;gap:5px;">
+                  <div style="display:flex;align-items:center;gap:4px;">
+                    <label style="width:72px;color:#1a3c63;font-weight:bold;flex-shrink:0;">Anbieter:</label>
+                    <select id="email-provider" style="flex:1;font-size:11px;font-family:Tahoma;border:1px solid #7f9db9;padding:2px;" onchange="emailPreset()">
+                      <option value="">– Eigene Einstellungen –</option>
+                      <option value="gmx">GMX / web.de</option>
+                      <option value="gmail">Gmail</option>
+                      <option value="outlook">Outlook / Hotmail</option>
+                      <option value="aol">AOL Mail</option>
+                      <option value="icloud">iCloud</option>
+                      <option value="yahoo">Yahoo</option>
+                    </select>
+                  </div>
+                  <div style="display:flex;gap:4px;">
+                    <div style="flex:1;display:flex;flex-direction:column;gap:3px;">
+                      <div style="font-weight:bold;color:#555;font-size:10px;margin-bottom:1px;">📥 IMAP (Empfang)</div>
+                      <div style="display:flex;align-items:center;gap:3px;">
+                        <label style="width:40px;flex-shrink:0;">Server:</label>
+                        <input id="email-imap-host" type="text" style="flex:1;font-size:10px;font-family:Tahoma;border:1px solid #7f9db9;padding:2px 3px;" placeholder="imap.beispiel.de">
+                      </div>
+                      <div style="display:flex;align-items:center;gap:3px;">
+                        <label style="width:40px;flex-shrink:0;">Port:</label>
+                        <input id="email-imap-port" type="number" value="993" style="width:50px;font-size:10px;font-family:Tahoma;border:1px solid #7f9db9;padding:2px 3px;">
+                        <label style="margin-left:4px;"><input type="checkbox" id="email-imap-ssl" checked> SSL</label>
+                      </div>
+                    </div>
+                    <div style="flex:1;display:flex;flex-direction:column;gap:3px;">
+                      <div style="font-weight:bold;color:#555;font-size:10px;margin-bottom:1px;">📤 SMTP (Versand)</div>
+                      <div style="display:flex;align-items:center;gap:3px;">
+                        <label style="width:40px;flex-shrink:0;">Server:</label>
+                        <input id="email-smtp-host" type="text" style="flex:1;font-size:10px;font-family:Tahoma;border:1px solid #7f9db9;padding:2px 3px;" placeholder="smtp.beispiel.de">
+                      </div>
+                      <div style="display:flex;align-items:center;gap:3px;">
+                        <label style="width:40px;flex-shrink:0;">Port:</label>
+                        <input id="email-smtp-port" type="number" value="465" style="width:50px;font-size:10px;font-family:Tahoma;border:1px solid #7f9db9;padding:2px 3px;">
+                        <label style="margin-left:4px;"><input type="checkbox" id="email-smtp-ssl" checked> SSL</label>
+                      </div>
+                    </div>
+                  </div>
+                  <div style="display:flex;align-items:center;gap:4px;">
+                    <label style="width:72px;color:#1a3c63;font-weight:bold;flex-shrink:0;">E-Mail:</label>
+                    <input id="email-user" type="email" style="flex:1;font-size:11px;font-family:Tahoma;border:1px solid #7f9db9;padding:2px 4px;" placeholder="deine@email.de">
+                  </div>
+                  <div style="display:flex;align-items:center;gap:4px;">
+                    <label style="width:72px;color:#1a3c63;font-weight:bold;flex-shrink:0;">Kennwort:</label>
+                    <input id="email-pass" type="password" style="flex:1;font-size:11px;font-family:Tahoma;border:1px solid #7f9db9;padding:2px 4px;" placeholder="••••••••">
+                  </div>
+                  <div id="email-test-result" style="min-height:16px;font-size:10px;padding:2px 0;"></div>
+                  <div style="display:flex;gap:5px;justify-content:flex-end;">
+                    <button class="btn-options" onclick="emailTestConnection()">🔌 Verbindung testen</button>
+                    <button class="btn-signon" style="border-radius:4px;padding:3px 14px;" onclick="emailSaveSettings()">💾 Speichern</button>
+                  </div>
+                </div>
+              </div>
+
               <div class="mein-aoi-section">
                 <div class="mein-aoi-title">📊 Online-Statistik</div>
                 <div style="font-size:11px;display:flex;flex-direction:column;gap:4px;">
@@ -1212,7 +1269,7 @@ function openWindow(id) {
   var w=document.getElementById(id); if(!w) return;
   if(w.classList.contains('minimized')) restoreWindow(id);
   else { if(id==='win-mailbox'||id==='win-im') applyDefaultPosition(id); w.style.display='flex'; bringToFront(id); }
-  if(id==='win-mailbox') playSound('snd-mail');
+  if(id==='win-mailbox'){ playSound('snd-mail'); if(_emailCfg) emailFetchInbox(); }
 }
 function toggleWindow(id) { var w=document.getElementById(id); if(w.style.display==='none'||w.classList.contains('minimized')) openWindow(id); else closeWindow(id); }
 function closeWindow(id) { var w=document.getElementById(id); if(w) w.style.display='none'; removeMinTab(id); }
@@ -1610,6 +1667,113 @@ function mailDelete() {
 }
 function selectMailTab(t) { document.querySelectorAll('.mail-tab').forEach(function(x){x.classList.remove('active');}); document.getElementById('tab-'+t).classList.add('active'); }
 
+/* ===== E-MAIL EINSTELLUNGEN ===== */
+var _emailCfg = null;
+
+var EMAIL_PRESETS = {
+  gmx:     { imapHost:'imap.gmx.net',              imapPort:993, imapSsl:true,  smtpHost:'mail.gmx.net',              smtpPort:465, smtpSsl:true  },
+  gmail:   { imapHost:'imap.gmail.com',             imapPort:993, imapSsl:true,  smtpHost:'smtp.gmail.com',            smtpPort:465, smtpSsl:true  },
+  outlook: { imapHost:'outlook.office365.com',      imapPort:993, imapSsl:true,  smtpHost:'smtp.office365.com',        smtpPort:587, smtpSsl:false },
+  aol:     { imapHost:'imap.aol.com',               imapPort:993, imapSsl:true,  smtpHost:'smtp.aol.com',              smtpPort:465, smtpSsl:true  },
+  icloud:  { imapHost:'imap.mail.me.com',           imapPort:993, imapSsl:true,  smtpHost:'smtp.mail.me.com',          smtpPort:587, smtpSsl:false },
+  yahoo:   { imapHost:'imap.mail.yahoo.com',        imapPort:993, imapSsl:true,  smtpHost:'smtp.mail.yahoo.com',       smtpPort:465, smtpSsl:true  },
+};
+
+function emailPreset() {
+  var p = EMAIL_PRESETS[document.getElementById('email-provider').value];
+  if(!p) return;
+  document.getElementById('email-imap-host').value = p.imapHost;
+  document.getElementById('email-imap-port').value = p.imapPort;
+  document.getElementById('email-imap-ssl').checked = p.imapSsl;
+  document.getElementById('email-smtp-host').value = p.smtpHost;
+  document.getElementById('email-smtp-port').value = p.smtpPort;
+  document.getElementById('email-smtp-ssl').checked = p.smtpSsl;
+}
+
+function emailGetFormCfg() {
+  return {
+    imapHost: document.getElementById('email-imap-host').value.trim(),
+    imapPort: parseInt(document.getElementById('email-imap-port').value) || 993,
+    imapSsl:  document.getElementById('email-imap-ssl').checked,
+    smtpHost: document.getElementById('email-smtp-host').value.trim(),
+    smtpPort: parseInt(document.getElementById('email-smtp-port').value) || 465,
+    smtpSsl:  document.getElementById('email-smtp-ssl').checked,
+    user:     document.getElementById('email-user').value.trim(),
+    password: document.getElementById('email-pass').value,
+  };
+}
+
+function emailSetResult(msg, ok) {
+  var el = document.getElementById('email-test-result');
+  if(!el) return;
+  el.textContent = msg;
+  el.style.color = ok ? '#007700' : '#cc0000';
+}
+
+function emailTestConnection() {
+  if(!window.electronAPI) return;
+  var cfg = emailGetFormCfg();
+  if(!cfg.user || !cfg.password || !cfg.imapHost) { emailSetResult('Bitte alle Felder ausfüllen.', false); return; }
+  emailSetResult('⏳ Verbinde…', true);
+  window.electronAPI.emailTest(cfg).then(function(r){
+    emailSetResult(r.ok ? '✔ Verbindung erfolgreich!' : '✘ Fehler: ' + r.error, r.ok);
+  }).catch(function(e){ emailSetResult('✘ ' + e.message, false); });
+}
+
+function emailSaveSettings() {
+  if(!window.electronAPI) return;
+  var cfg = emailGetFormCfg();
+  if(!cfg.user || !cfg.password || !cfg.imapHost) { emailSetResult('Bitte alle Felder ausfüllen.', false); return; }
+  window.electronAPI.emailSaveConfig(cfg).then(function(r){
+    if(r.ok){ _emailCfg = cfg; emailSetResult('✔ Gespeichert.', true); }
+    else emailSetResult('✘ Speichern fehlgeschlagen: ' + r.error, false);
+  });
+}
+
+function emailLoadSettings() {
+  if(!window.electronAPI) return;
+  window.electronAPI.emailLoadConfig().then(function(r){
+    if(!r.ok || !r.config) return;
+    var c = r.config;
+    _emailCfg = c;
+    document.getElementById('email-imap-host').value = c.imapHost || '';
+    document.getElementById('email-imap-port').value = c.imapPort || 993;
+    document.getElementById('email-imap-ssl').checked = !!c.imapSsl;
+    document.getElementById('email-smtp-host').value = c.smtpHost || '';
+    document.getElementById('email-smtp-port').value = c.smtpPort || 465;
+    document.getElementById('email-smtp-ssl').checked = !!c.smtpSsl;
+    document.getElementById('email-user').value  = c.user || '';
+    document.getElementById('email-pass').value  = c.password || '';
+  });
+}
+
+function emailFetchInbox() {
+  if(!window.electronAPI || !_emailCfg) return;
+  var tbody = document.getElementById('mail-tbody');
+  if(tbody) tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;color:#888;padding:12px;">⏳ Lade E-Mails…</td></tr>';
+  window.electronAPI.emailFetch(_emailCfg).then(function(r){
+    if(!r.ok){ if(tbody) tbody.innerHTML='<tr><td colspan="4" style="color:#c00;padding:8px;">Fehler: '+escHtml(r.error)+'</td></tr>'; return; }
+    if(!tbody) return;
+    tbody.innerHTML='';
+    if(r.messages.length === 0){
+      tbody.innerHTML='<tr><td colspan="4" style="text-align:center;color:#888;padding:12px;">Keine E-Mails gefunden.</td></tr>';
+      return;
+    }
+    r.messages.forEach(function(m, i){
+      var tr = document.createElement('tr');
+      if(!m.read) tr.className='unread';
+      tr.id='mail-row-'+i;
+      tr.innerHTML='<td>'+(m.read?'📨':'✉️')+'</td><td>'+escHtml(m.date)+'</td><td>'+escHtml(m.from)+'</td><td>'+escHtml(m.subject)+'</td>';
+      (function(msg){ tr.onclick=function(){ previewMail(tr,msg.from,msg.date,msg.subject,msg.body); }; tr.ondblclick=mailRead; })(m);
+      tbody.appendChild(tr);
+    });
+    mailUpdateCounter();
+    // Titelzeile aktualisieren
+    var titleEl = document.querySelector('#win-mailbox .title-left span');
+    if(titleEl) titleEl.textContent='📬 Postfach von '+(_emailCfg.user||'');
+  }).catch(function(e){ if(tbody) tbody.innerHTML='<tr><td colspan="4" style="color:#c00;padding:8px;">'+escHtml(e.message)+'</td></tr>'; });
+}
+
 /* ===== E-MAIL VERFASSEN ===== */
 function openComposeMail(to, subject, body) {
   document.getElementById('compose-to').value      = to      || '';
@@ -1622,17 +1786,33 @@ function openComposeMail(to, subject, body) {
 
 function composeSend() {
   var to      = document.getElementById('compose-to').value.trim();
+  var cc      = document.getElementById('compose-cc').value.trim();
   var subject = document.getElementById('compose-subject').value.trim();
   var body    = document.getElementById('compose-body').innerText.trim();
   if (!to)      { alert('Bitte einen Empfänger eingeben.'); return; }
   if (!subject) { alert('Bitte einen Betreff eingeben.');   return; }
-  // Simuliert Senden – in einer echten AOI-Mail-Integration würde hier der SMTP/API-Call stehen
-  closeWindow('win-compose');
-  document.getElementById('compose-to').value      = '';
-  document.getElementById('compose-cc').value      = '';
-  document.getElementById('compose-subject').value = '';
-  document.getElementById('compose-body').innerHTML = '';
-  alert('✉️ E-Mail an «' + to + '» wurde in den Ausgang gelegt.');
+  if (!window.electronAPI || !_emailCfg) {
+    alert('Bitte zuerst ein E-Mail-Konto in den Einstellungen einrichten.');
+    openWindow('win-main'); switchPortalTab('meinaoi'); return;
+  }
+  var btn = document.querySelector('#win-compose .btn-signon');
+  if(btn) { btn.disabled=true; btn.textContent='Sende…'; }
+  window.electronAPI.emailSend({ cfg:_emailCfg, to, cc, subject, body }).then(function(r){
+    if(btn) { btn.disabled=false; btn.textContent='📤 Senden'; }
+    if(r.ok){
+      closeWindow('win-compose');
+      document.getElementById('compose-to').value='';
+      document.getElementById('compose-cc').value='';
+      document.getElementById('compose-subject').value='';
+      document.getElementById('compose-body').innerHTML='';
+      alert('✔ E-Mail an «'+to+'» wurde gesendet.');
+    } else {
+      alert('✘ Senden fehlgeschlagen:\n'+r.error);
+    }
+  }).catch(function(e){
+    if(btn) { btn.disabled=false; btn.textContent='📤 Senden'; }
+    alert('✘ '+e.message);
+  });
 }
 
 function composeAttach() {
@@ -1643,6 +1823,7 @@ window.addEventListener('DOMContentLoaded',function(){
   initResizers();
   if(window.electronAPI) document.getElementById('electron-winctrls').style.display='flex';
   aoiInitScreenNames();
+  emailLoadSettings();
   aoiRenderBuddyListUI();
   // Sort-Button-Status aus localStorage wiederherstellen
   var savedSort = aoiGetSortOrder();

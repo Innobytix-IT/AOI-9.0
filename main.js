@@ -1,6 +1,9 @@
-const { app, BrowserWindow, ipcMain } = require('electron');
+const { app, BrowserWindow, ipcMain, safeStorage } = require('electron');
 const path = require('path');
 const { exec } = require('child_process');
+const fs = require('fs');
+const { ImapFlow } = require('imapflow');
+const nodemailer = require('nodemailer');
 
 function createWindow() {
   const win = new BrowserWindow({
@@ -172,6 +175,103 @@ ipcMain.handle('security-check', async () => {
     if (antiviruses.length === 0) antiviruses.push({ name: 'Kein AV gefunden', enabled: false, defsOk: false });
     return { platform: 'linux', firewalls, antiviruses };
   }
+});
+
+/* ===== E-MAIL IPC ===== */
+function emailConfigPath() {
+  return path.join(app.getPath('userData'), 'email_config.json');
+}
+
+ipcMain.handle('email-save-config', async (_, cfg) => {
+  try {
+    const toSave = { ...cfg };
+    if (safeStorage.isEncryptionAvailable() && cfg.password) {
+      toSave.password = safeStorage.encryptString(cfg.password).toString('base64');
+      toSave.encrypted = true;
+    }
+    fs.writeFileSync(emailConfigPath(), JSON.stringify(toSave, null, 2), 'utf8');
+    return { ok: true };
+  } catch (e) { return { ok: false, error: e.message }; }
+});
+
+ipcMain.handle('email-load-config', async () => {
+  try {
+    const raw = JSON.parse(fs.readFileSync(emailConfigPath(), 'utf8'));
+    if (raw.encrypted && raw.password && safeStorage.isEncryptionAvailable()) {
+      raw.password = safeStorage.decryptString(Buffer.from(raw.password, 'base64'));
+    }
+    return { ok: true, config: raw };
+  } catch (_) { return { ok: false, config: null }; }
+});
+
+ipcMain.handle('email-test', async (_, cfg) => {
+  const client = new ImapFlow({
+    host: cfg.imapHost, port: cfg.imapPort,
+    secure: cfg.imapSsl,
+    auth: { user: cfg.user, pass: cfg.password },
+    logger: false, tls: { rejectUnauthorized: false },
+  });
+  try {
+    await client.connect();
+    await client.logout();
+    return { ok: true };
+  } catch (e) { return { ok: false, error: e.message }; }
+});
+
+ipcMain.handle('email-fetch', async (_, cfg) => {
+  const client = new ImapFlow({
+    host: cfg.imapHost, port: cfg.imapPort,
+    secure: cfg.imapSsl,
+    auth: { user: cfg.user, pass: cfg.password },
+    logger: false, tls: { rejectUnauthorized: false },
+  });
+  try {
+    await client.connect();
+    const lock = await client.getMailboxLock('INBOX');
+    const msgs = [];
+    try {
+      // Neueste 30 Nachrichten, neueste zuerst
+      const status = await client.status('INBOX', { messages: true });
+      const total = status.messages || 0;
+      const from = Math.max(1, total - 29);
+      for await (const msg of client.fetch(`${from}:${total}`, {
+        uid: true, flags: true, envelope: true, bodyStructure: true,
+        bodyParts: ['text'],
+      })) {
+        const isRead = msg.flags && msg.flags.has('\\Seen');
+        const env = msg.envelope || {};
+        const fromAddr = env.from && env.from[0]
+          ? (env.from[0].name || env.from[0].address || '')
+          : '?';
+        const bodyPart = msg.bodyParts && (msg.bodyParts.get('text') || msg.bodyParts.get('TEXT'));
+        const bodyText = bodyPart ? bodyPart.toString().slice(0, 2000) : '';
+        msgs.unshift({
+          uid: msg.uid,
+          seq: msg.seq,
+          read: isRead,
+          from: fromAddr,
+          subject: env.subject || '(kein Betreff)',
+          date: env.date ? new Date(env.date).toLocaleDateString('de-DE') : '?',
+          body: bodyText,
+        });
+      }
+    } finally { lock.release(); }
+    await client.logout();
+    return { ok: true, messages: msgs };
+  } catch (e) { return { ok: false, error: e.message }; }
+});
+
+ipcMain.handle('email-send', async (_, { cfg, to, cc, subject, body }) => {
+  const transport = nodemailer.createTransport({
+    host: cfg.smtpHost, port: cfg.smtpPort,
+    secure: cfg.smtpSsl,
+    auth: { user: cfg.user, pass: cfg.password },
+    tls: { rejectUnauthorized: false },
+  });
+  try {
+    await transport.sendMail({ from: cfg.user, to, cc: cc || undefined, subject, text: body });
+    return { ok: true };
+  } catch (e) { return { ok: false, error: e.message }; }
 });
 
 app.whenReady().then(() => {

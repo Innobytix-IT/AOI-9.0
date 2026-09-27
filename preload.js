@@ -7,5 +7,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
   maximizeForce: () => ipcRenderer.send('window-maximize-force'),
   restore:       () => ipcRenderer.send('window-restore'),
   close:         () => ipcRenderer.send('window-close'),
-  securityCheck: () => ipcRenderer.invoke('security-check'),
+  securityCheck:    () => ipcRenderer.invoke('security-check'),
+  emailSaveConfig:  (cfg) => ipcRenderer.invoke('email-save-config', cfg),
+  emailLoadConfig:  ()    => ipcRenderer.invoke('email-load-config'),
+  emailTest:        (cfg) => ipcRenderer.invoke('email-test', cfg),
+  emailFetch:       (cfg) => ipcRenderer.invoke('email-fetch', cfg),
+  emailSend:        (args) => ipcRenderer.invoke('email-send', args),
 });
