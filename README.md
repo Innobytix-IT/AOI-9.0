@@ -21,6 +21,10 @@ Ein klassischer Instant-Messenger-Look, echter P2P-Chat via WebRTC und ein integ
 |-----------------|
 | ![Postfach](docs/screenshots/postfach.png) |
 
+| Radio, Postfach & Chat gleichzeitig |
+|-------------------------------------|
+| ![Radio Postfach Chat](docs/screenshots/radio_postfach_chat.webp) |
+
 ---
 
 ## Features
