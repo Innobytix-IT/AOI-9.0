@@ -1147,7 +1147,7 @@ function startOnlineTimer() {
 
 /* ===== BUDDY-NOTIFY ===== */
 function showBuddyNotify(name,action) {
-  playSound('snd-door-open');
+  playSound(action.indexOf('abgemeldet')>=0 ? 'snd-door-close' : 'snd-door-open');
   var el=document.getElementById('buddy-notify');
   el.textContent='🏃 '+name+' '+action;
   el.style.display='block';
