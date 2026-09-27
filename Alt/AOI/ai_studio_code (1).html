@@ -1,0 +1,851 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <title>AOI 9.0 Optimiert</title>
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      user-select: none;
+    }
+
+    body {
+      background: radial-gradient(circle at center, #9dbfe3 0%, #6893c5 100%);
+      font-family: "Tahoma", "MS Sans Serif", Segoe UI, sans-serif;
+      font-size: 11px;
+      height: 100vh;
+      overflow: hidden;
+    }
+
+    /* =========================================================
+       1. ANMELDE-BILDSCHIRM (MODAL)
+       ========================================================= */
+    #signon-screen {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      background: radial-gradient(circle at center, #9dbfe3 0%, #5684be 100%);
+      z-index: 1000;
+    }
+
+    .xp-window {
+      width: 620px;
+      background: #ece9d8;
+      border: 3px solid #0055ea;
+      border-radius: 8px 8px 0 0;
+      box-shadow: 4px 8px 25px rgba(0, 0, 0, 0.5);
+    }
+
+    .title-bar {
+      height: 30px;
+      background: linear-gradient(to bottom, #0058ee 0%, #3593ff 10%, #288eff 30%, #0060ee 50%, #0052e0 80%, #003dd0 100%);
+      border-radius: 5px 5px 0 0;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 0 6px;
+      color: white;
+      font-weight: bold;
+      text-shadow: 1px 1px #0f3789;
+    }
+
+    .title-left { display: flex; align-items: center; gap: 6px; }
+    .title-icon { width: 16px; height: 16px; }
+    .title-controls { display: flex; gap: 2px; }
+
+    .btn-win {
+      width: 21px;
+      height: 21px;
+      border-radius: 3px;
+      border: 1px solid #ffffff;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      font-size: 10px;
+      cursor: pointer;
+      box-shadow: inset 0 1px 0 rgba(255,255,255,0.6);
+      background: linear-gradient(to bottom, #438bf5 0%, #165bca 100%);
+      color: white;
+    }
+    .btn-win.close { background: linear-gradient(to bottom, #e87a55 0%, #c43509 100%); font-weight: bold; }
+    .btn-win:hover { filter: brightness(1.15); }
+
+    .window-body {
+      background: linear-gradient(to bottom, #e4effb 0%, #b8d4f1 100%);
+      padding: 12px;
+    }
+
+    .main-card {
+      background: #ffffff;
+      border: 1px solid #7da2ce;
+      border-radius: 12px;
+      padding: 16px;
+      box-shadow: inset 0 1px 3px rgba(0,0,0,0.1);
+    }
+
+    .card-top { display: flex; justify-content: space-between; gap: 15px; margin-bottom: 12px; }
+    .logo-container { width: 40%; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+    .aoi-logo-svg { width: 140px; height: 90px; }
+    .form-container { width: 60%; display: flex; flex-direction: column; gap: 7px; }
+
+    .form-row { display: flex; align-items: center; justify-content: space-between; }
+    .form-row label { font-weight: bold; color: #1a3c63; width: 95px; }
+    .form-row input, .form-row select {
+      flex: 1; padding: 3px 6px; font-size: 11px; font-family: Tahoma, sans-serif;
+      border: 1px solid #7f9db9; border-radius: 2px;
+    }
+    .screen-name-select { background: #001275 !important; color: #ffffff !important; font-weight: bold; }
+
+    .actions-row { display: flex; justify-content: flex-end; gap: 8px; margin-top: 10px; }
+    .btn-options {
+      background: linear-gradient(to bottom, #ffffff 0%, #d8e5f2 100%);
+      border: 1px solid #5d8cb9; border-radius: 4px; padding: 4px 10px; font-size: 11px;
+      font-weight: bold; color: #0b3967; cursor: pointer;
+    }
+    .btn-signon {
+      background: linear-gradient(to bottom, #a3e874 0%, #4da722 50%, #307e0c 100%);
+      border: 1px solid #235c09; border-radius: 12px; padding: 5px 24px; font-size: 12px;
+      font-weight: bold; color: white; text-shadow: 1px 1px #164003; cursor: pointer;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.3);
+    }
+    .btn-signon:hover { filter: brightness(1.1); }
+
+    .safety-panel {
+      margin-top: 10px; border: 1px solid #9bbde2; border-radius: 6px;
+      display: flex; background: #f7faff; font-size: 10px;
+    }
+    .safety-col { flex: 1; padding: 6px 10px; }
+    .safety-col:first-child { border-right: 1px solid #9bbde2; }
+    .safety-header { font-weight: bold; color: #0a3d6d; margin-bottom: 4px; }
+    .safety-item { display: flex; justify-content: space-between; margin-bottom: 2px; }
+    .status-on { color: #008000; font-weight: bold; }
+    .status-off { color: #cc0000; font-weight: bold; }
+
+    /* =========================================================
+       2. AOI HAUPT-DESKTOP (SHELL)
+       ========================================================= */
+    #desktop-shell {
+      display: none;
+      height: 100vh;
+      flex-direction: column;
+      background: #c8d9e6 url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="200" height="200"><path d="M 0 100 Q 100 0 200 100" stroke="%23b0c7dc" stroke-width="1" fill="none"/></svg>');
+    }
+
+    /* Menüzeile (Datei, Bearbeiten...) */
+    .menu-bar {
+      height: 22px;
+      background: linear-gradient(to bottom, #eff5fc 0%, #d8e5f2 100%);
+      border-bottom: 1px solid #97b5d2;
+      display: flex;
+      align-items: center;
+      padding: 0 8px;
+      gap: 15px;
+      font-size: 11px;
+      color: #0b335e;
+    }
+    .menu-item { cursor: pointer; padding: 2px 4px; }
+    .menu-item:hover { background: #b8d4f1; border-radius: 2px; }
+
+    /* Die große Icon-Werkzeugleiste */
+    .icon-toolbar {
+      height: 54px;
+      background: linear-gradient(to bottom, #d6e8f8 0%, #a2c6e6 50%, #87b4dd 51%, #a8cceb 100%);
+      border-bottom: 1px solid #6b9bc2;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 10px;
+    }
+
+    .toolbar-left, .toolbar-right { display: flex; align-items: center; gap: 8px; }
+
+    .tool-btn {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      cursor: pointer;
+      padding: 3px 6px;
+      border-radius: 4px;
+      position: relative;
+    }
+    .tool-btn:hover { background: rgba(255,255,255,0.4); }
+    .tool-icon { font-size: 18px; filter: drop-shadow(1px 1px 1px rgba(0,0,0,0.3)); }
+    .tool-label { font-size: 10px; color: #072a50; font-weight: bold; margin-top: 1px; }
+
+    .mail-badge {
+      position: absolute;
+      top: -2px;
+      left: 18px;
+      background: #cc0000;
+      color: white;
+      font-size: 9px;
+      font-weight: bold;
+      padding: 0 4px;
+      border-radius: 6px;
+      border: 1px solid white;
+    }
+
+    /* Adress- und Suchleiste */
+    .address-bar-row {
+      height: 34px;
+      background: linear-gradient(to bottom, #bdd8ee 0%, #90bde0 100%);
+      border-bottom: 1px solid #6897bf;
+      display: flex;
+      align-items: center;
+      padding: 0 8px;
+      gap: 6px;
+    }
+
+    .nav-btn {
+      width: 22px;
+      height: 22px;
+      background: #f7fbff;
+      border: 1px solid #5a8ab5;
+      border-radius: 3px;
+      cursor: pointer;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      font-weight: bold;
+      color: #0b335e;
+    }
+    .nav-btn:hover { background: #e0effd; }
+
+    .url-input-container {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      background: #ffffff;
+      border: 2px solid #55a024;
+      border-radius: 3px;
+      height: 24px;
+      padding: 0 4px;
+    }
+    .url-input {
+      width: 100%;
+      border: none;
+      outline: none;
+      font-family: Tahoma, sans-serif;
+      font-size: 11px;
+    }
+
+    .btn-go {
+      background: linear-gradient(to bottom, #88d447 0%, #3e9818 100%);
+      border: 1px solid #23600c;
+      border-radius: 3px;
+      color: white;
+      font-weight: bold;
+      padding: 3px 12px;
+      font-size: 11px;
+      cursor: pointer;
+      text-shadow: 1px 1px #164003;
+    }
+
+    /* Der Hauptarbeitsbereich (3 Spalten) */
+    .workspace-container {
+      flex: 1;
+      display: flex;
+      padding: 8px;
+      gap: 8px;
+      overflow: hidden;
+      position: relative;
+    }
+
+    /* 2.1 Linke Navigationsleiste */
+    .left-sidebar {
+      width: 170px;
+      background: #ffffff;
+      border: 1px solid #759ebd;
+      border-radius: 4px;
+      display: flex;
+      flex-direction: column;
+      box-shadow: 1px 1px 4px rgba(0,0,0,0.15);
+      overflow-y: auto;
+    }
+
+    .side-icon-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 6px;
+      padding: 8px;
+      background: #f0f6fc;
+      border-bottom: 1px solid #bed6ec;
+    }
+
+    .side-grid-item {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      cursor: pointer;
+      font-size: 10px;
+      color: #083463;
+      font-weight: bold;
+    }
+
+    .side-category {
+      border-bottom: 1px solid #dae7f4;
+    }
+    .side-cat-header {
+      background: linear-gradient(to bottom, #4f96d6 0%, #206ab1 100%);
+      color: white;
+      font-weight: bold;
+      padding: 4px 8px;
+      font-size: 10px;
+      display: flex;
+      justify-content: space-between;
+    }
+    .side-cat-list { list-style: none; padding: 4px 8px; }
+    .side-cat-list li {
+      padding: 3px 0;
+      color: #08386c;
+      cursor: pointer;
+      font-size: 11px;
+    }
+    .side-cat-list li:hover { text-decoration: underline; color: #d05800; }
+
+    /* 2.2 Zentraler MDI Arbeitsbereich */
+    .mdi-center {
+      flex: 1;
+      position: relative;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .mdi-window {
+      background: #ffffff;
+      border: 2px solid #0055ea;
+      border-radius: 6px 6px 0 0;
+      box-shadow: 2px 4px 12px rgba(0,0,0,0.3);
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      flex: 1;
+    }
+
+    .mdi-title {
+      height: 24px;
+      background: linear-gradient(to bottom, #0058ee 0%, #288eff 50%, #0052e0 100%);
+      color: white;
+      font-weight: bold;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 6px;
+    }
+
+    .mdi-content {
+      flex: 1;
+      border: none;
+      background: #fff;
+    }
+
+    /* 2.3 Rechte Buddy-Liste */
+    .buddy-sidebar {
+      width: 190px;
+      background: #ffffff;
+      border: 2px solid #0055ea;
+      border-radius: 6px 6px 0 0;
+      display: flex;
+      flex-direction: column;
+      box-shadow: 2px 4px 12px rgba(0,0,0,0.25);
+    }
+
+    .buddy-tree {
+      flex: 1;
+      overflow-y: auto;
+      padding: 6px;
+    }
+
+    .buddy-group {
+      font-weight: bold;
+      color: #072f5a;
+      margin: 4px 0 2px 0;
+      cursor: pointer;
+    }
+
+    .buddy-item {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 3px 6px;
+      margin-left: 10px;
+      cursor: pointer;
+      border-radius: 3px;
+    }
+    .buddy-item:hover { background: #ddecfa; }
+    .running-man {
+      width: 12px;
+      height: 12px;
+      background: #f7c600;
+      border: 1px solid #7d5c00;
+      border-radius: 2px;
+      display: inline-block;
+    }
+
+    .buddy-footer-actions {
+      background: #eaf2fb;
+      border-top: 1px solid #a8cceb;
+      padding: 6px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+    .buddy-btn-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 4px;
+    }
+    .buddy-act-btn {
+      background: linear-gradient(to bottom, #ffffff 0%, #d8e7f5 100%);
+      border: 1px solid #6b98c3;
+      border-radius: 3px;
+      padding: 3px 2px;
+      font-size: 10px;
+      font-weight: bold;
+      color: #083463;
+      cursor: pointer;
+      text-align: center;
+    }
+
+    /* AIM Instant Messenger Fenster (Pop-Up) */
+    #im-window {
+      position: absolute;
+      width: 320px;
+      height: 280px;
+      bottom: 20px;
+      right: 210px;
+      background: #ece9d8;
+      border: 2px solid #0055ea;
+      border-radius: 6px 6px 0 0;
+      box-shadow: 4px 6px 15px rgba(0,0,0,0.4);
+      display: none;
+      flex-direction: column;
+      z-index: 50;
+    }
+    .im-history {
+      flex: 1;
+      background: #ffffff;
+      margin: 6px;
+      border: 1px solid #7f9db9;
+      padding: 6px;
+      overflow-y: auto;
+      font-size: 11px;
+    }
+    .im-input-box {
+      height: 45px;
+      margin: 0 6px 6px 6px;
+      background: #ffffff;
+      border: 1px solid #7f9db9;
+      padding: 4px;
+      outline: none;
+      font-family: Tahoma;
+      font-size: 11px;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- =========================================================
+       1. ANMELDE-FENSTER (SIGN-ON)
+       ========================================================= -->
+  <div id="signon-screen">
+    <div class="xp-window">
+      <div class="title-bar">
+        <div class="title-left">
+          <svg class="title-icon" viewBox="0 0 100 100">
+            <polygon points="50,10 90,85 10,85" fill="#ffffff" stroke="#003dd0" stroke-width="6"/>
+            <ellipse cx="50" cy="55" rx="20" ry="12" fill="#0055ea" />
+            <circle cx="50" cy="55" r="6" fill="#ffffff" />
+          </svg>
+          <span>AOI 9.0 Optimiert - Anmelden</span>
+        </div>
+        <div class="title-controls">
+          <div class="btn-win">_</div>
+          <div class="btn-win">□</div>
+          <div class="btn-win close">✕</div>
+        </div>
+      </div>
+
+      <div class="window-body">
+        <div style="display:flex; justify-content:flex-end; margin-bottom: 8px;">
+          <button class="btn-options">Hilfe</button>
+        </div>
+
+        <div class="main-card">
+          <div class="card-top">
+            <!-- AOI Dreieck mit Auge -->
+            <div class="logo-container">
+              <svg class="aoi-logo-svg" viewBox="0 0 260 140">
+                <polygon points="65,15 115,105 15,105" fill="url(#blueGrad)" stroke="#003580" stroke-width="4"/>
+                <ellipse cx="65" cy="68" rx="22" ry="14" fill="#ffffff" />
+                <ellipse cx="65" cy="68" rx="11" ry="11" fill="#0058ee" />
+                <circle cx="65" cy="68" r="5" fill="#031b4d" />
+                <circle cx="62" cy="65" r="2.5" fill="#ffffff" />
+                <text x="125" y="65" font-family="'Trebuchet MS', Arial" font-weight="900" font-size="44" fill="#0048aa">AOI</text>
+                <text x="125" y="92" font-family="Arial" font-weight="bold" font-size="20" fill="#e89d1b">9.0</text>
+                <rect x="160" y="80" width="80" height="13" rx="3" fill="#e89d1b" />
+                <text x="163" y="90" font-family="Arial" font-weight="bold" font-size="9" fill="#ffffff">OPTIMIERT</text>
+                <defs>
+                  <linearGradient id="blueGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                    <stop offset="0%" stop-color="#4aa4ff" /><stop offset="100%" stop-color="#0037a3" />
+                  </linearGradient>
+                </defs>
+              </svg>
+            </div>
+
+            <!-- Formular -->
+            <div class="form-container">
+              <div class="form-row">
+                <label>Hauptname:</label>
+                <select id="user-screenname" class="screen-name-select">
+                  <option value="Klaus2003">Klaus2003</option>
+                  <option value="RetroSurfer">RetroSurfer</option>
+                  <option value="Gast">&lt;Neuer Name&gt;</option>
+                </select>
+              </div>
+
+              <div class="form-row">
+                <label>Kennwort:</label>
+                <input type="password" value="geheim123">
+              </div>
+
+              <div class="form-row">
+                <label>AHPT-Server:</label>
+                <input type="text" id="ahpt-url" value="https://mein-webspace.de/aoi/cloud/">
+              </div>
+
+              <div class="form-row">
+                <label>E-Mail-Konto:</label>
+                <input type="text" value="klaus@web.de">
+              </div>
+
+              <div class="actions-row">
+                <button class="btn-options" onclick="window.open('https://mail.aol.com','_blank')">AOL-Mail holen</button>
+                <button class="btn-options">Optionen</button>
+                <button class="btn-signon" id="signon-btn" onclick="startSignOn()">Anmelden</button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Sicherheitsstatus -->
+          <div class="safety-panel">
+            <div class="safety-col">
+              <div class="safety-header">🛡 Sicherheit bei AOI</div>
+              <div class="safety-item"><span>E-Mail Spamschutz</span><span class="status-on">EIN</span></div>
+              <div class="safety-item"><span>Virenschutz</span><span class="status-on">EIN</span></div>
+            </div>
+            <div class="safety-col">
+              <div class="safety-header">💻 Sicherheit auf meinem PC</div>
+              <div class="safety-item"><span>Firewall</span><span class="status-on">Aktiv</span></div>
+              <div class="safety-item"><span>AOI Schutzschild</span><span class="status-on">Läuft</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- =========================================================
+       2. AOI HAUPT-DESKTOP (NACH DEM LOGIN)
+       ========================================================= -->
+  <div id="desktop-shell">
+    
+    <!-- Menüleiste -->
+    <div class="menu-bar">
+      <span class="menu-item">Datei</span>
+      <span class="menu-item">Bearbeiten</span>
+      <span class="menu-item">Drucken</span>
+      <span class="menu-item" onclick="openMailbox()">Post</span>
+      <span class="menu-item">Gemeinschaft</span>
+      <span class="menu-item">Dienste</span>
+      <span class="menu-item">Fenster</span>
+      <span class="menu-item" style="color:#b31e00; font-weight:bold;" onclick="doSignOff()">Abmelden</span>
+      <span class="menu-item">Hilfe</span>
+    </div>
+
+    <!-- Große 3D Icon-Leiste -->
+    <div class="icon-toolbar">
+      <div class="toolbar-left">
+        <div class="tool-btn" onclick="openMailbox()">
+          <span class="mail-badge">15</span>
+          <span class="tool-icon">📬</span>
+          <span class="tool-label">Lesen</span>
+        </div>
+        <div class="tool-btn" onclick="alert('Neue E-Mail verfassen...')">
+          <span class="tool-icon">✍️</span>
+          <span class="tool-label">Schreiben</span>
+        </div>
+        <div class="tool-btn" onclick="openIM('SurfinJerry')">
+          <span class="tool-icon">🏃</span>
+          <span class="tool-label">Nachricht</span>
+        </div>
+        <div class="tool-btn">
+          <span class="tool-icon">👥</span>
+          <span class="tool-label">Leute</span>
+        </div>
+        <div class="tool-btn">
+          <span class="tool-icon">🛡️</span>
+          <span class="tool-label">Sicherheit</span>
+        </div>
+        <div class="tool-btn">
+          <span class="tool-icon">⚙️</span>
+          <span class="tool-label">Einstellungen</span>
+        </div>
+        <div class="tool-btn">
+          <span class="tool-icon">🎧</span>
+          <span class="tool-label">Musik</span>
+        </div>
+      </div>
+
+      <div class="toolbar-right">
+        <div class="tool-btn">
+          <span class="tool-icon">📻</span>
+          <span class="tool-label">Radio</span>
+        </div>
+        <!-- Kleines AOI-Logo in der Ecke -->
+        <svg style="width:32px; height:32px;" viewBox="0 0 100 100">
+          <polygon points="50,10 90,85 10,85" fill="#0058ee" stroke="#ffffff" stroke-width="4"/>
+          <circle cx="50" cy="55" r="8" fill="#ffffff" />
+        </svg>
+      </div>
+    </div>
+
+    <!-- Adressleiste -->
+    <div class="address-bar-row">
+      <button class="nav-btn" onclick="document.getElementById('browser-frame').contentWindow.history.back()">◀</button>
+      <button class="nav-btn" onclick="document.getElementById('browser-frame').contentWindow.history.forward()">▶</button>
+      <button class="nav-btn" onclick="document.getElementById('browser-frame').src='https://de.wikipedia.org'">↻</button>
+      <button class="btn-options" style="font-size:10px; padding:2px 8px;">Schnellstart</button>
+      
+      <div class="url-input-container">
+        <input type="text" id="url-bar" class="url-input" value="https://de.wikipedia.org" onkeydown="if(event.key==='Enter') navigateUrl()">
+      </div>
+      
+      <button class="btn-go" onclick="navigateUrl()">Los</button>
+      <button class="btn-options" style="font-size:10px; padding:2px 8px;">Favoriten ▾</button>
+    </div>
+
+    <!-- 3-Spalten Arbeitsbereich -->
+    <div class="workspace-container">
+      
+      <!-- Linke Navigation -->
+      <div class="left-sidebar">
+        <div class="side-icon-grid">
+          <div class="side-grid-item" onclick="navigateKeyword('suche')"><span>🔍</span>Suchen</div>
+          <div class="side-grid-item" onclick="navigateKeyword('stichwort')"><span>🔤</span>Stichwort</div>
+          <div class="side-grid-item"><span>🛍️</span>Einkaufen</div>
+          <div class="side-grid-item"><span>🗺️</span>Karten</div>
+        </div>
+
+        <div class="side-category">
+          <div class="side-cat-header">Information <span>▸</span></div>
+          <ul class="side-cat-list">
+            <li onclick="navigateKeyword('nachrichten')">Nachrichten</li>
+            <li onclick="navigateKeyword('wetter')">Wetterbericht</li>
+            <li onclick="navigateKeyword('finanzen')">Finanzen & Börse</li>
+            <li onclick="navigateKeyword('sport')">Sport</li>
+          </ul>
+        </div>
+
+        <div class="side-category">
+          <div class="side-cat-header">Unterhaltung <span>▸</span></div>
+          <ul class="side-cat-list">
+            <li>Kino & Filme</li>
+            <li>Spiele</li>
+            <li>Musik</li>
+          </ul>
+        </div>
+      </div>
+
+      <!-- Zentraler Browser / Hauptfenster -->
+      <div class="mdi-center">
+        <div class="mdi-window">
+          <div class="mdi-title">
+            <span id="window-caption">🌐 Willkommen bei AOI 9.0 Optimiert</span>
+            <div class="title-controls">
+              <div class="btn-win">_</div>
+              <div class="btn-win">□</div>
+              <div class="btn-win close">✕</div>
+            </div>
+          </div>
+          <!-- Eingebetteter Web-Browser -->
+          <iframe id="browser-frame" class="mdi-content" src="https://de.wikipedia.org"></iframe>
+        </div>
+      </div>
+
+      <!-- Rechte Buddy-Liste -->
+      <div class="buddy-sidebar">
+        <div class="title-bar" style="height:24px;">
+          <div class="title-left">
+            <span style="font-size:11px;">🏃 Buddy-Liste ®</span>
+          </div>
+          <button class="btn-options" style="font-size:9px; padding:1px 4px;">Hilfe</button>
+        </div>
+
+        <div class="buddy-tree">
+          <div class="buddy-group">▾ Buddies (3/5)</div>
+          <div class="buddy-item" onclick="openIM('SurfinJerry')">
+            <span class="running-man"></span>
+            <span>SurfinJerry</span>
+          </div>
+          <div class="buddy-item" onclick="openIM('InternetAnne')">
+            <span class="running-man"></span>
+            <span>InternetAnne</span>
+          </div>
+          <div class="buddy-item" onclick="openIM('DJ_Emm_Pea_Three')">
+            <span class="running-man"></span>
+            <span>DJ_Emm_Pea_3</span>
+          </div>
+
+          <div class="buddy-group" style="margin-top:8px;">▸ Kollegen (0/2)</div>
+          <div class="buddy-group">▸ Familie (0/3)</div>
+        </div>
+
+        <div class="buddy-footer-actions">
+          <div class="buddy-btn-grid">
+            <button class="buddy-act-btn" onclick="openIM('SurfinJerry')">Nachricht</button>
+            <button class="buddy-act-btn">Buddy-Chat</button>
+            <button class="buddy-act-btn">Info</button>
+            <button class="buddy-act-btn">Adressbuch</button>
+          </div>
+          <div style="font-size:9px; text-align:center; color:#555;">
+            AOI-Stichwort: <b>Buddy</b>
+          </div>
+        </div>
+      </div>
+
+      <!-- Das Pop-Up IM Chat-Fenster -->
+      <div id="im-window">
+        <div class="title-bar" style="height:22px;">
+          <span id="im-title" style="font-size:10px;">Sofortnachricht mit...</span>
+          <div class="btn-win close" onclick="closeIM()">✕</div>
+        </div>
+        <div class="im-history" id="im-chat-log">
+          <div style="color:#888; font-style:italic;">Direkte P2P-Verbindung via WebRTC aufgebaut.</div>
+        </div>
+        <input type="text" id="im-message-input" class="im-input-box" placeholder="Nachricht eingeben und Enter drücken..." onkeydown="if(event.key==='Enter') sendIMMessage()">
+      </div>
+
+    </div>
+  </div>
+
+  <script>
+    // ==========================================
+    // LOGIK & INTERAKTIONEN
+    // ==========================================
+
+    let activeBuddy = "";
+
+    function startSignOn() {
+      const btn = document.getElementById('signon-btn');
+      const user = document.getElementById('user-screenname').value;
+      
+      btn.innerText = "Verbinde...";
+      btn.style.filter = "grayscale(0.6)";
+
+      // Simulierte Einwahl & Handshake
+      setTimeout(() => {
+        btn.innerText = "Handshake...";
+      }, 700);
+
+      setTimeout(() => {
+        // Soundeffekt simulieren (Später echte WAV)
+        playRetroChime();
+        
+        // Umschalten auf Desktop
+        document.getElementById('signon-screen').style.display = 'none';
+        document.getElementById('desktop-shell').style.display = 'flex';
+      }, 1500);
+    }
+
+    function doSignOff() {
+      if (confirm("Möchten Sie sich wirklich von AOI abmelden?")) {
+        document.getElementById('desktop-shell').style.display = 'none';
+        document.getElementById('signon-screen').style.display = 'flex';
+        document.getElementById('signon-btn').innerText = "Anmelden";
+        document.getElementById('signon-btn').style.filter = "none";
+      }
+    }
+
+    function navigateUrl() {
+      let val = document.getElementById('url-bar').value.trim();
+      if (!val.startsWith('http://') && !val.startsWith('https://')) {
+        val = 'https://' + val;
+      }
+      document.getElementById('browser-frame').src = val;
+      document.getElementById('window-caption').innerText = "🌐 AOI Browser - " + val;
+    }
+
+    function navigateKeyword(kw) {
+      document.getElementById('url-bar').value = "aoi://" + kw;
+      if (kw === 'wetter') {
+        document.getElementById('browser-frame').src = "https://wttr.in";
+      } else if (kw === 'nachrichten') {
+        document.getElementById('browser-frame').src = "https://tagesschau.de";
+      } else {
+        alert("AOI-Stichwort '" + kw + "' aufgerufen!");
+      }
+    }
+
+    function openMailbox() {
+      alert("Postfach wird geöffnet...\n15 neue E-Mails via IMAP gefunden!\n\n(Hier verknüpfen wir als Nächstes die Mail-Tabelle)");
+    }
+
+    // Instant Messenger Fenster
+    function openIM(buddyName) {
+      activeBuddy = buddyName;
+      document.getElementById('im-title').innerText = "Sofortnachricht mit " + buddyName;
+      document.getElementById('im-window').style.display = 'flex';
+      document.getElementById('im-message-input').focus();
+    }
+
+    function closeIM() {
+      document.getElementById('im-window').style.display = 'none';
+    }
+
+    function sendIMMessage() {
+      const input = document.getElementById('im-message-input');
+      const text = input.value.trim();
+      if (!text) return;
+
+      const log = document.getElementById('im-chat-log');
+      const user = document.getElementById('user-screenname').value;
+      
+      log.innerHTML += `<div><b style="color:#0000aa;">${user}:</b> ${text}</div>`;
+      input.value = "";
+      log.scrollTop = log.scrollHeight;
+
+      // Kleine Retro-Bot-Antwort simulieren
+      setTimeout(() => {
+        log.innerHTML += `<div><b style="color:#aa0000;">${activeBuddy}:</b> Hey! Cool, dass AOI 9.0 wieder läuft 😎</div>`;
+        log.scrollTop = log.scrollHeight;
+      }, 1000);
+    }
+
+    // Retro Begrüßungs-Sound (Synthesizer via Web Audio API)
+    function playRetroChime() {
+      try {
+        const ctx = new (window.AudioContext || window.webkitAudioContext)();
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.type = "sine";
+        osc.frequency.setValueAtTime(440, ctx.currentTime);
+        osc.frequency.exponentialRampToValueAtTime(880, ctx.currentTime + 0.3);
+        gain.gain.setValueAtTime(0.2, ctx.currentTime);
+        gain.gain.linearRampToValueAtTime(0.01, ctx.currentTime + 0.5);
+        osc.start();
+        osc.stop(ctx.currentTime + 0.5);
+      } catch (e) {
+        // Fallback falls Audio geblockt
+      }
+    }
+  </script>
+</body>
+</html>

@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <title>AOI 9.0 Optimiert</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; user-select: none; }
+    body {
+      background: radial-gradient(circle at center, #9dbfe3 0%, #6893c5 100%);
+      font-family: "Tahoma", "MS Sans Serif", Segoe UI, sans-serif;
+      font-size: 11px;
+      height: 100vh;
+      overflow: hidden;
+    }
+
+    /* Unsichtbarer Schild bei Drag/Resize gegen Iframe-Mausverlust */
+    #mouse-shield {
+      position: fixed; inset: 0; z-index: 999999; display: none; background: transparent;
+    }
+
+    /* =========================================================
+       1. ANMELDE-FENSTER (SIGN-ON)
+       ========================================================= */
+    #signon-screen {
+      position: absolute; inset: 0; display: flex; justify-content: center;
+      align-items: center; background: radial-gradient(circle at center, #9dbfe3 0%, #5684be 100%);
+      z-index: 10000;
+    }
+    .xp-window {
+      width: 620px; background: #ece9d8; border: 3px solid #0055ea;
+      border-radius: 8px 8px 0 0; box-shadow: 4px 8px 25px rgba(0,0,0,0.5);
+    }
+    .title-bar {
+      height: 26px;
+      background: linear-gradient(to bottom, #0058ee 0%, #3593ff 10%, #288eff 30%, #0060ee 50%, #0052e0 80%, #003dd0 100%);
+      border-radius: 4px 4px 0 0; display: flex; justify-content: space-between;
+      align-items: center; padding: 0 6px; color: white; font-weight: bold;
+      text-shadow: 1px 1px #0f3789; cursor: move;
+    }
+    .title-left { display: flex; align-items: center; gap: 6px; }
+    .title-icon { width: 16px; height: 16px; }
+    .title-controls { display: flex; gap: 2px; }
+    .btn-win {
+      width: 19px; height: 19px; border-radius: 3px; border: 1px solid #ffffff;
+      display: flex; justify-content: center; align-items: center; font-size: 10px;
+      cursor: pointer; box-shadow: inset 0 1px 0 rgba(255,255,255,0.6);
+      background: linear-gradient(to bottom, #438bf5 0%, #165bca 100%); color: white;
+    }
+    .btn-win.close { background: linear-gradient(to bottom, #e87a55 0%, #c43509 100%); font-weight: bold; }
+    .btn-win:hover { filter: brightness(1.15); }
+
+    .window-body { background: linear-gradient(to bottom, #e4effb 0%, #b8d4f1 100%); padding: 12px; }
+    .main-card { background: #ffffff; border: 1px solid #7da2ce; border-radius: 12px; padding: 16px; box-shadow: inset 0 1px 3px rgba(0,0,0,0.1); }
+    .card-top { display: flex; justify-content: space-between; gap: 15px; margin-bottom: 12px; }
+    .logo-container { width: 40%; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+    .aoi-logo-svg { width: 140px; height: 90px; }
+    .form-container { width: 60%; display: flex; flex-direction: column; gap: 7px; }
+    .form-row { display: flex; align-items: center; justify-content: space-between; }
+    .form-row label { font-weight: bold; color: #1a3c63; width: 95px; }
+    .form-row input, .form-row select { flex: 1; padding: 3px 6px; font-size: 11px; font-family: Tahoma; border: 1px solid #7f9db9; }
+    .screen-name-select { background: #001275 !important; color: #ffffff !important; font-weight: bold; }
+    .actions-row { display: flex; justify-content: flex-end; gap: 8px; margin-top: 10px; }
+    .btn-options {
+      background: linear-gradient(to bottom, #ffffff 0%, #d8e5f2 100%);
+      border: 1px solid #5d8cb9; border-radius: 4px; padding: 4px 10px; font-size: 11px;
+      font-weight: bold; color: #0b3967; cursor: pointer;
+    }
+    .btn-signon {
+      background: linear-gradient(to bottom, #a3e874 0%, #4da722 50%, #307e0c 100%);
+      border: 1px solid #235c09; border-radius: 12px; padding: 5px 24px; font-size: 12px;
+      font-weight: bold; color: white; text-shadow: 1px 1px #164003; cursor: pointer;
+    }
+    .safety-panel { margin-top: 10px; border: 1px solid #9bbde2; border-radius: 6px; display: flex; background: #f7faff; font-size: 10px; }
+    .safety-col { flex: 1; padding: 6px 10px; }
+    .safety-col:first-child { border-right: 1px solid #9bbde2; }
+    .safety-header { font-weight: bold; color: #0a3d6d; margin-bottom: 4px; }
+    .safety-item { display: flex; justify-content: space-between; margin-bottom: 2px; }
+    .status-on { color: #008000; font-weight: bold; }
+
+    /* =========================================================
+       2. AOI HAUPTRAHMEN & SYSTEMLEISTEN
+       ========================================================= */
+    #desktop-shell { display: none; height: 100vh; flex-direction: column; }
+    
+    .menu-bar {
+      height: 22px; background: linear-gradient(to bottom, #eff5fc 0%, #d8e5f2 100%);
+      border-bottom: 1px solid #97b5d2; display: flex; align-items: center; padding: 0 8px; gap: 15px; color: #0b335e;
+    }
+    .menu-item { cursor: pointer; padding: 2px 4px; }
+    .menu-item:hover { background: #b8d4f1; border-radius: 2px; }
+
+    .icon-toolbar {
+      height: 52px; background: linear-gradient(to bottom, #d6e8f8 0%, #a2c6e6 50%, #87b4dd 51%, #a8cceb 100%);
+      border-bottom: 1px solid #6b9bc2; display: flex; align-items: center; justify-content: space-between; padding: 0 10px;
+    }
+    .toolbar-left, .toolbar-right { display: flex; align-items: center; gap: 8px; }
+    .tool-btn { display: flex; flex-direction: column; align-items: center; cursor: pointer; padding: 3px 6px; border-radius: 4px; position: relative; }
+    .tool-btn:hover { background: rgba(255,255,255,0.4); }
+    .tool-icon { font-size: 17px; filter: drop-shadow(1px 1px 1px rgba(0,0,0,0.3)); }
+    .tool-label { font-size: 10px; color: #072a50; font-weight: bold; margin-top: 1px; }
+    .mail-badge { position: absolute; top: -2px; left: 18px; background: #cc0000; color: white; font-size: 9px; font-weight: bold; padding: 0 4px; border-radius: 6px; border: 1px solid white; }
+
+    .address-bar-row {
+      height: 34px; background: linear-gradient(to bottom, #bdd8ee 0%, #90bde0 100%);
+      border-bottom: 1px solid #6897bf; display: flex; align-items: center; padding: 0 8px; gap: 6px;
+    }
+    .nav-

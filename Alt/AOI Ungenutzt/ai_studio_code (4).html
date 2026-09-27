@@ -1,0 +1,1007 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <title>AOI 9.0 Optimiert</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; user-select: none; }
+    body {
+      background: radial-gradient(circle at center, #9dbfe3 0%, #6893c5 100%);
+      font-family: "Tahoma", "MS Sans Serif", Segoe UI, sans-serif;
+      font-size: 11px;
+      height: 100vh;
+      overflow: hidden;
+    }
+
+    #mouse-shield {
+      position: fixed; inset: 0; z-index: 999999; display: none; background: transparent;
+    }
+
+    /* =========================================================
+       1. ANMELDE-FENSTER (SIGN-ON)
+       ========================================================= */
+    #signon-screen {
+      position: absolute; inset: 0; display: flex; justify-content: center;
+      align-items: center; background: radial-gradient(circle at center, #9dbfe3 0%, #5684be 100%);
+      z-index: 10000;
+    }
+    .xp-window {
+      width: 620px; background: #ece9d8; border: 3px solid #0055ea;
+      border-radius: 8px 8px 0 0; box-shadow: 4px 8px 25px rgba(0,0,0,0.5);
+    }
+    .title-bar {
+      height: 26px;
+      background: linear-gradient(to bottom, #0058ee 0%, #3593ff 10%, #288eff 30%, #0060ee 50%, #0052e0 80%, #003dd0 100%);
+      border-radius: 4px 4px 0 0; display: flex; justify-content: space-between;
+      align-items: center; padding: 0 6px; color: white; font-weight: bold;
+      text-shadow: 1px 1px #0f3789; cursor: move;
+    }
+    .title-left { display: flex; align-items: center; gap: 6px; }
+    .title-icon { width: 16px; height: 16px; }
+    .title-controls { display: flex; gap: 2px; }
+    .btn-win {
+      width: 19px; height: 19px; border-radius: 3px; border: 1px solid #ffffff;
+      display: flex; justify-content: center; align-items: center; font-size: 10px;
+      cursor: pointer; box-shadow: inset 0 1px 0 rgba(255,255,255,0.6);
+      background: linear-gradient(to bottom, #438bf5 0%, #165bca 100%); color: white;
+    }
+    .btn-win.close { background: linear-gradient(to bottom, #e87a55 0%, #c43509 100%); font-weight: bold; }
+    .btn-win:hover { filter: brightness(1.15); }
+
+    .window-body { background: linear-gradient(to bottom, #e4effb 0%, #b8d4f1 100%); padding: 12px; }
+    .main-card { background: #ffffff; border: 1px solid #7da2ce; border-radius: 12px; padding: 16px; box-shadow: inset 0 1px 3px rgba(0,0,0,0.1); }
+    .card-top { display: flex; justify-content: space-between; gap: 15px; margin-bottom: 12px; }
+    .logo-container { width: 40%; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+    .aoi-logo-svg { width: 140px; height: 90px; }
+    .form-container { width: 60%; display: flex; flex-direction: column; gap: 7px; }
+    .form-row { display: flex; align-items: center; justify-content: space-between; }
+    .form-row label { font-weight: bold; color: #1a3c63; width: 95px; }
+    .form-row input, .form-row select { flex: 1; padding: 3px 6px; font-size: 11px; font-family: Tahoma; border: 1px solid #7f9db9; }
+    .screen-name-select { background: #001275 !important; color: #ffffff !important; font-weight: bold; }
+    .actions-row { display: flex; justify-content: flex-end; gap: 8px; margin-top: 10px; }
+    .btn-options {
+      background: linear-gradient(to bottom, #ffffff 0%, #d8e5f2 100%);
+      border: 1px solid #5d8cb9; border-radius: 4px; padding: 4px 10px; font-size: 11px;
+      font-weight: bold; color: #0b3967; cursor: pointer;
+    }
+    .btn-signon {
+      background: linear-gradient(to bottom, #a3e874 0%, #4da722 50%, #307e0c 100%);
+      border: 1px solid #235c09; border-radius: 12px; padding: 5px 24px; font-size: 12px;
+      font-weight: bold; color: white; text-shadow: 1px 1px #164003; cursor: pointer;
+    }
+    .safety-panel { margin-top: 10px; border: 1px solid #9bbde2; border-radius: 6px; display: flex; background: #f7faff; font-size: 10px; }
+    .safety-col { flex: 1; padding: 6px 10px; }
+    .safety-col:first-child { border-right: 1px solid #9bbde2; }
+    .safety-header { font-weight: bold; color: #0a3d6d; margin-bottom: 4px; }
+    .safety-item { display: flex; justify-content: space-between; margin-bottom: 2px; }
+    .status-on { color: #008000; font-weight: bold; }
+
+    /* =========================================================
+       2. AOI HAUPTRAHMEN & SYSTEMLEISTEN
+       ========================================================= */
+    #desktop-shell { display: none; height: 100vh; flex-direction: column; }
+    
+    .menu-bar {
+      height: 22px; background: linear-gradient(to bottom, #eff5fc 0%, #d8e5f2 100%);
+      border-bottom: 1px solid #97b5d2; display: flex; align-items: center; padding: 0 8px; gap: 15px; color: #0b335e;
+    }
+    .menu-item { cursor: pointer; padding: 2px 4px; }
+    .menu-item:hover { background: #b8d4f1; border-radius: 2px; }
+
+    .icon-toolbar {
+      height: 52px; background: linear-gradient(to bottom, #d6e8f8 0%, #a2c6e6 50%, #87b4dd 51%, #a8cceb 100%);
+      border-bottom: 1px solid #6b9bc2; display: flex; align-items: center; justify-content: space-between; padding: 0 10px;
+    }
+    .toolbar-left, .toolbar-right { display: flex; align-items: center; gap: 8px; }
+    .tool-btn { display: flex; flex-direction: column; align-items: center; cursor: pointer; padding: 3px 6px; border-radius: 4px; position: relative; }
+    .tool-btn:hover { background: rgba(255,255,255,0.4); }
+    .tool-icon { font-size: 17px; filter: drop-shadow(1px 1px 1px rgba(0,0,0,0.3)); }
+    .tool-label { font-size: 10px; color: #072a50; font-weight: bold; margin-top: 1px; }
+    .mail-badge { position: absolute; top: -2px; left: 18px; background: #cc0000; color: white; font-size: 9px; font-weight: bold; padding: 0 4px; border-radius: 6px; border: 1px solid white; }
+
+    .address-bar-row {
+      height: 34px; background: linear-gradient(to bottom, #bdd8ee 0%, #90bde0 100%);
+      border-bottom: 1px solid #6897bf; display: flex; align-items: center; padding: 0 8px; gap: 6px;
+    }
+    .nav-btn { width: 22px; height: 22px; background: #f7fbff; border: 1px solid #5a8ab5; border-radius: 3px; cursor: pointer; display: flex; justify-content: center; align-items: center; font-weight: bold; color: #0b335e; }
+    .url-input-container { flex: 1; display: flex; align-items: center; background: #ffffff; border: 2px solid #55a024; border-radius: 3px; height: 24px; padding: 0 4px; }
+    .url-input { width: 100%; border: none; outline: none; font-family: Tahoma; font-size: 11px; }
+    .btn-go { background: linear-gradient(to bottom, #88d447 0%, #3e9818 100%); border: 1px solid #23600c; border-radius: 3px; color: white; font-weight: bold; padding: 3px 12px; font-size: 11px; cursor: pointer; }
+
+    /* =========================================================
+       3. DER MDI ARBEITSBEREICH & RESIZE SYSTEM
+       ========================================================= */
+    #mdi-workspace {
+      flex: 1; position: relative; overflow: hidden;
+      background: #c8d9e6 url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="300" height="300"><path d="M 0 150 Q 150 0 300 150" stroke="%23b3cadf" stroke-width="1.5" fill="none"/></svg>');
+    }
+
+    .mdi-window {
+      position: absolute; background: #ece9d8; border: 2px solid #0055ea;
+      border-radius: 6px 6px 0 0; box-shadow: 3px 5px 15px rgba(0,0,0,0.35);
+      display: flex; flex-direction: column; overflow: visible;
+    }
+    .mdi-window.active-win { border-color: #0055ea; box-shadow: 4px 6px 20px rgba(0,0,0,0.45); }
+    .mdi-window.inactive-win .title-bar {
+      background: linear-gradient(to bottom, #7a96df 0%, #a0b3e5 50%, #768fdb 100%) !important;
+      text-shadow: none !important; color: #e0e0e0 !important;
+    }
+
+    .mdi-window.maximized {
+      top: 0 !important; left: 0 !important; width: 100% !important; height: 100% !important;
+      border-radius: 0 !important; border: none !important;
+    }
+    .mdi-window.maximized .resizer { display: none !important; }
+    .mdi-window.minimized {
+      height: 28px !important; width: 160px !important; overflow: hidden !important;
+    }
+    .mdi-window.minimized .window-inner-content { display: none !important; }
+    .mdi-window.minimized .resizer { display: none !important; }
+
+    /* RESIZE HANDLES */
+    .resizer { position: absolute; z-index: 50; }
+    .resizer-r  { top: 0; right: -4px; width: 8px; height: 100%; cursor: ew-resize; }
+    .resizer-b  { bottom: -4px; left: 0; height: 8px; width: 100%; cursor: ns-resize; }
+    .resizer-l  { top: 0; left: -4px; width: 8px; height: 100%; cursor: ew-resize; }
+    .resizer-t  { top: -4px; left: 0; height: 8px; width: 100%; cursor: ns-resize; }
+    .resizer-br { bottom: -4px; right: -4px; width: 12px; height: 12px; cursor: nwse-resize; z-index: 60; }
+    .resizer-bl { bottom: -4px; left: -4px; width: 12px; height: 12px; cursor: nesw-resize; z-index: 60; }
+    .resizer-tr { top: -4px; right: -4px; width: 12px; height: 12px; cursor: nesw-resize; z-index: 60; }
+    .resizer-tl { top: -4px; left: -4px; width: 12px; height: 12px; cursor: nwse-resize; z-index: 60; }
+
+    .resize-grip {
+      position: absolute; bottom: 1px; right: 1px; width: 10px; height: 10px;
+      pointer-events: none; z-index: 45; opacity: 0.6;
+      background: radial-gradient(#333 1.5px, transparent 1.5px);
+      background-size: 3px 3px;
+    }
+
+    #minimized-bar {
+      position: absolute; bottom: 0; left: 0; right: 0; height: 30px;
+      display: flex; gap: 4px; padding: 2px 6px; pointer-events: none; z-index: 9999;
+    }
+    .min-task {
+      pointer-events: auto; width: 150px; height: 26px; background: #d4e4f7;
+      border: 1px solid #4a75a0; border-radius: 3px 3px 0 0; display: flex;
+      align-items: center; padding: 0 6px; font-weight: bold; font-size: 10px;
+      cursor: pointer; box-shadow: inset 0 1px 0 #fff; color: #083463;
+    }
+
+    /* =========================================================
+       4. SPEZIELLE FENSTER-INHALTE
+       ========================================================= */
+    /* 4.1 Breitband Portal */
+    .portal-banner {
+      height: 52px; background: linear-gradient(to right, #003399 0%, #3366cc 50%, #6699ff 100%);
+      color: white; display: flex; align-items: center; justify-content: space-between; padding: 0 16px;
+    }
+    .portal-banner h1 { font-size: 22px; font-style: italic; font-weight: 900; letter-spacing: -1px; text-shadow: 2px 2px 4px #000; }
+    .portal-body { flex: 1; display: flex; gap: 10px; padding: 10px; background: #ffffff; overflow-y: auto; }
+    .portal-main-news { flex: 2; border: 1px solid #bcd2ea; border-radius: 4px; padding: 10px; }
+    .portal-side-widgets { flex: 1; display: flex; flex-direction: column; gap: 10px; min-width: 140px; }
+    .widget-box { border: 1px solid #bcd2ea; border-radius: 4px; padding: 8px; background: #f6faff; }
+    .widget-title { font-weight: bold; color: #003399; margin-bottom: 4px; border-bottom: 1px solid #d0e0f2; padding-bottom: 2px; }
+
+    /* 4.2 Buddy-Liste Inhalt */
+    .buddy-tree { flex: 1; overflow-y: auto; padding: 6px; background: #ffffff; }
+    .buddy-group { font-weight: bold; color: #072f5a; margin: 4px 0 2px 0; cursor: pointer; }
+    .buddy-item { display: flex; align-items: center; gap: 6px; padding: 3px 6px; margin-left: 10px; cursor: pointer; border-radius: 3px; }
+    .buddy-item:hover { background: #ddecfa; }
+    .running-man { width: 12px; height: 12px; background: #f7c600; border: 1px solid #7d5c00; border-radius: 2px; display: inline-block; }
+    .buddy-footer-actions { background: #eaf2fb; border-top: 1px solid #a8cceb; padding: 6px; display: flex; flex-direction: column; gap: 6px; }
+    .buddy-btn-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; }
+    .buddy-act-btn { background: linear-gradient(to bottom, #ffffff 0%, #d8e7f5 100%); border: 1px solid #6b98c3; border-radius: 3px; padding: 3px 2px; font-size: 10px; font-weight: bold; color: #083463; cursor: pointer; text-align: center; }
+
+    /* 4.3 Postfach Inhalt */
+    .mail-tabs { display: flex; gap: 4px; padding: 6px 8px 0 8px; background: #d8e6f3; border-bottom: 1px solid #7faad0; }
+    .mail-tab { background: linear-gradient(to bottom, #f0f7fe 0%, #bad4ed 100%); border: 1px solid #6d96be; border-bottom: none; border-radius: 4px 4px 0 0; padding: 4px 14px; font-weight: bold; color: #07315c; cursor: pointer; }
+    .mail-tab.active { background: #ffffff; border-bottom: 1px solid #ffffff; margin-bottom: -1px; }
+    .mail-body-layout { flex: 1; display: flex; padding: 6px; gap: 6px; background: #ffffff; overflow: hidden; }
+    .mail-tree { width: 130px; border: 1px solid #7f9db9; padding: 4px; font-size: 11px; background: #fdfdfd; }
+    .mail-tree-item { padding: 2px 4px; cursor: pointer; }
+    .mail-tree-item.selected { background: #ff9900; color: white; font-weight: bold; }
+    .mail-grid-container { flex: 1; display: flex; flex-direction: column; gap: 6px; }
+    .mail-table-box { flex: 1; border: 1px solid #7f9db9; overflow-y: auto; }
+    .mail-table { width: 100%; border-collapse: collapse; font-size: 11px; }
+    .mail-table th { background: #ece9d8; border-bottom: 1px solid #999; padding: 3px 5px; text-align: left; font-size: 10px; color: #333; }
+    .mail-table td { padding: 3px 5px; border-bottom: 1px solid #eee; cursor: pointer; }
+    .mail-table tr:hover { background: #e5f1fb; }
+    .mail-table tr.unread { font-weight: bold; color: #000; }
+    .mail-preview-box { height: 85px; border: 1px solid #7f9db9; background: #fffff8; padding: 6px; overflow-y: auto; font-size: 11px; }
+    .mail-actions-bar { display: flex; justify-content: space-between; padding: 4px 6px; background: #eaf2fb; border-top: 1px solid #c2d8ed; }
+
+    /* 4.4 Sofortnachricht Inhalt */
+    .im-history { flex: 1; background: #ffffff; margin: 6px; border: 1px solid #7f9db9; padding: 6px; overflow-y: auto; }
+    .im-input-box { height: 40px; margin: 0 6px 6px 6px; background: #ffffff; border: 1px solid #7f9db9; padding: 4px; outline: none; font-family: Tahoma; }
+
+    /* 4.5 Linkes Navigationspanel (Kanäle) */
+    .nav-icon-grid {
+      display: grid; grid-template-columns: 1fr 1fr; gap: 6px; padding: 8px;
+      background: #f0f6fc; border-bottom: 1px solid #bed6ec;
+    }
+    .nav-grid-item {
+      display: flex; flex-direction: column; align-items: center; cursor: pointer;
+      font-size: 10px; color: #083463; font-weight: bold;
+    }
+    .nav-grid-item:hover { color: #d05800; }
+    .nav-category { border-bottom: 1px solid #dae7f4; }
+    .nav-cat-header {
+      background: linear-gradient(to bottom, #4f96d6 0%, #206ab1 100%);
+      color: white; font-weight: bold; padding: 4px 8px; font-size: 10px;
+      display: flex; justify-content: space-between; cursor: pointer;
+    }
+    .nav-cat-list { list-style: none; padding: 4px 8px; }
+    .nav-cat-list li { padding: 3px 0; color: #08386c; cursor: pointer; font-size: 11px; }
+    .nav-cat-list li:hover { color: #d05800; text-decoration: underline; }
+  </style>
+</head>
+<body>
+
+  <div id="mouse-shield"></div>
+
+  <!-- AUDIO-ELEMENTE -->
+  <audio id="snd-mail" src="post.mp3" preload="auto"></audio>
+  <audio id="snd-door-open" src="door_open.mp3" preload="auto"></audio>
+  <audio id="snd-door-close" src="door_close.mp3" preload="auto"></audio>
+
+  <!-- ================= 1. ANMELDE-BILDSCHIRM ================= -->
+  <div id="signon-screen">
+    <div class="xp-window">
+      <div class="title-bar">
+        <div class="title-left">
+          <svg class="title-icon" viewBox="0 0 100 100">
+            <polygon points="50,10 90,85 10,85" fill="#ffffff" stroke="#003dd0" stroke-width="6"/>
+            <ellipse cx="50" cy="55" rx="20" ry="12" fill="#0055ea" />
+            <circle cx="50" cy="55" r="6" fill="#ffffff" />
+          </svg>
+          <span>AOI 9.0 Optimiert - Anmelden</span>
+        </div>
+        <div class="title-controls"><div class="btn-win close">✕</div></div>
+      </div>
+      <div class="window-body">
+        <div style="display:flex; justify-content:flex-end; margin-bottom: 8px;">
+          <button class="btn-options">Hilfe</button>
+        </div>
+        <div class="main-card">
+          <div class="card-top">
+            <div class="logo-container">
+              <svg class="aoi-logo-svg" viewBox="0 0 260 140">
+                <polygon points="65,15 115,105 15,105" fill="url(#blueGrad)" stroke="#003580" stroke-width="4"/>
+                <ellipse cx="65" cy="68" rx="22" ry="14" fill="#ffffff" />
+                <ellipse cx="65" cy="68" rx="11" ry="11" fill="#0058ee" />
+                <circle cx="65" cy="68" r="5" fill="#031b4d" />
+                <circle cx="62" cy="65" r="2.5" fill="#ffffff" />
+                <text x="125" y="65" font-family="'Trebuchet MS', Arial" font-weight="900" font-size="44" fill="#0048aa">AOI</text>
+                <text x="125" y="92" font-family="Arial" font-weight="bold" font-size="20" fill="#e89d1b">9.0</text>
+                <rect x="160" y="80" width="80" height="13" rx="3" fill="#e89d1b" />
+                <text x="163" y="90" font-family="Arial" font-weight="bold" font-size="9" fill="#ffffff">OPTIMIERT</text>
+                <defs>
+                  <linearGradient id="blueGrad" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stop-color="#4aa4ff" /><stop offset="100%" stop-color="#0037a3" /></linearGradient>
+                </defs>
+              </svg>
+            </div>
+            <div class="form-container">
+              <div class="form-row">
+                <label>Hauptname:</label>
+                <select id="user-screenname" class="screen-name-select">
+                  <option value="RetroSurfer">RetroSurfer</option>
+                  <option value="Klaus2003">Klaus2003</option>
+                </select>
+              </div>
+              <div class="form-row"><label>Kennwort:</label><input type="password" value="geheim123"></div>
+              <div class="form-row"><label>AHPT-Server:</label><input type="text" value="https://mein-webspace.de/aoi/cloud/"></div>
+              <div class="form-row"><label>E-Mail-Konto:</label><input type="text" value="klaus@web.de"></div>
+              <div class="actions-row">
+                <button class="btn-options" onclick="window.open('https://mail.aol.com','_blank')">AOL-Mail holen</button>
+                <button class="btn-signon" id="signon-btn" onclick="startSignOn()">Anmelden</button>
+              </div>
+            </div>
+          </div>
+          <div class="safety-panel">
+            <div class="safety-col">
+              <div class="safety-header">🛡 Sicherheit bei AOI</div>
+              <div class="safety-item"><span>E-Mail Spamschutz</span><span class="status-on">EIN</span></div>
+              <div class="safety-item"><span>Virenschutz</span><span class="status-on">EIN</span></div>
+            </div>
+            <div class="safety-col">
+              <div class="safety-header">💻 Sicherheit auf meinem PC</div>
+              <div class="safety-item"><span>Firewall</span><span class="status-on">Aktiv</span></div>
+              <div class="safety-item"><span>AOI Schutzschild</span><span class="status-on">Läuft</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ================= 2. AOI HAUPTPROGRAMM ================= -->
+  <div id="desktop-shell">
+    
+    <!-- Menüzeile -->
+    <div class="menu-bar">
+      <span class="menu-item">Datei</span>
+      <span class="menu-item">Bearbeiten</span>
+      <span class="menu-item" onclick="openWindow('win-mailbox')">Post</span>
+      <span class="menu-item" onclick="openWindow('win-buddylist')">Freunde</span>
+      <span class="menu-item" onclick="toggleWindow('win-navigation')">Kanäle</span>
+      <span class="menu-item" onclick="openWindow('win-main')">Willkommen</span>
+      <span class="menu-item" style="color:#b31e00; font-weight:bold;" onclick="doSignOff()">Abmelden</span>
+      <span class="menu-item">Hilfe</span>
+    </div>
+
+    <!-- Große 3D Iconleiste -->
+    <div class="icon-toolbar">
+      <div class="toolbar-left">
+        <div class="tool-btn" onclick="openWindow('win-mailbox')">
+          <span class="mail-badge" id="mail-counter">3</span>
+          <span class="tool-icon">📬</span>
+          <span class="tool-label">Lesen</span>
+        </div>
+        <div class="tool-btn" onclick="alert('Neue E-Mail verfassen...')">
+          <span class="tool-icon">✍️</span>
+          <span class="tool-label">Schreiben</span>
+        </div>
+        <div class="tool-btn" onclick="openIM('SurfinJerry')">
+          <span class="tool-icon">🏃</span>
+          <span class="tool-label">Nachricht</span>
+        </div>
+        <div class="tool-btn" onclick="openWindow('win-buddylist')">
+          <span class="tool-icon">👥</span>
+          <span class="tool-label">Buddies</span>
+        </div>
+        <div class="tool-btn" onclick="toggleWindow('win-navigation')">
+          <span class="tool-icon">🧭</span>
+          <span class="tool-label">Kanäle</span>
+        </div>
+        <div class="tool-btn"><span class="tool-icon">🛡️</span><span class="tool-label">Sicherheit</span></div>
+        <div class="tool-btn"><span class="tool-icon">⚙️</span><span class="tool-label">Einstellungen</span></div>
+      </div>
+      <div class="toolbar-right">
+        <div class="tool-btn" onclick="openWindow('win-main')"><span class="tool-icon">🌐</span><span class="tool-label">Portal</span></div>
+        <svg style="width:30px; height:30px;" viewBox="0 0 100 100">
+          <polygon points="50,10 90,85 10,85" fill="#0058ee" stroke="#ffffff" stroke-width="4"/>
+          <circle cx="50" cy="55" r="8" fill="#ffffff" />
+        </svg>
+      </div>
+    </div>
+
+    <!-- Adressleiste -->
+    <div class="address-bar-row">
+      <button class="nav-btn" onclick="restorePortal()">🏠</button>
+      <button class="nav-btn">◀</button>
+      <button class="nav-btn">▶</button>
+      <button class="btn-options" style="font-size:10px; padding:2px 8px;">Schnellstart</button>
+      <div class="url-input-container">
+        <input type="text" id="url-bar" class="url-input" value="aoi://willkommen" onkeydown="if(event.key==='Enter') navigateUrl()">
+      </div>
+      <button class="btn-go" onclick="navigateUrl()">Los</button>
+      <button class="btn-options" style="font-size:10px; padding:2px 8px;">Favoriten ▾</button>
+    </div>
+
+    <!-- =========================================================
+         MDI ARBEITSFLÄCHE
+         ========================================================= -->
+    <div id="mdi-workspace">
+
+      <!-- FENSTER 0: KANÄLE (EXAKT LINKS PLATZIERT) -->
+      <div class="mdi-window" id="win-navigation" style="top: 4px; left: 4px; width: 165px; height: 520px; z-index: 9;">
+        <div class="title-bar" onmousedown="focusAndDrag(event, 'win-navigation')">
+          <div class="title-left">
+            <span>🧭 AOI Kanäle</span>
+          </div>
+          <div class="title-controls">
+            <div class="btn-win" onclick="minimizeWindow('win-navigation')">_</div>
+            <div class="btn-win close" onclick="closeWindow('win-navigation')">✕</div>
+          </div>
+        </div>
+
+        <div class="window-inner-content" style="flex:1; display:flex; flex-direction:column; overflow-y:auto; background:#ffffff;">
+          <div class="nav-icon-grid">
+            <div class="nav-grid-item" onclick="navigateKeyword('suche')"><span>🔍</span>Suchen</div>
+            <div class="nav-grid-item" onclick="navigateKeyword('stichwort')"><span>🔤</span>Stichwort</div>
+            <div class="nav-grid-item"><span>🛍️</span>Einkaufen</div>
+            <div class="nav-grid-item"><span>🗺️</span>Karten</div>
+          </div>
+
+          <div class="nav-category">
+            <div class="nav-cat-header">Information <span>▸</span></div>
+            <ul class="nav-cat-list">
+              <li onclick="navigateKeyword('nachrichten')">Nachrichten</li>
+              <li onclick="navigateKeyword('wetter')">Wetterbericht</li>
+              <li onclick="navigateKeyword('finanzen')">Finanzen & Börse</li>
+              <li onclick="navigateKeyword('sport')">Sport</li>
+            </ul>
+          </div>
+
+          <div class="nav-category">
+            <div class="nav-cat-header">Unterhaltung <span>▸</span></div>
+            <ul class="nav-cat-list">
+              <li>Kino & Filme</li>
+              <li>Spiele</li>
+              <li>Musik</li>
+            </ul>
+          </div>
+
+          <div class="nav-category">
+            <div class="nav-cat-header">Ressourcen <span>▸</span></div>
+            <ul class="nav-cat-list">
+              <li>Computer & Technik</li>
+              <li>Reisen</li>
+              <li>Auto & Motor</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+
+      <!-- FENSTER 1: HAUPTFENSTER (EXAKT ZWISCHEN KANÄLEN UND BUDDYLISTE) -->
+      <div class="mdi-window active-win" id="win-main" style="top: 4px; left: 174px; width: calc(100% - 398px); height: calc(100% - 8px); z-index: 10;">
+        <div class="title-bar" onmousedown="focusAndDrag(event, 'win-main')">
+          <div class="title-left">
+            <span>🌐 Willkommen bei AOI 9.0 Breitband</span>
+          </div>
+          <div class="title-controls">
+            <div class="btn-win" onclick="minimizeWindow('win-main')">_</div>
+            <div class="btn-win" onclick="toggleMaximize('win-main')">□</div>
+            <div class="btn-win close" onclick="closeWindow('win-main')">✕</div>
+          </div>
+        </div>
+
+        <div class="window-inner-content" style="flex:1; display:flex; flex-direction:column; overflow:hidden;">
+          <div id="portal-view" style="flex:1; display:flex; flex-direction:column; overflow-y:auto;">
+            <div class="portal-banner">
+              <div>
+                <span style="font-size:12px; font-weight:bold; letter-spacing:1px; opacity:0.8;">WILLKOMMEN</span>
+                <h1>AOI FÜR BREITBAND</h1>
+              </div>
+              <div style="text-align:right; font-size:10px;">
+                <b>26. September 2026</b><br>
+                Status: Verbunden (DSL 6000)
+              </div>
+            </div>
+
+            <div class="portal-body">
+              <div class="portal-main-news">
+                <div style="font-size:16px; font-weight:bold; color:#0b3464; margin-bottom:8px;">
+                  🚴 Neuer Etappensieg bei der Tour de France!
+                </div>
+                <div style="display:flex; gap:10px;">
+                  <div style="width:140px; height:100px; background:#205596; border-radius:4px; display:flex; align-items:center; justify-content:center; color:white; font-weight:bold; font-size:10px; text-align:center; padding:4px;">
+                    [ Radsport Foto ]<br>Spitzengruppe im Zielsprint
+                  </div>
+                  <div style="flex:1; font-size:11px; line-height:1.4; color:#333;">
+                    Die Entscheidung fiel erst auf den letzten Metern vor dem Ziel. Mit einem energischen Antritt sicherte sich der Ausreißer den Tagessieg auf der schweren Bergetappe.<br><br>
+                    <a href="javascript:void(0)" onclick="alert('Mehr Sportnachrichten werden geladen...')" style="color:#0044bb; font-weight:bold;">Vollständigen Bericht lesen ▸</a>
+                  </div>
+                </div>
+
+                <div style="margin-top:14px; border-top:1px solid #dae7f4; padding-top:10px;">
+                  <b>Top-Themen heute:</b>
+                  <ul style="margin-left:18px; margin-top:4px; color:#0b3464; line-height:1.5;">
+                    <li><a href="javascript:void(0)">Großes Update für AOI 9.0 Optimiert veröffentlicht</a></li>
+                    <li><a href="javascript:void(0)">Fensterplatzierung entspricht exakt der Bildvorlage</a></li>
+                    <li><a href="javascript:void(0)">Die besten Retro-Hits des Monats im AOI Radio</a></li>
+                  </ul>
+                </div>
+              </div>
+
+              <div class="portal-side-widgets">
+                <div class="widget-box">
+                  <div class="widget-title">☀️ Wetter aktuell</div>
+                  <div style="font-size:18px; font-weight:bold; color:#d05800;">22°C Heiter</div>
+                  <div style="color:#555; margin-top:2px;">Berlin & Umland</div>
+                  <div style="font-size:10px; color:#777; margin-top:4px;">Morgen: 20°C leicht bewölkt</div>
+                </div>
+
+                <div class="widget-box">
+                  <div class="widget-title">📬 Mein Postfach</div>
+                  <div>Sie haben <b>3 neue</b> E-Mails!</div>
+                  <button class="btn-options" style="margin-top:6px; width:100%;" onclick="openWindow('win-mailbox')">Post jetzt öffnen</button>
+                </div>
+
+                <div class="widget-box" style="background:#eaf2fb;">
+                  <div class="widget-title">🔍 AOI Suche</div>
+                  <input type="text" style="width:100%; padding:2px; font-size:11px; border:1px solid #7f9db9;" placeholder="Suchbegriff...">
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <iframe id="browser-frame" style="display:none; flex:1; border:none; background:#fff;"></iframe>
+        </div>
+      </div>
+
+      <!-- FENSTER 2: BUDDY-LISTE (EXAKT RECHTS VON OBEN BIS UNTEN) -->
+      <div class="mdi-window" id="win-buddylist" style="top: 4px; right: 4px; width: 215px; height: calc(100% - 8px); z-index: 12;">
+        <div class="title-bar" onmousedown="focusAndDrag(event, 'win-buddylist')">
+          <div class="title-left">
+            <span>🏃 Buddy-Liste ®</span>
+          </div>
+          <div class="title-controls">
+            <div class="btn-win" onclick="minimizeWindow('win-buddylist')">_</div>
+            <div class="btn-win" onclick="toggleMaximize('win-buddylist')">□</div>
+            <div class="btn-win close" onclick="closeWindow('win-buddylist')">✕</div>
+          </div>
+        </div>
+
+        <div class="window-inner-content" style="flex:1; display:flex; flex-direction:column; overflow:hidden;">
+          <div class="buddy-tree">
+            <div class="buddy-group">▾ Buddies (3/5)</div>
+            <div class="buddy-item" onclick="openIM('SurfinJerry')">
+              <span class="running-man"></span>
+              <span>SurfinJerry</span>
+            </div>
+            <div class="buddy-item" onclick="openIM('InternetAnne')">
+              <span class="running-man"></span>
+              <span>InternetAnne</span>
+            </div>
+            <div class="buddy-item" onclick="openIM('DJ_Emm_Pea_Three')">
+              <span class="running-man"></span>
+              <span>DJ_Emm_Pea_3</span>
+            </div>
+
+            <div class="buddy-group" style="margin-top:8px;">▸ Kollegen (0/2)</div>
+            <div class="buddy-group">▸ Familie (0/3)</div>
+          </div>
+
+          <div class="buddy-footer-actions">
+            <div class="buddy-btn-grid">
+              <button class="buddy-act-btn" onclick="openIM('SurfinJerry')">Nachricht</button>
+              <button class="buddy-act-btn" onclick="simulateBuddyToggle()">Test: Tür</button>
+              <button class="buddy-act-btn" onclick="alert('Buddy-Info: SurfinJerry ist seit 14:15 Uhr online.')">Info</button>
+              <button class="buddy-act-btn" onclick="alert('Adressbuch mit 12 Kontakten.')">Adressbuch</button>
+            </div>
+            <div style="font-size:9px; text-align:center; color:#555;">AOI-Stichwort: <b>Buddy</b></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- FENSTER 3: POSTFACH (FESTE ANORDNUNG WIE IM SCREENSHOT) -->
+      <div class="mdi-window" id="win-mailbox" style="top: 90px; left: 320px; width: 960px; height: 540px; z-index: 25; display:none;">
+        <div class="title-bar" onmousedown="focusAndDrag(event, 'win-mailbox')">
+          <div class="title-left">
+            <span>📬 Postfach von RetroSurfer</span>
+          </div>
+          <div class="title-controls">
+            <div class="btn-win" onclick="minimizeWindow('win-mailbox')">_</div>
+            <div class="btn-win" onclick="toggleMaximize('win-mailbox')">□</div>
+            <div class="btn-win close" onclick="closeWindow('win-mailbox')">✕</div>
+          </div>
+        </div>
+
+        <div class="window-inner-content" style="flex:1; display:flex; flex-direction:column; overflow:hidden;">
+          <div class="mail-tabs">
+            <div class="mail-tab active" id="tab-new" onclick="selectMailTab('new')">Neu (3)</div>
+            <div class="mail-tab" id="tab-old" onclick="selectMailTab('old')">Alt</div>
+            <div class="mail-tab" id="tab-sent" onclick="selectMailTab('sent')">Gesendet</div>
+          </div>
+
+          <div class="mail-body-layout">
+            <div class="mail-tree">
+              <div class="mail-tree-item selected">📁 Posteingang</div>
+              <div class="mail-tree-item" style="margin-left:8px;">↳ Neu (3)</div>
+              <div class="mail-tree-item" style="margin-left:8px;">↳ Gelesen</div>
+              <div class="mail-tree-item">📁 Gesendet</div>
+              <div class="mail-tree-item">📁 Papierkorb</div>
+              <div class="mail-tree-item">💾 Auf meinem PC</div>
+            </div>
+
+            <div class="mail-grid-container">
+              <div class="mail-table-box">
+                <table class="mail-table">
+                  <thead>
+                    <tr><th>Typ</th><th>Datum</th><th>Absender</th><th>Betreff</th></tr>
+                  </thead>
+                  <tbody>
+                    <tr class="unread" onclick="previewMail('Steve Case', 'Willkommen bei AOI 9.0!', 'Hallo RetroSurfer! Willkommen in der Zukunft von AOI. Die Fensterplatzierung entspricht jetzt exakt deiner Vorgabe!')">
+                      <td>✉️</td><td>Heute</td><td>Steve Case</td><td>Willkommen bei AOI 9.0!</td>
+                    </tr>
+                    <tr class="unread" onclick="previewMail('SurfinJerry', 'Bist du online?', 'Hey! Schreib mir mal im Sofortnachrichten-Fenster. Die Tür-Sounds klingen richtig genial.')">
+                      <td>✉️</td><td>Heute</td><td>SurfinJerry</td><td>Bist du online?</td>
+                    </tr>
+                    <tr class="unread" onclick="previewMail('AHPT Cloud', 'Tunnel bereit', 'Dein asymmetrischer HTTP Polling Tunnel auf deinem Webspace ist aktiv und empfangsbereit für WebRTC.')">
+                      <td>✉️</td><td>Gestern</td><td>AHPT Cloud</td><td>Tunnel bereit</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+              <div class="mail-preview-box" id="mail-preview">
+                <i>Klicke auf eine E-Mail, um die Schnellansicht zu lesen...</i>
+              </div>
+            </div>
+          </div>
+
+          <div class="mail-actions-bar">
+            <div style="display:flex; gap:4px;">
+              <button class="btn-options" onclick="alert('E-Mail wird im Lesefenster geöffnet...')">Lesen</button>
+              <button class="btn-options">Speichern ▾</button>
+              <button class="btn-options">Löschen</button>
+            </div>
+            <button class="btn-options" onclick="playSound('snd-mail')">🔔 Sound wiederholen</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- FENSTER 4: SOFORTNACHRICHT (FESTE ANORDNUNG UNTEN RECHTS) -->
+      <div class="mdi-window" id="win-im" style="bottom: 25px; right: 15px; width: 315px; height: 310px; z-index: 30; display:none;">
+        <div class="title-bar" onmousedown="focusAndDrag(event, 'win-im')">
+          <div class="title-left">
+            <span id="im-title">Sofortnachricht mit...</span>
+          </div>
+          <div class="title-controls">
+            <div class="btn-win" onclick="minimizeWindow('win-im')">_</div>
+            <div class="btn-win" onclick="toggleMaximize('win-im')">□</div>
+            <div class="btn-win close" onclick="closeWindow('win-im')">✕</div>
+          </div>
+        </div>
+
+        <div class="window-inner-content" style="flex:1; display:flex; flex-direction:column; overflow:hidden;">
+          <div class="im-history" id="im-chat-log">
+            <div style="color:#888; font-style:italic;">Direkte P2P-Verbindung via WebRTC aufgebaut.</div>
+          </div>
+          <input type="text" id="im-message-input" class="im-input-box" placeholder="Nachricht eingeben..." onkeydown="if(event.key==='Enter') sendIMMessage()">
+        </div>
+      </div>
+
+      <!-- LEISTE FÜR MINIMIERTE FENSTER AM UNTEREN RAND -->
+      <div id="minimized-bar"></div>
+
+    </div>
+  </div>
+
+  <!-- =========================================================
+       5. JAVASCRIPT: WINDOW-MANAGER MIT FESTEN STANDARDPOSITIONEN
+       ========================================================= -->
+  <script>
+    let topZIndex = 35;
+
+    // Feste Standardpositionen wie im Screenshot definiert
+    function applyDefaultPosition(winId) {
+      const win = document.getElementById(winId);
+      if (!win) return;
+      win.classList.remove('maximized');
+
+      if (winId === 'win-mailbox') {
+        win.style.top = '90px';
+        win.style.left = '320px';
+        win.style.width = '960px';
+        win.style.height = '540px';
+      } else if (winId === 'win-im') {
+        const ws = document.getElementById('mdi-workspace');
+        win.style.width = '315px';
+        win.style.height = '310px';
+        win.style.left = Math.max(10, ws.clientWidth - 315 - 15) + 'px';
+        win.style.top = Math.max(10, ws.clientHeight - 310 - 25) + 'px';
+      }
+    }
+
+    function bringToFront(winId) {
+      topZIndex++;
+      const win = document.getElementById(winId);
+      if (win) {
+        win.style.zIndex = topZIndex;
+        document.querySelectorAll('.mdi-window').forEach(w => {
+          w.classList.remove('active-win');
+          w.classList.add('inactive-win');
+        });
+        win.classList.remove('inactive-win');
+        win.classList.add('active-win');
+      }
+    }
+
+    // Fenster öffnen: Setzt Chat und Mailbox immer exakt an ihre Soll-Position!
+    function openWindow(winId) {
+      const win = document.getElementById(winId);
+      if (win) {
+        if (win.classList.contains('minimized')) {
+          restoreWindow(winId);
+        } else {
+          // Immer an die Standardkoordinaten aus dem Screenshot setzen
+          if (winId === 'win-mailbox' || winId === 'win-im') {
+            applyDefaultPosition(winId);
+          }
+          win.style.display = 'flex';
+          bringToFront(winId);
+        }
+      }
+      if (winId === 'win-mailbox') {
+        playSound('snd-mail');
+      }
+    }
+
+    function toggleWindow(winId) {
+      const win = document.getElementById(winId);
+      if (win.style.display === 'none' || win.classList.contains('minimized')) {
+        openWindow(winId);
+      } else {
+        closeWindow(winId);
+      }
+    }
+
+    function closeWindow(winId) {
+      const win = document.getElementById(winId);
+      if (win) win.style.display = 'none';
+      removeMinTab(winId);
+    }
+
+    function toggleMaximize(winId) {
+      const win = document.getElementById(winId);
+      bringToFront(winId);
+      if (win.classList.contains('maximized')) {
+        win.classList.remove('maximized');
+        win.style.left = win.dataset.origLeft || '50px';
+        win.style.top = win.dataset.origTop || '50px';
+        win.style.width = win.dataset.origWidth || '500px';
+        win.style.height = win.dataset.origHeight || '400px';
+      } else {
+        win.dataset.origLeft = win.style.left;
+        win.dataset.origTop = win.style.top;
+        win.dataset.origWidth = win.style.width;
+        win.dataset.origHeight = win.style.height;
+        win.classList.add('maximized');
+      }
+    }
+
+    function minimizeWindow(winId) {
+      const win = document.getElementById(winId);
+      win.style.display = 'none';
+      win.classList.add('minimized');
+      addMinTab(winId);
+    }
+
+    function restoreWindow(winId) {
+      const win = document.getElementById(winId);
+      win.classList.remove('minimized');
+      win.style.display = 'flex';
+      bringToFront(winId);
+      removeMinTab(winId);
+    }
+
+    function addMinTab(winId) {
+      if (document.getElementById('mintab-' + winId)) return;
+      const bar = document.getElementById('minimized-bar');
+      const title = document.querySelector(`#${winId} .title-left span`).innerText;
+      const tab = document.createElement('div');
+      tab.id = 'mintab-' + winId;
+      tab.className = 'min-task';
+      tab.innerText = '🗔 ' + title;
+      tab.onclick = () => restoreWindow(winId);
+      bar.appendChild(tab);
+    }
+
+    function removeMinTab(winId) {
+      const tab = document.getElementById('mintab-' + winId);
+      if (tab) tab.remove();
+    }
+
+    // ================= DRAG LOGIK =================
+    let dragElem = null;
+    let dragStartX = 0, dragStartY = 0;
+    let initialX = 0, initialY = 0;
+
+    function focusAndDrag(e, winId) {
+      if (e.target.closest('.title-controls')) return;
+      bringToFront(winId);
+      const win = document.getElementById(winId);
+      if (win.classList.contains('maximized')) return;
+
+      dragElem = win;
+      dragStartX = e.clientX;
+      dragStartY = e.clientY;
+      initialX = win.offsetLeft;
+      initialY = win.offsetTop;
+
+      document.getElementById('mouse-shield').style.display = 'block';
+      document.getElementById('mouse-shield').style.cursor = 'move';
+
+      document.addEventListener('mousemove', onDragging);
+      document.addEventListener('mouseup', stopDragging);
+    }
+
+    function onDragging(e) {
+      if (!dragElem) return;
+      const dx = e.clientX - dragStartX;
+      const dy = e.clientY - dragStartY;
+      dragElem.style.left = (initialX + dx) + 'px';
+      dragElem.style.top = (initialY + dy) + 'px';
+    }
+
+    function stopDragging() {
+      document.removeEventListener('mousemove', onDragging);
+      document.removeEventListener('mouseup', stopDragging);
+      document.getElementById('mouse-shield').style.display = 'none';
+      dragElem = null;
+    }
+
+    // ================= RESIZE LOGIK (8 WEGE) =================
+    let resizeWin = null;
+    let resizeDir = '';
+    let startW = 0, startH = 0, startL = 0, startT = 0, startMouseX = 0, startMouseY = 0;
+    const minWidth = 160, minHeight = 120;
+
+    function initResizers() {
+      const dirs = ['r', 'b', 'l', 't', 'br', 'bl', 'tr', 'tl'];
+      document.querySelectorAll('.mdi-window').forEach(win => {
+        win.addEventListener('mousedown', () => bringToFront(win.id));
+
+        dirs.forEach(d => {
+          const r = document.createElement('div');
+          r.className = `resizer resizer-${d}`;
+          r.addEventListener('mousedown', (e) => startResizing(e, win, d));
+          win.appendChild(r);
+        });
+
+        const grip = document.createElement('div');
+        grip.className = 'resize-grip';
+        win.appendChild(grip);
+      });
+    }
+
+    function startResizing(e, win, direction) {
+      if (win.classList.contains('maximized')) return;
+      e.stopPropagation();
+      bringToFront(win.id);
+
+      resizeWin = win;
+      resizeDir = direction;
+      startMouseX = e.clientX;
+      startMouseY = e.clientY;
+      startW = win.offsetWidth;
+      startH = win.offsetHeight;
+      startL = win.offsetLeft;
+      startT = win.offsetTop;
+
+      const shield = document.getElementById('mouse-shield');
+      shield.style.display = 'block';
+      shield.style.cursor = window.getComputedStyle(e.target).cursor;
+
+      document.addEventListener('mousemove', onResizing);
+      document.addEventListener('mouseup', stopResizing);
+    }
+
+    function onResizing(e) {
+      if (!resizeWin) return;
+      const dx = e.clientX - startMouseX;
+      const dy = e.clientY - startMouseY;
+
+      if (resizeDir.includes('r')) {
+        const newW = Math.max(minWidth, startW + dx);
+        resizeWin.style.width = newW + 'px';
+      }
+      if (resizeDir.includes('l')) {
+        const newW = Math.max(minWidth, startW - dx);
+        if (newW > minWidth) {
+          resizeWin.style.width = newW + 'px';
+          resizeWin.style.left = (startL + dx) + 'px';
+        }
+      }
+
+      if (resizeDir.includes('b')) {
+        const newH = Math.max(minHeight, startH + dy);
+        resizeWin.style.height = newH + 'px';
+      }
+      if (resizeDir.includes('t')) {
+        const newH = Math.max(minHeight, startH - dy);
+        if (newH > minHeight) {
+          resizeWin.style.height = newH + 'px';
+          resizeWin.style.top = (startT + dy) + 'px';
+        }
+      }
+    }
+
+    function stopResizing() {
+      document.removeEventListener('mousemove', onResizing);
+      document.removeEventListener('mouseup', stopResizing);
+      document.getElementById('mouse-shield').style.display = 'none';
+      resizeWin = null;
+    }
+
+    // ================= SOUND & LOGIN =================
+    function playSound(id) {
+      const snd = document.getElementById(id);
+      if (snd) {
+        snd.currentTime = 0;
+        snd.play().catch(e => console.log("Audio blockiert:", e));
+      }
+    }
+
+    let doorState = false;
+    function simulateBuddyToggle() {
+      doorState = !doorState;
+      playSound(doorState ? 'snd-door-open' : 'snd-door-close');
+    }
+
+    function startSignOn() {
+      const btn = document.getElementById('signon-btn');
+      btn.innerText = "Verbinde...";
+      setTimeout(() => { btn.innerText = "Handshake..."; }, 600);
+      setTimeout(() => {
+        document.getElementById('signon-screen').style.display = 'none';
+        document.getElementById('desktop-shell').style.display = 'flex';
+        playSound('snd-mail'); // "Sie haben Post!"
+      }, 1400);
+    }
+
+    function doSignOff() {
+      if (confirm("Möchten Sie sich von AOI abmelden?")) {
+        playSound('snd-door-close');
+        document.getElementById('desktop-shell').style.display = 'none';
+        document.getElementById('signon-screen').style.display = 'flex';
+        document.getElementById('signon-btn').innerText = "Anmelden";
+      }
+    }
+
+    // ================= PORTAL & BROWSER =================
+    function restorePortal() {
+      document.getElementById('portal-view').style.display = 'flex';
+      document.getElementById('browser-frame').style.display = 'none';
+      document.getElementById('url-bar').value = 'aoi://willkommen';
+      openWindow('win-main');
+    }
+
+    function navigateUrl() {
+      let val = document.getElementById('url-bar').value.trim();
+      if (val === 'aoi://willkommen' || val === '') {
+        restorePortal();
+        return;
+      }
+      if (!val.startsWith('http://') && !val.startsWith('https://')) {
+        val = 'https://' + val;
+      }
+      openWindow('win-main');
+      document.getElementById('portal-view').style.display = 'none';
+      const frame = document.getElementById('browser-frame');
+      frame.style.display = 'block';
+      frame.src = val;
+    }
+
+    function navigateKeyword(kw) {
+      document.getElementById('url-bar').value = "aoi://" + kw;
+      if (kw === 'wetter') {
+        alert("Wetter-Portal wird aufgerufen...");
+      } else if (kw === 'nachrichten') {
+        alert("Nachrichten-Portal wird aufgerufen...");
+      } else {
+        alert("AOI-Stichwort: " + kw);
+      }
+    }
+
+    // ================= CHAT & POSTFACH =================
+    let currentIMBuddy = "";
+    function openIM(name) {
+      currentIMBuddy = name;
+      document.getElementById('im-title').innerText = "Sofortnachricht mit " + name;
+      openWindow('win-im');
+      document.getElementById('im-message-input').focus();
+    }
+
+    function sendIMMessage() {
+      const input = document.getElementById('im-message-input');
+      const txt = input.value.trim();
+      if (!txt) return;
+
+      const log = document.getElementById('im-chat-log');
+      log.innerHTML += `<div><b style="color:#0000aa;">Ich:</b> ${txt}</div>`;
+      input.value = "";
+      log.scrollTop = log.scrollHeight;
+
+      setTimeout(() => {
+        log.innerHTML += `<div><b style="color:#aa0000;">${currentIMBuddy}:</b> Das Layout sitzt jetzt wie angegossen! 🎯</div>`;
+        log.scrollTop = log.scrollHeight;
+      }, 1000);
+    }
+
+    function previewMail(sender, subj, text) {
+      document.getElementById('mail-preview').innerHTML = `<b>Von:</b> ${sender}<br><b>Betreff:</b> ${subj}<br><br>${text}`;
+    }
+
+    function selectMailTab(tab) {
+      document.querySelectorAll('.mail-tab').forEach(t => t.classList.remove('active'));
+      document.getElementById('tab-' + tab).classList.add('active');
+    }
+
+    window.addEventListener('DOMContentLoaded', () => {
+      initResizers();
+    });
+  </script>
+</body>
+</html>
