@@ -44,8 +44,9 @@ if (isset($_SERVER['REQUEST_METHOD']) && $_SERVER['REQUEST_METHOD'] === 'OPTIONS
 }
 
 define('DATEN_DIR',     __DIR__ . '/aoi_data');
-define('PRESENCE_FILE', DATEN_DIR . '/presence.php');
-define('INBOX_PREFIX',  DATEN_DIR . '/inbox_');
+define('PRESENCE_FILE',  DATEN_DIR . '/presence.php');
+define('DIRECTORY_FILE', DATEN_DIR . '/directory.php');
+define('INBOX_PREFIX',   DATEN_DIR . '/inbox_');
 define('TOKEN_DATEI',   __DIR__ . '/aoi_token.php');
 define('PRESENCE_TTL',  45);
 define('SIGNAL_TTL',    120);
@@ -152,6 +153,26 @@ if ($aktion === 'info') {
 }
 
 if (!token_ok($token)) aoi_fehler('Ungueltiger Token.', 403);
+
+// list_users braucht keinen Screen-Namen
+if ($aktion === 'list_users') {
+    $dir      = lies(DIRECTORY_FILE);
+    $presence = bereinige(lies(PRESENCE_FILE), PRESENCE_TTL);
+    $users    = array();
+    foreach ($dir as $n => $info) {
+        $users[] = array(
+            'name'   => $n,
+            'online' => isset($presence[$n]),
+            'since'  => isset($info['since']) ? $info['since'] : 0,
+        );
+    }
+    usort($users, function($a, $b) {
+        if ($a['online'] !== $b['online']) return $b['online'] ? 1 : -1;
+        return strcasecmp($a['name'], $b['name']);
+    });
+    aoi_ok(array('users' => $users, 'total' => count($users)));
+}
+
 if (!name_ok($name))   aoi_fehler('Ungueltiger Screen-Name.');
 
 // CHECK_NAME – Prüft ob ein Name bereits online ist (liest nur, ändert nichts)
@@ -166,6 +187,16 @@ if ($aktion === 'presence') {
     $presence = bereinige(lies(PRESENCE_FILE), PRESENCE_TTL);
     $presence[$name] = array('ts' => time(), 'session' => $session);
     schreibe(PRESENCE_FILE, $presence);
+    // Optionaler Verzeichnis-Eintrag (öffentliche Nutzersuche)
+    if (!empty($ein['public'])) {
+        $dir = lies(DIRECTORY_FILE);
+        $dir[$name] = array(
+            'ts'    => time(),
+            'since' => isset($dir[$name]['since']) ? $dir[$name]['since'] : time(),
+        );
+        schreibe(DIRECTORY_FILE, $dir);
+    }
+
     $buddies = array();
     foreach ($presence as $n => $p) { if ($n !== $name) $buddies[] = $n; }
     aoi_ok(array('buddies' => $buddies));
@@ -202,6 +233,13 @@ if ($aktion === 'bye') {
     unset($presence[$name]);
     schreibe(PRESENCE_FILE, $presence);
     aoi_ok(array('tschuess' => true));
+}
+
+if ($aktion === 'unregister_public') {
+    $dir = lies(DIRECTORY_FILE);
+    unset($dir[$name]);
+    schreibe(DIRECTORY_FILE, $dir);
+    aoi_ok(array('removed' => true));
 }
 
 aoi_fehler('Unbekannte Aktion: ' . htmlspecialchars($aktion, ENT_QUOTES));

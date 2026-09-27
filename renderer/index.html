@@ -398,11 +398,10 @@ body {
           <div class="form-container">
             <div class="form-row"><label>Hauptname:</label><div style="flex:1;display:flex;gap:4px;"><select id="user-screenname" class="screen-name-select" style="flex:1;"></select><button class="btn-options" style="white-space:nowrap;padding:3px 8px;" onclick="aoiShowCreateNameDialog()">+ Neu</button></div></div>
             <div class="signon-error-msg" id="signon-error"></div>
-            <div class="form-row"><label>Kennwort:</label><input type="password" value="geheim123"></div>
+            <div class="form-row"><label>Kennwort:</label><input type="password" id="inp-password" placeholder="Leer = kein Schutz"></div>
             <div class="form-row"><label>AHPT-Server:</label><input type="text" id="inp-signal-url" value="https://innobytix-it.de/AOI_9/AOI_Treffpunkt/aoi_signal.php"></div>
-            <div class="form-row"><label>E-Mail-Konto:</label><input type="text" value="klaus@web.de"></div>
+            
             <div class="actions-row">
-              <button class="btn-options" onclick="window.open('https://mail.aol.com','_blank')">AOI-Mail holen</button>
               <button class="btn-signon" id="signon-btn" onclick="startSignOn()">Anmelden</button>
             </div>
           </div>
@@ -670,6 +669,25 @@ body {
                 </div>
               </div>
               <div class="mein-aoi-section">
+                <div class="mein-aoi-title">🔑 Kennwort</div>
+                <div id="pw-status" style="font-size:11px;margin-bottom:6px;color:#555;">Kein Kennwortschutz aktiv.</div>
+                <div style="font-size:11px;display:flex;flex-direction:column;gap:4px;">
+                  <div style="display:flex;align-items:center;gap:4px;"><label style="width:85px;flex-shrink:0;">Aktuell:</label><input type="password" id="pw-current" placeholder="Leer wenn nicht gesetzt" style="flex:1;font-size:11px;font-family:Tahoma;border:1px solid #7f9db9;padding:2px 4px;"></div>
+                  <div style="display:flex;align-items:center;gap:4px;"><label style="width:85px;flex-shrink:0;">Neues PW:</label><input type="password" id="pw-new" placeholder="Leer = Schutz entfernen" style="flex:1;font-size:11px;font-family:Tahoma;border:1px solid #7f9db9;padding:2px 4px;"></div>
+                  <div style="display:flex;align-items:center;gap:4px;"><label style="width:85px;flex-shrink:0;">Bestätigen:</label><input type="password" id="pw-new2" placeholder="Wiederholen" style="flex:1;font-size:11px;font-family:Tahoma;border:1px solid #7f9db9;padding:2px 4px;"></div>
+                  <div id="pw-msg" style="min-height:14px;font-size:10px;color:#c00;"></div>
+                  <div style="display:flex;gap:5px;justify-content:flex-end;"><button class="btn-options" onclick="aoiChangePassword()">Kennwort speichern</button></div>
+                </div>
+                <div style="margin-top:6px;font-size:10px;color:#888;">Nur lokal gespeichert – nie an den Server übertragen.</div>
+              </div>
+              <div class="mein-aoi-section">
+                <div class="mein-aoi-title">🌐 Nutzersuche</div>
+                <div id="pub-status" style="font-size:11px;margin-bottom:5px;color:#555;">Nicht im öffentlichen Verzeichnis.</div>
+                <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;"><input type="checkbox" id="chk-pub-toggle" onclick="aoiTogglePublic(this.checked)" style="cursor:pointer;"><label for="chk-pub-toggle" style="font-size:11px;cursor:pointer;">Im öffentlichen Verzeichnis sichtbar sein</label></div>
+                <button class="btn-options" style="font-size:10px;margin-top:4px;" onclick="openWindow('win-userdir')">🔍 Nutzersuche öffnen</button>
+                <div style="font-size:10px;color:#888;margin-top:4px;">Andere AOI-Nutzer können deinen Namen dann in der Suche finden.</div>
+              </div>
+              <div class="mein-aoi-section">
                 <div class="mein-aoi-title">⚙️ Schnelleinstellungen</div>
                 <div class="mein-aoi-grid">
                   <div class="mein-aoi-item"><span>🎨</span> Erscheinungsbild</div>
@@ -782,6 +800,7 @@ body {
             <button class="buddy-act-btn" onclick="aoiShowAddBuddyDialog()">+ Buddy</button>
             <button class="buddy-act-btn" onclick="aoiRemoveSelected()">Entfernen</button>
             <button class="buddy-act-btn" onclick="aoiShowBuddyInfo()">Info</button>
+            <button class="buddy-act-btn" onclick="openWindow('win-userdir');aoiLoadUserDir()" style="grid-column:span 2;">🔍 Nutzersuche</button>
           </div>
           <div style="font-size:9px;text-align:center;color:#555;">AOI-Stichwort: <b>Buddy</b></div>
         </div>
@@ -993,6 +1012,19 @@ body {
         <label>Screen-Name:</label>
         <input type="text" id="inp-new-name" maxlength="32" onkeydown="if(event.key==='Enter')aoiConfirmCreateName()">
       </div>
+      <div class="aoi-modal-row">
+        <label>Kennwort:</label>
+        <input type="password" id="inp-new-password" maxlength="64" placeholder="Optional – nur lokal gespeichert">
+      </div>
+      <div class="aoi-modal-row">
+        <label>Bestätigen:</label>
+        <input type="password" id="inp-new-password2" maxlength="64" placeholder="Kennwort wiederholen">
+      </div>
+      <div class="aoi-modal-row" style="align-items:center;gap:8px;">
+        <input type="checkbox" id="chk-public-name" style="cursor:pointer;">
+        <label for="chk-public-name" style="cursor:pointer;font-size:11px;">In der Nutzersuche sichtbar (öffentliches Verzeichnis)</label>
+      </div>
+      <div style="font-size:10px;color:#888;padding:0 0 4px 0;">Kennwort und Sichtbarkeit können jederzeit unter Mein AOI geändert werden.</div>
       <div class="aoi-modal-error" id="dlg-name-error"></div>
       <div class="aoi-modal-btns">
         <button class="btn-options" onclick="document.getElementById('dlg-create-name').style.display='none'">Abbrechen</button>
@@ -1002,6 +1034,19 @@ body {
   </div>
 </div>
 
+
+<!-- ===== FENSTER: NUTZERSUCHE ===== -->
+<div class="mdi-window" id="win-userdir" style="top:80px;left:200px;width:400px;height:480px;z-index:30;display:none;">
+  <div class="title-bar" onmousedown="focusAndDrag(event,'win-userdir')">
+    <div class="title-left"><span>🔍 Nutzersuche</span></div>
+    <div class="title-controls"><div class="btn-win" onclick="minimizeWindow('win-userdir')">_</div><div class="btn-win" onclick="toggleMaximize('win-userdir')">□</div><div class="btn-win close" onclick="closeWindow('win-userdir')">✕</div></div>
+  </div>
+  <div class="window-inner-content" style="flex:1;min-height:0;display:flex;flex-direction:column;overflow:hidden;padding:0;">
+    <div style="padding:8px;background:#ddeeff;border-bottom:1px solid #8ab;flex-shrink:0;"><div style="display:flex;gap:4px;"><input type="text" id="userdir-search" placeholder="Name suchen…" style="flex:1;font-size:11px;font-family:Tahoma;border:1px solid #7f9db9;padding:3px 6px;" oninput="aoiFilterUserDir()"><button class="btn-go" onclick="aoiLoadUserDir()" style="font-size:10px;padding:2px 8px;">Aktualisieren</button></div><div style="font-size:10px;color:#555;margin-top:4px;">Zeigt nur Nutzer, die sich öffentlich sichtbar gestellt haben.</div></div>
+    <div id="userdir-list" style="flex:1;overflow-y:auto;padding:4px 0;"><div style="padding:20px;text-align:center;color:#888;font-size:11px;">Wird geladen…</div></div>
+    <div style="padding:6px 8px;border-top:1px solid #c0bdb5;background:#f0ede0;font-size:10px;color:#555;flex-shrink:0;"><span id="userdir-count"></span></div>
+  </div>
+</div>
 <!-- ===== DIALOG: BUDDY SUCHEN ===== -->
 <div class="aoi-modal" id="dlg-add-buddy">
   <div class="aoi-modal-box" style="width:340px;">
@@ -1210,6 +1255,8 @@ function showWelcomeSplash(name) {
   else if(hasUnread) { setTimeout(function(){ playSound('snd-mail'); }, 1200); }
   splashTimer=setTimeout(function(){ splashTimer=null; closeSplashNow(); }, 6000);
   aoiStartOnline(name);
+  aoiUpdatePwStatus(name);
+  aoiUpdatePubStatus(name);
 }
 
 function startOnlineTimer() {
@@ -1348,6 +1395,7 @@ function openWindow(id) {
   if(w.classList.contains('minimized')) restoreWindow(id);
   else { if(id==='win-mailbox'||id==='win-im') applyDefaultPosition(id); w.style.display='flex'; bringToFront(id); }
   if(id==='win-mailbox'){ if(document.querySelectorAll('#mail-tbody tr.unread').length>0) playSound('snd-mail'); if(_emailCfg) emailFetchInbox(); }
+  if(id==='win-userdir') aoiLoadUserDir();
 }
 function toggleWindow(id) { var w=document.getElementById(id); if(w.style.display==='none'||w.classList.contains('minimized')) openWindow(id); else closeWindow(id); }
 function closeWindow(id) { var w=document.getElementById(id); if(w) w.style.display='none'; removeMinTab(id); }
@@ -1425,18 +1473,29 @@ function simulateBuddyToggle() {
   doorState=!doorState; playSound(doorState?'snd-door-open':'snd-door-close');
   showBuddyNotify('DJ_Emm_Pea_Three',doorState?'hat sich angemeldet':'hat sich abgemeldet');
 }
-function startSignOn() {
+async function startSignOn() {
   var btn=document.getElementById('signon-btn');
   var name=document.getElementById('user-screenname').value.trim();
   if(!name) return;
-  document.getElementById('signon-error').textContent='';
+  var errEl=document.getElementById('signon-error');
+  errEl.textContent='';
   var serverUrl=(document.getElementById('inp-signal-url').value||'').trim();
   if(serverUrl) AOI_SIGNAL_URL=serverUrl;
+  var storedHash=null;
+  try{ storedHash=localStorage.getItem('aoi_pw_hash_'+name); }catch(e){}
+  if(storedHash){
+    var enteredPw=document.getElementById('inp-password')?document.getElementById('inp-password').value:'';
+    var enteredHash=await aoiHashPassword(enteredPw);
+    if(enteredHash!==storedHash){
+      errEl.textContent='Falsches Kennwort.';
+      return;
+    }
+  }
   btn.disabled=true; btn.textContent='Prüfe...';
   aoiPost({aktion:'check_name',name:name},function(err,data){
     if(!err&&data&&data.ok&&data.taken){
       btn.disabled=false; btn.textContent='Anmelden';
-      document.getElementById('signon-error').textContent='Dieser Name ist bereits online vergeben. Bitte einen anderen wählen.';
+      errEl.textContent='Dieser Name ist bereits online vergeben. Bitte einen anderen wählen.';
       return;
     }
     btn.disabled=false;
@@ -2149,7 +2208,8 @@ function aoiStopOnline() {
 
 function aoiPresenceHeartbeat() {
   if(!aoi_name) return;
-  aoiPost({aktion:'presence', name:aoi_name, session:aoi_session}, function(err, data) {
+  var aoi_is_pub=false; try{aoi_is_pub=localStorage.getItem('aoi_pub_'+aoi_name)==='1';}catch(e){}
+  aoiPost({aktion:'presence', name:aoi_name, session:aoi_session, public:aoi_is_pub}, function(err, data) {
     if(err || !data || !data.ok) return;
     var buddies = data.buddies || [];
     // Nur gespeicherte Buddies berücksichtigen – keine Fremden anzeigen
@@ -2288,10 +2348,112 @@ function aoiInitScreenNames() {
   names.forEach(function(n){ var o=document.createElement('option'); o.value=n; o.textContent=n; sel.appendChild(o); });
 }
 
+/* ===== KENNWORT & VERZEICHNIS ===== */
+async function aoiHashPassword(pw) {
+  var enc = new TextEncoder();
+  var buf = await crypto.subtle.digest('SHA-256', enc.encode(pw));
+  return Array.from(new Uint8Array(buf)).map(function(b){ return b.toString(16).padStart(2,'0'); }).join('');
+}
+
+function aoiUpdatePwStatus(name) {
+  var el = document.getElementById('pw-status'); if(!el) return;
+  var has = false; try{ has = !!localStorage.getItem('aoi_pw_hash_'+name); }catch(e){}
+  el.innerHTML = has
+    ? '<span style="color:#070;">&#9679;</span> Kennwort ist gesetzt.'
+    : '<span style="color:#888;">&#9679;</span> Kein Kennwortschutz aktiv.';
+  var cur = document.getElementById('pw-current'); if(cur) cur.value = '';
+  var pn = document.getElementById('pw-new'); if(pn) pn.value = '';
+  var pn2 = document.getElementById('pw-new2'); if(pn2) pn2.value = '';
+  var pm = document.getElementById('pw-msg'); if(pm) pm.textContent = '';
+}
+
+function aoiUpdatePubStatus(name) {
+  var chk = document.getElementById('chk-pub-toggle');
+  var st = document.getElementById('pub-status');
+  var isPub = false; try{ isPub = localStorage.getItem('aoi_pub_'+name) === '1'; }catch(e){}
+  if(chk) chk.checked = isPub;
+  if(st) st.innerHTML = isPub
+    ? '<span style="color:#070;">&#9679;</span> Im öffentlichen Verzeichnis sichtbar.'
+    : '<span style="color:#888;">&#9679;</span> Nicht im öffentlichen Verzeichnis.';
+}
+
+function aoiTogglePublic(enabled) {
+  if(!aoi_name) return;
+  try{
+    if(enabled) localStorage.setItem('aoi_pub_'+aoi_name,'1');
+    else { localStorage.removeItem('aoi_pub_'+aoi_name); aoiPost({aktion:'unregister_public',name:aoi_name},function(){}); }
+  }catch(e){}
+  aoiUpdatePubStatus(aoi_name);
+}
+
+function aoiChangePassword() {
+  if(!aoi_name){ alert('Bitte erst anmelden.'); return; }
+  var cur = document.getElementById('pw-current').value;
+  var nw = document.getElementById('pw-new').value;
+  var nw2 = document.getElementById('pw-new2').value;
+  var msg = document.getElementById('pw-msg');
+  msg.textContent = ''; msg.style.color = '#c00';
+  if(nw !== nw2){ msg.textContent = 'Kennwörter stimmen nicht überein.'; return; }
+  var stored = null; try{ stored = localStorage.getItem('aoi_pw_hash_'+aoi_name); }catch(e){}
+  function doSave(ok) {
+    if(!ok){ msg.textContent = 'Aktuelles Kennwort ist falsch.'; return; }
+    if(!nw) {
+      try{ localStorage.removeItem('aoi_pw_hash_'+aoi_name); }catch(e){}
+      msg.style.color = '#070'; msg.textContent = 'Kennwortschutz entfernt.'; aoiUpdatePwStatus(aoi_name);
+    } else {
+      aoiHashPassword(nw).then(function(h){
+        try{ localStorage.setItem('aoi_pw_hash_'+aoi_name, h); }catch(e){}
+        msg.style.color = '#070'; msg.textContent = 'Kennwort gespeichert.'; aoiUpdatePwStatus(aoi_name);
+      });
+    }
+  }
+  if(!stored){ doSave(true); }
+  else { aoiHashPassword(cur).then(function(h){ doSave(h === stored); }); }
+}
+
+var _userDirData = [];
+function aoiLoadUserDir() {
+  var list = document.getElementById('userdir-list');
+  if(list) list.innerHTML = '<div style="padding:20px;text-align:center;color:#888;font-size:11px;">Wird geladen…</div>';
+  aoiPost({aktion:'list_users', name:aoi_name||'_'}, function(err, data) {
+    if(err||!data||!data.ok){ if(list) list.innerHTML = '<div style="padding:16px;color:#c00;font-size:11px;">Fehler beim Laden.</div>'; return; }
+    _userDirData = data.users || [];
+    aoiRenderUserDir(_userDirData);
+    var cnt = document.getElementById('userdir-count');
+    if(cnt) cnt.textContent = _userDirData.length + ' Nutzer im Verzeichnis';
+  });
+}
+function aoiFilterUserDir() {
+  var q = (document.getElementById('userdir-search').value || '').toLowerCase().trim();
+  var filtered = q ? _userDirData.filter(function(u){ return u.name.toLowerCase().indexOf(q) !== -1; }) : _userDirData;
+  aoiRenderUserDir(filtered);
+  var cnt = document.getElementById('userdir-count');
+  if(cnt) cnt.textContent = (q ? filtered.length + ' Treffer von ' + _userDirData.length : _userDirData.length) + ' Nutzer';
+}
+function aoiRenderUserDir(users) {
+  var list = document.getElementById('userdir-list'); if(!list) return;
+  if(!users || !users.length){ list.innerHTML = '<div style="padding:20px;text-align:center;color:#888;font-size:11px;">Keine Nutzer gefunden.</div>'; return; }
+  var html = '';
+  users.forEach(function(u) {
+    var safe = u.name.replace(/'/g,"&#39;").replace(/"/g,"&quot;");
+    var dot = u.online ? '<span style="color:#060;">&#9679;</span>' : '<span style="color:#bbb;">&#9711;</span>';
+    var status = u.online ? '<span style="color:#060;font-size:10px;">Online</span>' : '<span style="color:#999;font-size:10px;">Offline</span>';
+    html += '<div class="menu-dd-item" style="display:flex;align-items:center;justify-content:space-between;padding:5px 10px;cursor:default;" ondblclick="aoiTryOpenIM(\''+safe+'\')" title="Doppelklick: Nachricht senden">'
+      + '<span>' + dot + ' <b>' + safe + '</b></span>'
+      + '<span style="display:flex;gap:6px;align-items:center;">' + status
+      + ' <button class="btn-options" style="font-size:9px;padding:1px 5px;" onclick="aoiAddBuddy(\''+safe+'\',\'Buddies\')">+Buddy</button></span>'
+      + '</div>';
+  });
+  list.innerHTML = html;
+}
+
 function aoiShowCreateNameDialog() {
   document.getElementById('dlg-create-name').style.display='flex';
   document.getElementById('inp-new-name').value='';
   document.getElementById('dlg-name-error').textContent='';
+  var pf=document.getElementById('inp-new-password'); if(pf) pf.value='';
+  var pf2=document.getElementById('inp-new-password2'); if(pf2) pf2.value='';
+  var pc=document.getElementById('chk-public-name'); if(pc) pc.checked=false;
   setTimeout(function(){ document.getElementById('inp-new-name').focus(); },50);
 }
 
@@ -2301,14 +2463,21 @@ function aoiConfirmCreateName() {
   if(!aoiNameValid(name)){ errEl.textContent='Ungültiger Name (1–32 Zeichen, nur a-z A-Z 0-9 _ – .)'; return; }
   var names = aoiGetSavedNames();
   if(names.indexOf(name)!==-1){ errEl.textContent='Dieser Name ist bereits auf diesem Gerät gespeichert.'; return; }
+  // Kennwort vorab prüfen
+  var pw = document.getElementById('inp-new-password') ? document.getElementById('inp-new-password').value : '';
+  var pw2 = document.getElementById('inp-new-password2') ? document.getElementById('inp-new-password2').value : '';
+  if(pw && pw !== pw2){ errEl.textContent='Kennwörter stimmen nicht überein.'; return; }
   errEl.textContent='Prüfe Verfügbarkeit online...';
   aoiPost({aktion:'check_name',name:name},function(err,data){
-    if(err||!data||!data.ok){ errEl.textContent=''; }  // Server nicht erreichbar → trotzdem anlegen
+    if(err||!data||!data.ok){ errEl.textContent=''; }
     else if(data.taken){ errEl.textContent='Dieser Name ist bereits online vergeben. Bitte einen anderen wählen.'; return; }
     names.push(name); aoiSaveNames(names);
+    if(pw) aoiHashPassword(pw).then(function(h){ try{localStorage.setItem('aoi_pw_hash_'+name,h);}catch(e){} });
+    var pub = document.getElementById('chk-public-name') && document.getElementById('chk-public-name').checked;
+    try{ if(pub) localStorage.setItem('aoi_pub_'+name,'1'); else localStorage.removeItem('aoi_pub_'+name); }catch(e){}
     aoiInitScreenNames();
-    document.getElementById('user-screenname').value=name;
-    document.getElementById('dlg-create-name').style.display='none';
+    document.getElementById('user-screenname').value = name;
+    document.getElementById('dlg-create-name').style.display = 'none';
   });
 }
 
