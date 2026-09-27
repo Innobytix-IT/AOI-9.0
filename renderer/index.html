@@ -1503,7 +1503,7 @@ function bringToFront(id) {
 function openWindow(id) {
   var w=document.getElementById(id); if(!w) return;
   if(w.classList.contains('minimized')) restoreWindow(id);
-  else { if(id==='win-mailbox'||id==='win-im') applyDefaultPosition(id); w.style.display='flex'; bringToFront(id); }
+  else { if((id==='win-mailbox'||id==='win-im') && w.style.display==='none') applyDefaultPosition(id); w.style.display='flex'; bringToFront(id); }
   if(id==='win-mailbox'){ if(document.querySelectorAll('#mail-tbody tr.unread').length>0) playSound('snd-mail'); if(_emailCfg) emailFetchInbox(); }
   if(id==='win-userdir') aoiLoadUserDir();
   if(id==='win-server-setup') { aoiSrvTabInit(); var inp=document.getElementById('srv-url-input'); if(inp) inp.value=AOI_SIGNAL_URL||''; }
