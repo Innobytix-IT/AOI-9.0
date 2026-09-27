@@ -1198,6 +1198,8 @@ function showWelcomeSplash(name) {
   document.getElementById('signon-screen').style.display='none';
   document.getElementById('desktop-shell').style.display='flex';
   restorePortal();
+  openWindow('win-buddylist');
+  openWindow('win-navigation');
   document.getElementById('welcome-splash').style.display='flex';
   if(window.electronAPI) window.electronAPI.maximizeForce();
   fetchLiveGoogleNews();
