@@ -144,8 +144,15 @@ body {
   border-bottom:1px solid #97b5d2;display:flex;align-items:center;padding:0 8px;gap:15px;color:#0b335e;
   -webkit-app-region:drag;user-select:none;
 }
-.menu-item { cursor:pointer;padding:2px 4px;-webkit-app-region:no-drag; }
+.menu-item { cursor:pointer;padding:2px 4px;-webkit-app-region:no-drag;position:relative; }
 .menu-item:hover { background:#b8d4f1;border-radius:2px; }
+.menu-dropdown { display:none;position:absolute;top:100%;left:0;background:#ece9d8;border:1px solid #7faad0;box-shadow:3px 4px 8px rgba(0,0,0,.35);z-index:9999;min-width:180px;padding:2px 0; }
+.menu-item.open>.menu-dropdown { display:block; }
+.menu-dd-item { padding:3px 20px;font-size:11px;cursor:pointer;white-space:nowrap;color:#000; }
+.menu-dd-item:hover { background:#316ac5;color:#fff; }
+.menu-dd-sep { height:1px;background:#b0b0b0;margin:3px 4px; }
+.menu-dd-item.disabled { color:#888;cursor:default; }
+.menu-dd-item.disabled:hover { background:transparent;color:#888; }
 .electron-winctrls { margin-left:auto;display:flex;gap:2px;-webkit-app-region:no-drag; }
 .electron-winctrls button { width:18px;height:16px;border:1px solid #7faad0;background:linear-gradient(to bottom,#d4e7f7,#b0cce4);color:#0b335e;font-size:9px;cursor:pointer;padding:0;line-height:1; }
 .electron-winctrls button:hover { background:linear-gradient(to bottom,#e4f0fa,#c8ddf2); }
@@ -454,8 +461,29 @@ body {
 <!-- HAUPTPROGRAMM -->
 <div id="desktop-shell">
   <div class="menu-bar">
-    <span class="menu-item">Datei</span>
-    <span class="menu-item">Bearbeiten</span>
+    <span class="menu-item" onclick="menuToggle(event,'menu-datei')">Datei
+      <div class="menu-dropdown" id="menu-datei">
+        <div class="menu-dd-item" onclick="restorePortal()">🏠 Willkommen</div>
+        <div class="menu-dd-item" onclick="openWindow('win-main');switchPortalTab('news')">📰 Aktuelles</div>
+        <div class="menu-dd-sep"></div>
+        <div class="menu-dd-item" onclick="window.print()">🖨️ Drucken…</div>
+        <div class="menu-dd-sep"></div>
+        <div class="menu-dd-item" onclick="menuClose();doSignOff()">🔌 Abmelden</div>
+        <div class="menu-dd-item" onclick="menuClose();if(window.electronAPI)window.electronAPI.close()">❌ AOI beenden</div>
+      </div>
+    </span>
+    <span class="menu-item" onclick="menuToggle(event,'menu-bearbeiten')">Bearbeiten
+      <div class="menu-dropdown" id="menu-bearbeiten">
+        <div class="menu-dd-item" onclick="document.execCommand('undo')">↩️ Rückgängig</div>
+        <div class="menu-dd-item" onclick="document.execCommand('redo')">↪️ Wiederholen</div>
+        <div class="menu-dd-sep"></div>
+        <div class="menu-dd-item" onclick="document.execCommand('cut')">✂️ Ausschneiden</div>
+        <div class="menu-dd-item" onclick="document.execCommand('copy')">📋 Kopieren</div>
+        <div class="menu-dd-item" onclick="document.execCommand('paste')">📌 Einfügen</div>
+        <div class="menu-dd-sep"></div>
+        <div class="menu-dd-item" onclick="document.execCommand('selectAll')">⬜ Alles auswählen</div>
+      </div>
+    </span>
     <span class="menu-item" onclick="openWindow('win-mailbox')">Post</span>
     <span class="menu-item" onclick="openWindow('win-buddylist')">Freunde</span>
     <span class="menu-item" onclick="toggleWindow('win-navigation')">Kanäle</span>
@@ -1372,6 +1400,19 @@ function startSignOn() {
     setTimeout(function(){ btn.textContent='Anmelden'; },500);
   });
 }
+/* ===== MENÜ-DROPDOWNS ===== */
+function menuToggle(e, id) {
+  e.stopPropagation();
+  var item = e.currentTarget;
+  var isOpen = item.classList.contains('open');
+  menuClose();
+  if (!isOpen) item.classList.add('open');
+}
+function menuClose() {
+  document.querySelectorAll('.menu-item.open').forEach(function(el){ el.classList.remove('open'); });
+}
+document.addEventListener('click', menuClose);
+
 function doSignOff() {
   aoiStopOnline();
   if(onlineTimer){clearInterval(onlineTimer);onlineTimer=null;}
