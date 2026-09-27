@@ -25,11 +25,9 @@ function createWindow() {
 
   win.loadFile(path.join(__dirname, 'renderer', 'index.html'));
 
-  // OS-Fensterfokus zuverlässig an Renderer melden
-  win.on('focus', () => win.webContents.send('window-focus-changed', true));
-  win.on('blur',  () => win.webContents.send('window-focus-changed', false));
 }
 
+ipcMain.handle('is-window-focused', () => BrowserWindow.getFocusedWindow() !== null);
 ipcMain.on('window-minimize', () => BrowserWindow.getFocusedWindow()?.minimize());
 ipcMain.on('window-maximize', () => { const w = BrowserWindow.getFocusedWindow(); w?.isMaximized() ? w.unmaximize() : w?.maximize(); });
 ipcMain.on('window-maximize-force', () => BrowserWindow.getFocusedWindow()?.maximize());
