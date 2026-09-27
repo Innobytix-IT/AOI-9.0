@@ -1287,13 +1287,22 @@ function navigateKeyword(kw) {
 
 /* ===== IM ===== */
 var currentIMBuddy='';
+function aoiUpdateIMStatus(name) {
+  if(currentIMBuddy !== name) return;
+  var online = !!aoi_known_buddies[name];
+  var connected = aoi_peers[name] && aoi_peers[name].ready;
+  var statusText = connected ? '🔗 P2P verbunden' : (online ? '● Online' : '○ Offline');
+  var statusEl = document.getElementById('im-buddy-away-disp');
+  if(statusEl) statusEl.textContent = statusText;
+  var avatarEl = document.getElementById('im-buddy-avatar');
+  if(avatarEl) avatarEl.textContent = online ? '🟢' : '🔴';
+}
+
 function openIM(name) {
   currentIMBuddy=name;
-  var d=buddyData[name]||{away:'Keine Away-Nachricht',avatar:'🏃',reply:'Hey!'};
   document.getElementById('im-title').textContent='Sofortnachricht mit '+name;
   document.getElementById('im-buddy-name-disp').textContent=name;
-  document.getElementById('im-buddy-away-disp').textContent=d.away;
-  document.getElementById('im-buddy-avatar').textContent=d.avatar;
+  aoiUpdateIMStatus(name);
   // "+ Buddy"-Button nur zeigen wenn nicht bereits in der Liste
   var addBtn=document.getElementById('im-add-buddy-btn');
   if(addBtn){
@@ -1530,8 +1539,8 @@ function aoiInitiatePeer(name) {
 }
 
 function aoiSetupDataChannel(dc, fromName) {
-  dc.onopen  = function() { if(aoi_peers[fromName]) aoi_peers[fromName].ready=true; aoiUpdateBuddyListUI(); };
-  dc.onclose = function() { if(aoi_peers[fromName]) aoi_peers[fromName].ready=false; };
+  dc.onopen  = function() { if(aoi_peers[fromName]) aoi_peers[fromName].ready=true; aoiUpdateBuddyListUI(); aoiUpdateIMStatus(fromName); };
+  dc.onclose = function() { if(aoi_peers[fromName]) aoi_peers[fromName].ready=false; aoiUpdateIMStatus(fromName); };
   dc.onmessage = function(e) { aoiReceiveIM(fromName, e.data); };
 }
 
@@ -1553,11 +1562,13 @@ function aoiReceiveIM(fromName, text) {
 function aoiShowBuddyOnline(name) {
   showBuddyNotify(name, 'hat sich angemeldet');
   if(!buddyData[name]) buddyData[name] = {away:'● Online', avatar:'🟢', reply:null};
+  aoiUpdateIMStatus(name);
 }
 
 function aoiShowBuddyOffline(name) {
   showBuddyNotify(name, 'hat sich abgemeldet');
   if(buddyData[name] && buddyData[name].avatar==='🟢') delete buddyData[name];
+  aoiUpdateIMStatus(name);
 }
 
 /* ===== SCREEN-NAMEN (localStorage) ===== */
