@@ -790,7 +790,12 @@ body {
       <div class="window-inner-content" style="flex:1;min-height:0;display:flex;flex-direction:column;overflow:hidden;">
         <div style="background:#ddeeff;border-bottom:1px solid #8ab;padding:5px 8px;font-size:10px;display:flex;justify-content:space-between;align-items:center;flex-shrink:0;">
           <span style="color:#003399;font-weight:bold;">👤 <span id="my-sn-display">RetroSurfer</span></span>
-          <span id="my-status-badge" style="color:#006600;font-weight:bold;">● Online</span>
+          <select id="my-status-select" onchange="aoiSetMyStatus(this.value)" style="font-size:10px;border:1px solid #6b98c3;border-radius:3px;background:#eaf2fb;color:#003399;padding:1px 3px;cursor:pointer;">
+            <option value="avail">🟢 Verfügbar</option>
+            <option value="away">🌙 Away</option>
+            <option value="busy">🔴 Beschäftigt</option>
+            <option value="brb">⏰ BRB</option>
+          </select>
         </div>
         <div class="buddy-sort-bar">
           <span>Sortieren:</span>
@@ -972,8 +977,9 @@ body {
           <div class="fmt-sep"></div>
           <div class="fmt-btn" onclick="toggleSmileyPicker(event)" title="Smileys">😊</div>
         </div>
-        <div class="im-history" id="im-chat-log"><div style="color:#888;font-style:italic;font-size:10px;">Direkte P2P-Verbindung aufgebaut.</div></div>
-        <div id="im-message-input" class="im-input-ce" contenteditable="true" onkeydown="handleIMKey(event)"></div>
+        <div id="im-typing-indicator" style="display:none;padding:2px 8px 1px;font-size:10px;color:#777;font-style:italic;background:#f5f7fa;border-bottom:1px solid #dde;flex-shrink:0;"></div>
+        <div class="im-history" id="im-chat-log"></div>
+        <div id="im-message-input" class="im-input-ce" contenteditable="true" onkeydown="handleIMKey(event)" oninput="aoiOnIMInput()"></div>
         <input type="file" id="im-file-input" style="display:none" onchange="aoiSendFile(this)">
         <div id="im-transfer-bar" style="display:none;padding:2px 6px 0;">
           <div style="height:6px;background:#dde8f5;border:1px solid #7f9db9;border-radius:3px;overflow:hidden;">
@@ -1337,6 +1343,7 @@ function showWelcomeSplash(name) {
   mailInitDemoEmails(name);
   document.getElementById('welcome-splash').style.display='flex';
   if(window.electronAPI) window.electronAPI.maximizeForce();
+  aoiRequestNotifPermission();
   fetchLiveGoogleNews();
   startOnlineTimer();
   detectBandwidth();
@@ -1796,30 +1803,107 @@ function browserForward() {
 
 /* ===== IM ===== */
 var currentIMBuddy='';
+var aoi_im_wins = {};      // name → extra window element
+var aoi_my_status = 'avail';
+var _typingTimers = {};    // name → clearTimeout handle
+
 function aoiUpdateIMStatus(name) {
-  if(currentIMBuddy !== name) return;
   var online = !!aoi_known_buddies[name];
   var connected = aoi_peers[name] && aoi_peers[name].ready;
   var statusText = connected ? '🔗 P2P verbunden' : (online ? '● Online' : '○ Offline');
-  var statusEl = document.getElementById('im-buddy-away-disp');
-  if(statusEl) statusEl.textContent = statusText;
-  var avatarEl = document.getElementById('im-buddy-avatar');
-  if(avatarEl) avatarEl.textContent = online ? '🟢' : '🔴';
+  if(currentIMBuddy === name) {
+    var statusEl = document.getElementById('im-buddy-away-disp');
+    if(statusEl) statusEl.textContent = statusText;
+    var avatarEl = document.getElementById('im-buddy-avatar');
+    if(avatarEl) avatarEl.textContent = online ? '🟢' : '🔴';
+  }
+  var ew = aoi_im_wins[name];
+  if(ew) { var se=ew.querySelector('.im-extra-status'); if(se) se.textContent=statusText; }
 }
 
 function openIM(name) {
+  // Already has an extra window → focus it
+  if(aoi_im_wins[name]) {
+    var ew=aoi_im_wins[name];
+    if(ew.classList.contains('minimized')) restoreWindow(ew.id);
+    else { ew.style.display='flex'; bringToFront(ew.id); }
+    return;
+  }
+  // win-im is visible with a DIFFERENT buddy → create extra window
+  var mainWin=document.getElementById('win-im');
+  var mainVisible=mainWin&&mainWin.style.display!=='none'&&!mainWin.classList.contains('minimized');
+  if(mainVisible && currentIMBuddy && currentIMBuddy!==name) {
+    aoiCreateExtraIMWin(name); return;
+  }
+  // Use win-im
   currentIMBuddy=name;
   document.getElementById('im-title').textContent='Sofortnachricht mit '+name;
   document.getElementById('im-buddy-name-disp').textContent=name;
   aoiUpdateIMStatus(name);
-  // "+ Buddy"-Button nur zeigen wenn nicht bereits in der Liste
   var addBtn=document.getElementById('im-add-buddy-btn');
-  if(addBtn){
-    var inList=aoiGetBuddyList().some(function(b){ return b.name===name; });
-    addBtn.style.display=inList?'none':'inline-block';
-  }
+  if(addBtn){ var inList=aoiGetBuddyList().some(function(b){return b.name===name;}); addBtn.style.display=inList?'none':'inline-block'; }
+  var log=document.getElementById('im-chat-log');
+  if(log) aoiLoadChatHistory(name, log);
   openWindow('win-im');
   document.getElementById('im-message-input').focus();
+}
+
+function aoiCreateExtraIMWin(name) {
+  var ws=document.getElementById('mdi-workspace'); if(!ws) return;
+  var safe='win-im-'+name.replace(/[^a-zA-Z0-9]/g,'_');
+  var offset=Object.keys(aoi_im_wins).length;
+  var el=document.createElement('div');
+  el.className='mdi-window'; el.id=safe;
+  el.style.cssText='position:absolute;width:300px;height:360px;z-index:30;'
+    +'right:'+(35+offset*22)+'px;bottom:'+(40+offset*22)+'px;display:none;';
+  el.innerHTML='<div class="title-bar" onmousedown="focusAndDrag(event,\''+safe+'\')"><div class="title-left"><span>💬 '+escHtml(name)+'</span></div>'
+    +'<div class="title-controls"><div class="btn-win" onclick="minimizeWindow(\''+safe+'\')">_</div>'
+    +'<div class="btn-win" onclick="toggleMaximize(\''+safe+'\')">□</div>'
+    +'<div class="btn-win close" onclick="aoiCloseExtraIMWin(\''+escHtml(name)+'\')">✕</div></div></div>'
+    +'<div class="window-inner-content" style="flex:1;min-height:0;display:flex;flex-direction:column;overflow:hidden;">'
+    +'<div class="im-buddy-header" style="padding:4px 8px;flex-shrink:0;">'
+    +'<div class="im-buddy-avatar" style="font-size:18px;width:28px;height:28px;">🏄</div>'
+    +'<div style="flex:1;min-width:0;">'
+    +'<div class="im-buddy-name">'+escHtml(name)+'</div>'
+    +'<div class="im-buddy-away-msg im-extra-status">● Online</div></div></div>'
+    +'<div class="im-extra-typing" style="display:none;padding:2px 8px 1px;font-size:10px;color:#777;font-style:italic;background:#f5f7fa;border-bottom:1px solid #dde;flex-shrink:0;"></div>'
+    +'<div class="im-history im-extra-log" style="flex:1;overflow-y:auto;padding:4px 8px;"></div>'
+    +'<div class="im-input-ce" contenteditable="true" style="min-height:36px;border-top:1px solid #a0b8d0;padding:4px 8px;font-size:12px;outline:none;overflow-y:auto;max-height:80px;" '
+    +'onkeydown="aoiExtraIMKey(event,\''+escHtml(name)+'\')" oninput="aoiOnExtraIMInput(\''+escHtml(name)+'\')"></div>'
+    +'<div class="im-send-row"><button class="btn-options" onclick="aoiSendExtraIM(\''+escHtml(name)+'\')">Senden</button></div>'
+    +'</div>';
+  ws.appendChild(el);
+  aoi_im_wins[name]=el;
+  var logEl=el.querySelector('.im-extra-log');
+  if(logEl) aoiLoadChatHistory(name, logEl);
+  el.style.display='flex'; bringToFront(safe);
+  aoiUpdateIMStatus(name);
+  el.querySelector('.im-input-ce').focus();
+}
+
+function aoiCloseExtraIMWin(name) {
+  var el=aoi_im_wins[name]; if(!el) return;
+  el.style.display='none';
+  el.parentNode&&el.parentNode.removeChild(el);
+  delete aoi_im_wins[name];
+}
+
+function aoiSendExtraIM(name) {
+  var el=aoi_im_wins[name]; if(!el) return;
+  var inputEl=el.querySelector('.im-input-ce');
+  var logEl=el.querySelector('.im-extra-log');
+  if(!inputEl||!logEl) return;
+  var html=inputEl.innerHTML.trim(), text=inputEl.innerText.trim();
+  if(!text) return;
+  var d=document.createElement('div'); d.innerHTML='<b style="color:#0000aa;">Ich:</b> '+html;
+  logEl.appendChild(d); inputEl.innerHTML=''; logEl.scrollTop=logEl.scrollHeight;
+  aoiSaveChatMsg(name,'out',d.innerHTML);
+  playSound('snd-msg-sent');
+  aoiSendViaDataChannel(name, text);
+}
+
+function aoiExtraIMKey(e, name) {
+  if(e.key==='Enter'&&!e.shiftKey){ e.preventDefault(); aoiSendExtraIM(name); }
 }
 
 function aoiReopenLastIM(){
@@ -1847,11 +1931,13 @@ function sendIMMessage() {
   var log=document.getElementById('im-chat-log');
   var d=document.createElement('div'); d.innerHTML='<b style="color:#0000aa;">Ich:</b> '+html;
   log.appendChild(d); input.innerHTML=''; log.scrollTop=log.scrollHeight; playSound('snd-msg-sent');
+  aoiSaveChatMsg(currentIMBuddy,'out',d.innerHTML);
   if(aoiSendViaDataChannel(currentIMBuddy, text)) return;
   var bd=buddyData[currentIMBuddy];
   if(bd && bd.reply) setTimeout(function(){
     var r=document.createElement('div'); r.innerHTML='<b style="color:#aa0000;">'+currentIMBuddy+':</b> '+bd.reply;
     playSound('snd-msg-recv'); log.appendChild(r); log.scrollTop=log.scrollHeight;
+    aoiSaveChatMsg(currentIMBuddy,'in',r.innerHTML);
   },900+Math.random()*600);
 }
 
@@ -2391,32 +2477,46 @@ function aoiInitiatePeer(name) {
 }
 
 function aoiSetupDataChannel(dc, fromName) {
-  dc.onopen  = function() { if(aoi_peers[fromName]) aoi_peers[fromName].ready=true; aoiUpdateBuddyListUI(); aoiUpdateIMStatus(fromName); };
+  dc.onopen  = function() {
+    if(aoi_peers[fromName]) aoi_peers[fromName].ready=true;
+    aoiUpdateBuddyListUI(); aoiUpdateIMStatus(fromName);
+    // Status + ausstehende Offline-Msgs senden
+    if(aoi_my_status!=='avail') dc.send(JSON.stringify({aoi:'status',v:aoi_my_status}));
+    aoiDeliverPendingMsgs(fromName);
+  };
   dc.onclose = function() { if(aoi_peers[fromName]) aoi_peers[fromName].ready=false; aoiUpdateIMStatus(fromName); };
   dc.onmessage = function(e) { aoiReceiveIM(fromName, e.data); };
 }
 
 function aoiReceiveIM(fromName, text) {
-  // Datei-Protokoll-Pakete abfangen
-  if(typeof text === 'string' && text.indexOf('{"aoi":"file"') === 0) {
-    try { var msg = JSON.parse(text); aoiReceiveFileMsg(fromName, msg); } catch(e){}
-    return;
+  // JSON-Kontrollnachrichten abfangen
+  if(typeof text==='string' && text.charAt(0)==='{') {
+    try {
+      var msg=JSON.parse(text);
+      if(msg.aoi==='file')   { aoiReceiveFileMsg(fromName, msg); return; }
+      if(msg.aoi==='typing') { aoiReceiveTyping(fromName); return; }
+      if(msg.aoi==='status') { aoiReceiveBuddyStatus(fromName, msg.v); return; }
+    } catch(e) {}
   }
-  var imWin=document.getElementById('win-im');
-  var imVisible=imWin&&imWin.style.display!=='none'&&!imWin.classList.contains('minimized');
-  if(currentIMBuddy!==fromName||!imVisible) openIM(fromName);
-  var log = document.getElementById('im-chat-log');
-  if(!log) return;
-  var d = document.createElement('div');
-  d.innerHTML = '<b style="color:#aa0000;">' + fromName + ':</b> ' + text.replace(/</g,'&lt;').replace(/>/g,'&gt;');
-  log.appendChild(d); log.scrollTop = log.scrollHeight;
+  // Richtiges Log-Element ermitteln
+  openIM(fromName);
+  var logEl;
+  if(aoi_im_wins[fromName]) logEl=aoi_im_wins[fromName].querySelector('.im-extra-log');
+  else logEl=document.getElementById('im-chat-log');
+  if(!logEl) return;
+  var d=document.createElement('div');
+  d.innerHTML='<b style="color:#aa0000;">'+fromName+':</b> '+text.replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  logEl.appendChild(d); logEl.scrollTop=logEl.scrollHeight;
+  aoiSaveChatMsg(fromName,'in',d.innerHTML);
   playSound('snd-msg-recv');
+  if(!document.hasFocus()) aoiDesktopNotify('💬 Neue Nachricht von '+fromName, text.substring(0,80), 'im-'+fromName);
 }
 
 function aoiShowBuddyOnline(name) {
   showBuddyNotify(name, 'hat sich angemeldet');
   if(!buddyData[name]) buddyData[name] = {away:'● Online', avatar:'🟢', reply:null};
   aoiUpdateIMStatus(name);
+  aoiDesktopNotify('🏃 '+name+' ist jetzt online', '', 'buddy-'+name);
 }
 
 function aoiShowBuddyOffline(name) {
@@ -2876,13 +2976,15 @@ function aoiRenderBuddyListUI() {
     var online=!!onlineSet[n];
     var connected=aoi_peers[n]&&aoi_peers[n].ready;
     var safe=n.replace(/'/g,"\\'").replace(/</g,'&lt;');
+    var buddyStatus=(buddyData[n]&&buddyData[n].status)||'avail';
     var statusTxt=connected?'🔗 P2P verbunden':(online?'● Online':'○ Offline');
+    var statusSuffix=online?aoiStatusLabel(buddyStatus):'';
     var dim=(!online&&inList)?'opacity:0.5;':'' ;
-    var runnerStyle=online?'':'background:#ccc;border-color:#999;';
+    var runnerStyle=online?({avail:'',away:'background:#d4a017;',busy:'background:#c00;border-color:#900;',brb:'background:#e08000;border-color:#a05800;'}[buddyStatus]||''):'background:#ccc;border-color:#999;';
     return '<div class="buddy-item" style="'+dim+'" onclick="aoiSelectBuddy(\''+safe+'\')" ondblclick="aoiTryOpenIM(\''+safe+'\')" oncontextmenu="aoiBuddyContextMenu(event,\''+safe+'\')">'
-      +'<span class="running-man" style="'+runnerStyle+'"></span><span>'+n+'</span>'
+      +'<span class="running-man" style="'+runnerStyle+'"></span><span>'+n+'<span style="color:#888;font-size:9px;">'+statusSuffix+'</span></span>'
       +'<div class="away-bubble"><div class="away-name">'+n+'</div>'
-      +'<div class="away-status">'+statusTxt+'</div></div></div>';
+      +'<div class="away-status">'+statusTxt+statusSuffix+'</div></div></div>';
   }
 
   var html='';
@@ -3178,6 +3280,132 @@ function aoiFileSize(bytes) {
 
 function escHtml(s) {
   return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+/* ===== CHAT-VERLAUF ===== */
+var AOI_HIST_MAX = 150;
+function aoiHistKey(name) { return 'aoi_chat_v1_' + name; }
+function aoiSaveChatMsg(name, dir, html) {
+  if(!name) return;
+  try {
+    var arr = JSON.parse(localStorage.getItem(aoiHistKey(name)) || '[]');
+    arr.push({d:dir, h:html, t:Date.now()});
+    if(arr.length > AOI_HIST_MAX) arr = arr.slice(arr.length - AOI_HIST_MAX);
+    localStorage.setItem(aoiHistKey(name), JSON.stringify(arr));
+  } catch(e) {}
+}
+function aoiLoadChatHistory(name, logEl) {
+  if(!logEl) return;
+  logEl.innerHTML = '';
+  try {
+    var arr = JSON.parse(localStorage.getItem(aoiHistKey(name)) || '[]');
+    if(arr.length === 0) {
+      logEl.innerHTML = '<div style="color:#888;font-style:italic;font-size:10px;">Direkte P2P-Verbindung aufgebaut.</div>';
+      return;
+    }
+    var sep = document.createElement('div');
+    sep.innerHTML = '<span style="color:#aaa;font-size:9px;">— Frühere Nachrichten —</span>';
+    sep.style.cssText = 'text-align:center;padding:4px 0 2px;';
+    logEl.appendChild(sep);
+    arr.forEach(function(m) {
+      var d = document.createElement('div');
+      d.innerHTML = m.h;
+      logEl.appendChild(d);
+    });
+    logEl.scrollTop = logEl.scrollHeight;
+  } catch(e) {
+    logEl.innerHTML = '<div style="color:#888;font-style:italic;font-size:10px;">Direkte P2P-Verbindung aufgebaut.</div>';
+  }
+}
+
+/* ===== TIPP-INDIKATOR ===== */
+var _typingSendTimer = null;
+function aoiOnIMInput() {
+  if(!currentIMBuddy) return;
+  aoiSendTypingSignal(currentIMBuddy);
+}
+function aoiOnExtraIMInput(name) { aoiSendTypingSignal(name); }
+function aoiSendTypingSignal(name) {
+  if(_typingSendTimer) return; // throttle: max 1x pro 2s
+  var peer = aoi_peers[name];
+  if(peer && peer.dc && peer.dc.readyState==='open') {
+    try { peer.dc.send(JSON.stringify({aoi:'typing'})); } catch(e) {}
+  }
+  _typingSendTimer = setTimeout(function(){ _typingSendTimer=null; }, 2000);
+}
+function aoiReceiveTyping(fromName) {
+  // Indikator im richtigen Fenster anzeigen
+  var indEl;
+  if(aoi_im_wins[fromName]) indEl = aoi_im_wins[fromName].querySelector('.im-extra-typing');
+  else if(currentIMBuddy===fromName) indEl = document.getElementById('im-typing-indicator');
+  if(!indEl) return;
+  indEl.textContent = fromName + ' schreibt…';
+  indEl.style.display = '';
+  if(_typingTimers[fromName]) clearTimeout(_typingTimers[fromName]);
+  _typingTimers[fromName] = setTimeout(function(){
+    indEl.style.display='none'; indEl.textContent='';
+  }, 3500);
+}
+
+/* ===== DESKTOP-BENACHRICHTIGUNGEN ===== */
+function aoiRequestNotifPermission() {
+  if(typeof Notification === 'undefined') return;
+  if(Notification.permission === 'default') Notification.requestPermission();
+}
+function aoiDesktopNotify(title, body, tag) {
+  if(typeof Notification === 'undefined') return;
+  if(Notification.permission !== 'granted') return;
+  try { new Notification(title, {body: body||'', tag: tag||'aoi', icon: '', silent: false}); } catch(e) {}
+}
+
+/* ===== BUDDY-STATUS ===== */
+function aoiSetMyStatus(v) {
+  aoi_my_status = v;
+  // An alle verbundenen Peers senden
+  Object.keys(aoi_peers).forEach(function(n) {
+    var p = aoi_peers[n];
+    if(p && p.dc && p.dc.readyState==='open') {
+      try { p.dc.send(JSON.stringify({aoi:'status',v:v})); } catch(e) {}
+    }
+  });
+  aoiUpdateBuddyListUI();
+}
+function aoiReceiveBuddyStatus(fromName, v) {
+  if(!buddyData[fromName]) buddyData[fromName]={away:'● Online',avatar:'🟢',reply:null};
+  buddyData[fromName].status = v;
+  aoiUpdateBuddyListUI();
+}
+function aoiStatusLabel(v) {
+  return {avail:'',away:' (Away)',busy:' (Beschäftigt)',brb:' (BRB)'}[v]||'';
+}
+
+/* ===== OFFLINE-NACHRICHTEN ZWISCHENSPEICHERN ===== */
+var _pendingMsgs = {}; // name → [{text, html, ts}]
+function aoiQueueOfflineMsg(name, text, html) {
+  if(!_pendingMsgs[name]) _pendingMsgs[name]=[];
+  _pendingMsgs[name].push({text:text, html:html, ts:Date.now()});
+  try { localStorage.setItem('aoi_pending_'+name, JSON.stringify(_pendingMsgs[name])); } catch(e) {}
+}
+function aoiLoadPendingMsgs(name) {
+  try {
+    var arr=JSON.parse(localStorage.getItem('aoi_pending_'+name)||'[]');
+    if(arr.length) _pendingMsgs[name]=arr;
+  } catch(e) {}
+}
+function aoiDeliverPendingMsgs(name) {
+  aoiLoadPendingMsgs(name);
+  var msgs=_pendingMsgs[name];
+  if(!msgs||!msgs.length) return;
+  var peer=aoi_peers[name];
+  if(!peer||!peer.dc||peer.dc.readyState!=='open') return;
+  msgs.forEach(function(m){
+    try { peer.dc.send(m.text); } catch(e) {}
+    // Im eigenen Log als nachträglich gesendet markieren
+    var logEl; if(aoi_im_wins[name]) logEl=aoi_im_wins[name].querySelector('.im-extra-log'); else if(currentIMBuddy===name) logEl=document.getElementById('im-chat-log');
+    if(logEl){ var d=document.createElement('div'); d.innerHTML='<b style="color:#0000aa;">Ich</b> <span style="font-size:9px;color:#888;">(gesendet)</span>: '+escHtml(m.text); logEl.appendChild(d); logEl.scrollTop=logEl.scrollHeight; }
+  });
+  _pendingMsgs[name]=[];
+  try { localStorage.removeItem('aoi_pending_'+name); } catch(e) {}
 }
 </script>
 
