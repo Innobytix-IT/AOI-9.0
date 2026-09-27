@@ -7,11 +7,28 @@ Ein klassischer Instant-Messenger-Look, echter P2P-Chat via WebRTC und ein integ
 
 ---
 
+## Screenshots
+
+| Anmelden | Verbinden |
+|----------|-----------|
+| ![Login](docs/screenshots/login.png) | ![Verbinden](docs/screenshots/verbinden.png) |
+
+| Desktop mit Chat & Sport | Finanzen & Chat |
+|--------------------------|-----------------|
+| ![Desktop](docs/screenshots/desktop.webp) | ![Finanzen](docs/screenshots/finanzen.webp) |
+
+| E-Mail-Postfach |
+|-----------------|
+| ![Postfach](docs/screenshots/postfach.png) |
+
+---
+
 ## Features
 
 - **Retro-Design** – Klassische AOL-Optik mit Buddy-Liste, Sounds und Modem-Verbindungsanimation
 - **WebRTC P2P Messaging** – Direkte Nachrichten zwischen Buddies ohne zentralen Nachrichtenserver
-- **Buddy-Verwaltung** – Gruppen, Online/Offline-Status, Sortierung, Kontextmenü
+- **Dateiübertragung ohne Limit** – Beliebige Dateien direkt P2P via DataChannel, kein Umweg über Server
+- **Buddy-Verwaltung** – Gruppen, Online/Offline-Status, Sortierung, Kontextmenü, Buddy-Suche
 - **Screen Names** – Mehrere Namen pro Installation, Eindeutigkeitsprüfung via Server
 - **Integrierter Browser** – Webviewer mit Navigationsliste (Wetter, Sport, Musik, Suche …)
 - **Sounds** – Modem-Einwahl, Türklingeln bei Buddy-Login (optional)
