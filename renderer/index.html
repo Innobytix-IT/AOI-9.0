@@ -1807,6 +1807,14 @@ var aoi_im_wins = {};      // name → extra window element
 var aoi_my_status = 'avail';
 var _typingTimers = {};    // name → clearTimeout handle
 
+// Fensterfokus per Event-Listener tracken – zuverlässiger als document.hasFocus() on-the-fly
+var _aoiWinFocused = document.hasFocus();
+window.addEventListener('focus', function() { _aoiWinFocused = true; });
+window.addEventListener('blur',  function() { _aoiWinFocused = false; });
+document.addEventListener('visibilitychange', function() {
+  if(document.visibilityState === 'hidden') _aoiWinFocused = false;
+});
+
 function aoiUpdateIMStatus(name) {
   var online = !!aoi_known_buddies[name];
   var connected = aoi_peers[name] && aoi_peers[name].ready;
@@ -3374,7 +3382,7 @@ function aoiRequestNotifPermission() {
 function aoiDesktopNotify(title, body, tag) {
   if(typeof Notification === 'undefined') return;
   if(Notification.permission !== 'granted') return;
-  if(document.hasFocus() && document.visibilityState !== 'hidden') return;
+  if(_aoiWinFocused) return;
   try { new Notification(title, {body: body||'', tag: tag||'aoi', icon: '', silent: false}); } catch(e) {}
 }
 
