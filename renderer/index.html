@@ -1205,8 +1205,9 @@ function showWelcomeSplash(name) {
   detectBandwidth();
   var modem=document.getElementById('snd-modem'); if(modem){ modem.pause(); modem.currentTime=0; }
   var wlk=document.getElementById('snd-willkommen');
-  if(wlk){ wlk.currentTime=0; wlk.onended=function(){ wlk.onended=null; playSound('snd-mail'); }; wlk.play().catch(function(){ setTimeout(function(){ playSound('snd-mail'); }, 1000); }); }
-  else { setTimeout(function(){ playSound('snd-mail'); }, 1200); }
+  var hasUnread = document.querySelectorAll('#mail-tbody tr.unread').length > 0;
+  if(wlk){ wlk.currentTime=0; wlk.onended=function(){ wlk.onended=null; if(hasUnread) playSound('snd-mail'); }; wlk.play().catch(function(){ if(hasUnread) setTimeout(function(){ playSound('snd-mail'); }, 1000); }); }
+  else if(hasUnread) { setTimeout(function(){ playSound('snd-mail'); }, 1200); }
   splashTimer=setTimeout(function(){ splashTimer=null; closeSplashNow(); }, 6000);
   aoiStartOnline(name);
 }
@@ -1346,7 +1347,7 @@ function openWindow(id) {
   var w=document.getElementById(id); if(!w) return;
   if(w.classList.contains('minimized')) restoreWindow(id);
   else { if(id==='win-mailbox'||id==='win-im') applyDefaultPosition(id); w.style.display='flex'; bringToFront(id); }
-  if(id==='win-mailbox'){ playSound('snd-mail'); if(_emailCfg) emailFetchInbox(); }
+  if(id==='win-mailbox'){ if(document.querySelectorAll('#mail-tbody tr.unread').length>0) playSound('snd-mail'); if(_emailCfg) emailFetchInbox(); }
 }
 function toggleWindow(id) { var w=document.getElementById(id); if(w.style.display==='none'||w.classList.contains('minimized')) openWindow(id); else closeWindow(id); }
 function closeWindow(id) { var w=document.getElementById(id); if(w) w.style.display='none'; removeMinTab(id); }
@@ -1794,13 +1795,15 @@ function mailInitDemoEmails(userName) {
   var deleted = false;
   try{ deleted = !!localStorage.getItem('aoi_mail_deleted_'+WELCOME_MAIL_ID); }catch(e){}
   if(deleted) { mailUpdateCounter(); return; }
+  var alreadyRead = false;
+  try{ alreadyRead = !!localStorage.getItem('aoi_mail_read_'+WELCOME_MAIL_ID); }catch(e){}
   var tbody = document.getElementById('mail-tbody');
   var now = new Date();
   var dateStr = now.toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit',year:'numeric'});
   var tr = document.createElement('tr');
-  tr.className = 'unread';
+  tr.className = alreadyRead ? '' : 'unread';
   tr.dataset.demoId = WELCOME_MAIL_ID;
-  tr.innerHTML = '<td>✉️</td><td>'+dateStr+'</td><td>AOI 9.0 Nostalgia-Team</td><td>Willkommen bei AOI 9.0 Nostalgia!</td>';
+  tr.innerHTML = '<td>'+(alreadyRead?'📨':'✉️')+'</td><td>'+dateStr+'</td><td>AOI 9.0 Nostalgia-Team</td><td>Willkommen bei AOI 9.0 Nostalgia!</td>';
   var body = buildWelcomeMailHtml(userName||'');
   tr.onclick = function(){ previewMail(tr,'AOI 9.0 Nostalgia-Team',dateStr,'Willkommen bei AOI 9.0 Nostalgia!',body,true); };
   tr.ondblclick = mailRead;
@@ -1814,6 +1817,7 @@ function previewMail(row, from, date, subj, txt, isHtml) {
   row.classList.add('mail-selected');
   row.classList.remove('unread');
   if(row.cells[0]) row.cells[0].textContent = '📨';
+  if(row.dataset.demoId) { try{ localStorage.setItem('aoi_mail_read_'+row.dataset.demoId,'1'); }catch(e){} }
   _selMail = { row:row, from:from, date:date, subject:subj, body:txt, isHtml:!!isHtml };
   var bodyHtml = isHtml ? txt : e(txt).replace(/\n/g,'<br>');
   document.getElementById('mail-preview').innerHTML =
