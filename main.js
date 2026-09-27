@@ -27,7 +27,11 @@ function createWindow() {
 
 }
 
-ipcMain.handle('is-window-focused', () => BrowserWindow.getFocusedWindow() !== null);
+ipcMain.handle('is-window-focused', () => {
+  // app.hasFocus() erkennt auch wenn ein eingebetteter Webview den OS-Fokus hält
+  if (typeof app.hasFocus === 'function') return app.hasFocus();
+  return BrowserWindow.getAllWindows().some(w => w.isFocused());
+});
 ipcMain.on('window-minimize', () => BrowserWindow.getFocusedWindow()?.minimize());
 ipcMain.on('window-maximize', () => { const w = BrowserWindow.getFocusedWindow(); w?.isMaximized() ? w.unmaximize() : w?.maximize(); });
 ipcMain.on('window-maximize-force', () => BrowserWindow.getFocusedWindow()?.maximize());
