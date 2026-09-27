@@ -696,8 +696,11 @@ body {
       <div class="window-inner-content" style="flex:1;min-height:0;display:flex;flex-direction:column;overflow:hidden;">
         <div class="im-buddy-header">
           <div class="im-buddy-avatar" id="im-buddy-avatar">🏄</div>
-          <div class="im-buddy-info">
-            <div class="im-buddy-name" id="im-buddy-name-disp">SurfinJerry</div>
+          <div class="im-buddy-info" style="flex:1;min-width:0;">
+            <div style="display:flex;align-items:center;gap:6px;">
+              <div class="im-buddy-name" id="im-buddy-name-disp">SurfinJerry</div>
+              <button id="im-add-buddy-btn" onclick="aoiIMAddBuddy()" style="display:none;font-size:9px;padding:1px 5px;background:linear-gradient(to bottom,#fff 0%,#d8e5f2 100%);border:1px solid #5d8cb9;border-radius:3px;color:#0b3967;cursor:pointer;white-space:nowrap;">+ Buddy</button>
+            </div>
             <div class="im-buddy-away-msg" id="im-buddy-away-disp">🏄 "Surfe gerade durch das Netz – zurück um 20 Uhr"</div>
           </div>
         </div>
@@ -723,6 +726,12 @@ body {
         <div class="im-history" id="im-chat-log"><div style="color:#888;font-style:italic;font-size:10px;">Direkte P2P-Verbindung aufgebaut.</div></div>
         <div id="im-message-input" class="im-input-ce" contenteditable="true" onkeydown="handleIMKey(event)"></div>
         <input type="file" id="im-file-input" style="display:none" onchange="aoiSendFile(this)">
+        <div id="im-transfer-bar" style="display:none;padding:2px 6px 0;">
+          <div style="height:6px;background:#dde8f5;border:1px solid #7f9db9;border-radius:3px;overflow:hidden;">
+            <div id="im-transfer-progress" style="height:100%;width:0%;background:linear-gradient(90deg,#0044cc,#44aaff);transition:width .1s linear;"></div>
+          </div>
+          <div id="im-transfer-label" style="font-size:9px;color:#555;text-align:right;margin-top:1px;"></div>
+        </div>
         <div class="im-send-row">
           <button class="btn-options" title="Datei senden" onclick="document.getElementById('im-file-input').click()" style="padding:4px 8px;font-size:13px;">📎</button>
           <button class="btn-options" onclick="sendIMMessage()">Senden</button>
@@ -1285,8 +1294,21 @@ function openIM(name) {
   document.getElementById('im-buddy-name-disp').textContent=name;
   document.getElementById('im-buddy-away-disp').textContent=d.away;
   document.getElementById('im-buddy-avatar').textContent=d.avatar;
+  // "+ Buddy"-Button nur zeigen wenn nicht bereits in der Liste
+  var addBtn=document.getElementById('im-add-buddy-btn');
+  if(addBtn){
+    var inList=aoiGetBuddyList().some(function(b){ return b.name===name; });
+    addBtn.style.display=inList?'none':'inline-block';
+  }
   openWindow('win-im');
   document.getElementById('im-message-input').focus();
+}
+
+function aoiIMAddBuddy(){
+  if(!currentIMBuddy) return;
+  aoiAddBuddy(currentIMBuddy,'Buddies');
+  document.getElementById('im-add-buddy-btn').style.display='none';
+  aoiPresenceHeartbeat();
 }
 function handleIMKey(e) { if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();sendIMMessage();} }
 function sendIMMessage() {
@@ -1824,17 +1846,24 @@ function aoiSendFile(input) {
     var startMsg = JSON.stringify({aoi:'file',phase:'start',name:file.name,size:buf.byteLength,mime:file.type||'application/octet-stream',total:total});
     peer.dc.send(startMsg);
     // Chunks senden
+    // Fortschrittsbalken einblenden
+    var tbar=document.getElementById('im-transfer-bar');
+    var tprog=document.getElementById('im-transfer-progress');
+    var tlabel=document.getElementById('im-transfer-label');
+    if(tbar){ tbar.style.display='block'; tprog.style.width='0%'; tlabel.textContent=''; }
     var i = 0;
     function sendNext() {
       if(i >= total) {
         peer.dc.send(JSON.stringify({aoi:'file',phase:'end',name:file.name}));
+        if(tbar){ tbar.style.display='none'; tprog.style.width='0%'; }
         return;
       }
       var slice = buf.slice(i*AOI_CHUNK, (i+1)*AOI_CHUNK);
       var b64 = btoa(String.fromCharCode.apply(null, new Uint8Array(slice)));
       peer.dc.send(JSON.stringify({aoi:'file',phase:'chunk',n:i,data:b64}));
       i++;
-      // Kleines yield damit der DC nicht blockiert
+      // Fortschritt aktualisieren
+      if(tprog){ var pct=Math.round(i/total*100); tprog.style.width=pct+'%'; tlabel.textContent=pct+'% – '+aoiFileSize(i*AOI_CHUNK>buf.byteLength?buf.byteLength:i*AOI_CHUNK)+' / '+aoiFileSize(buf.byteLength); }
       setTimeout(sendNext, 0);
     }
     sendNext();
@@ -1858,7 +1887,16 @@ function aoiReceiveFileMsg(fromName, msg) {
     log.appendChild(d); log.scrollTop=log.scrollHeight;
   } else if(msg.phase === 'chunk') {
     var ft = _fileTransfers[fromName];
-    if(ft) ft.chunks[msg.n] = msg.data;
+    if(ft){
+      ft.chunks[msg.n] = msg.data;
+      // Fortschrittsbalken nur wenn dieser Buddy gerade im IM-Fenster offen ist
+      if(fromName===currentIMBuddy){
+        var tbar2=document.getElementById('im-transfer-bar');
+        var tprog2=document.getElementById('im-transfer-progress');
+        var tlabel2=document.getElementById('im-transfer-label');
+        if(tbar2){ tbar2.style.display='block'; var pct2=Math.round((msg.n+1)/ft.total*100); tprog2.style.width=pct2+'%'; tlabel2.textContent=pct2+'% empfangen'; }
+      }
+    }
   } else if(msg.phase === 'end') {
     var ft2 = _fileTransfers[fromName];
     if(!ft2) return;
@@ -1874,6 +1912,10 @@ function aoiReceiveFileMsg(fromName, msg) {
     }
     var blob = new Blob(parts, {type:ft2.mime});
     var url = URL.createObjectURL(blob);
+    if(fromName===currentIMBuddy){
+      var tbar3=document.getElementById('im-transfer-bar');
+      if(tbar3){ tbar3.style.display='none'; document.getElementById('im-transfer-progress').style.width='0%'; }
+    }
     var prog = document.getElementById('ft-progress-'+fromName);
     if(prog) {
       prog.innerHTML = '<b style="color:#aa0000;">'+escHtml(fromName)+':</b> <span style="background:#e8ffe8;border:1px solid #60c060;border-radius:4px;padding:2px 6px;font-size:11px;">📎 <a href="'+url+'" download="'+escHtml(ft2.name)+'" style="color:#006600;text-decoration:underline;font-weight:bold;">'+escHtml(ft2.name)+'</a> ('+aoiFileSize(ft2.size)+') – Klicken zum Speichern</span>';
