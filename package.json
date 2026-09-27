@@ -1,7 +1,7 @@
 {
   "name": "aoi-9",
   "version": "9.0.0",
-  "description": "AOI 9.0 – Retro Online-Software",
+  "description": "AOI 9.0 Nostalgia – Retro Online-Software",
   "main": "main.js",
   "scripts": {
     "start": "electron .",
@@ -11,8 +11,8 @@
   },
   "build": {
     "appId": "de.aoi.aoi9",
-    "productName": "AOI 9.0",
-    "copyright": "AOI 9.0 Retro-Simulation",
+    "productName": "AOI 9.0 Nostalgia",
+    "copyright": "AOI 9.0 Nostalgia",
     "files": [
       "main.js",
       "preload.js",

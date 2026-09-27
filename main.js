@@ -11,7 +11,7 @@ function createWindow() {
     height: 768,
     minWidth: 800,
     minHeight: 600,
-    title: 'AOI 9.0',
+    title: 'AOI 9.0 Nostalgia',
     icon: path.join(__dirname, 'assets', process.platform === 'win32' ? 'icon.ico' : 'icon.png'),
     frame: false,
     backgroundColor: '#008080',

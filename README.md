@@ -1,8 +1,8 @@
-# AOI 9.0
+# AOI 9.0 Nostalgia
 
 **Retro AOL-style Electron desktop app with WebRTC P2P messaging**
 
-AOI 9.0 bringt das Feeling der frühen 2000er zurück – mit moderner Technik darunter.  
+AOI 9.0 Nostalgia bringt das Feeling der frühen 2000er zurück – mit moderner Technik darunter.  
 Ein klassischer Instant-Messenger-Look, echter P2P-Chat via WebRTC und ein integrierter Webbrowser.
 
 ---
