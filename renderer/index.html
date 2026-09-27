@@ -1550,7 +1550,9 @@ function aoiReceiveIM(fromName, text) {
     try { var msg = JSON.parse(text); aoiReceiveFileMsg(fromName, msg); } catch(e){}
     return;
   }
-  if(currentIMBuddy !== fromName) openIM(fromName);
+  var imWin=document.getElementById('win-im');
+  var imVisible=imWin&&imWin.style.display!=='none'&&!imWin.classList.contains('minimized');
+  if(currentIMBuddy!==fromName||!imVisible) openIM(fromName);
   var log = document.getElementById('im-chat-log');
   if(!log) return;
   var d = document.createElement('div');
@@ -1943,7 +1945,9 @@ function aoiSendFile(input) {
 
 function aoiReceiveFileMsg(fromName, msg) {
   if(msg.phase === 'start') {
-    if(currentIMBuddy !== fromName) openIM(fromName);
+    var imWin2=document.getElementById('win-im');
+    var imVis2=imWin2&&imWin2.style.display!=='none'&&!imWin2.classList.contains('minimized');
+    if(currentIMBuddy!==fromName||!imVis2) openIM(fromName);
     _fileTransfers[fromName] = {name:msg.name, mime:msg.mime, chunks:[], total:msg.total, size:msg.size};
     var log = document.getElementById('im-chat-log');
     var d = document.createElement('div');
