@@ -291,6 +291,13 @@ body {
 .mail-table tr.unread { font-weight:bold;color:#000; }
 .mail-preview-box { height:85px;border:1px solid #7f9db9;background:#fffff8;padding:6px;overflow-y:auto;font-size:11px; }
 .mail-actions-bar { display:flex;justify-content:space-between;padding:4px 6px;background:#eaf2fb;border-top:1px solid #c2d8ed; }
+.mail-save-item { padding:5px 12px;font-size:11px;font-family:Tahoma,sans-serif;cursor:pointer;white-space:nowrap; }
+.mail-save-item:hover { background:#d0e4f7; }
+.mail-table tr.mail-selected { background:#c5dff7 !important; }
+.mail-read-view { position:absolute;inset:0;background:#fffff8;z-index:50;display:flex;flex-direction:column;overflow:hidden; }
+.mail-read-header { padding:8px 12px;background:#d8e6f3;border-bottom:1px solid #7faad0;font-size:11px;font-family:Tahoma; }
+.mail-read-body { flex:1;overflow-y:auto;padding:10px 14px;font-size:12px;font-family:Tahoma;line-height:1.6; }
+.mail-read-bar { padding:4px 8px;background:#eaf2fb;border-top:1px solid #c2d8ed;display:flex;gap:4px; }
 
 /* ===== IM-FENSTER ===== */
 .im-buddy-header { padding:6px 10px;background:linear-gradient(to bottom,#ddeeff,#c6dcf6);border-bottom:1px solid #8aabcc;display:flex;align-items:flex-start;gap:8px;flex-shrink:0; }
@@ -357,7 +364,7 @@ body {
       <div class="title-controls"><div class="btn-win close" onclick="if(window.electronAPI)window.electronAPI.close()" title="Beenden">✕</div></div>
     </div>
     <div class="window-body">
-      <div style="display:flex;justify-content:flex-end;margin-bottom:8px;"><button class="btn-options">Hilfe</button></div>
+      <div style="display:flex;justify-content:flex-end;margin-bottom:8px;"><button class="btn-options" onclick="window.open('https://github.com/Innobytix-IT/AOI-9.0','_blank')">Hilfe</button></div>
       <div class="main-card">
         <div class="card-top">
           <div class="logo-container">
@@ -454,7 +461,7 @@ body {
     <span class="menu-item" onclick="toggleWindow('win-navigation')">Kanäle</span>
     <span class="menu-item" onclick="openWindow('win-main')">Willkommen</span>
     <span class="menu-item" style="color:#b31e00;font-weight:bold;" onclick="doSignOff()">Abmelden</span>
-    <span class="menu-item">Hilfe</span>
+    <span class="menu-item" onclick="window.open('https://github.com/Innobytix-IT/AOI-9.0','_blank')">Hilfe</span>
     <div class="electron-winctrls" id="electron-winctrls" style="display:none;">
       <button onclick="if(window.electronAPI)window.electronAPI.minimize()" title="Minimieren">_</button>
       <button onclick="if(window.electronAPI)window.electronAPI.maximize()" title="Maximieren">□</button>
@@ -464,10 +471,11 @@ body {
   <div class="icon-toolbar">
     <div class="toolbar-left">
       <div class="tool-btn" onclick="openWindow('win-mailbox')"><span class="mail-badge" id="mail-counter">3</span><span class="tool-icon">📬</span><span class="tool-label">Lesen</span></div>
-      <div class="tool-btn" onclick="alert('Neue E-Mail verfassen...')"><span class="tool-icon">✍️</span><span class="tool-label">Schreiben</span></div>
-      <div class="tool-btn" onclick="openIM('SurfinJerry')"><span class="tool-icon">🏃</span><span class="tool-label">Nachricht</span></div>
+      <div class="tool-btn" onclick="openComposeMail()"><span class="tool-icon">✍️</span><span class="tool-label">Schreiben</span></div>
+      <div class="tool-btn" onclick="aoiReopenLastIM()"><span class="tool-icon">🏃</span><span class="tool-label">Nachricht</span></div>
       <div class="tool-btn" onclick="openWindow('win-buddylist')"><span class="tool-icon">👥</span><span class="tool-label">Buddies</span></div>
       <div class="tool-btn" onclick="toggleWindow('win-navigation')"><span class="tool-icon">🧭</span><span class="tool-label">Kanäle</span></div>
+      <div class="tool-btn" onclick="openWindow('win-radio')"><span class="tool-icon">📻</span><span class="tool-label">Radio</span></div>
       <div class="tool-btn" onclick="openSecurityCheck()"><span class="tool-icon">🛡️</span><span class="tool-label">Sicherheit</span></div>
       <div class="tool-btn" onclick="openWindow('win-main');switchPortalTab('meinaoi');"><span class="tool-icon">⚙️</span><span class="tool-label">Einstellungen</span></div>
     </div>
@@ -518,7 +526,7 @@ body {
         </div>
         <div class="nav-category">
           <div class="nav-cat-header">Unterhaltung <span>▸</span></div>
-          <ul class="nav-cat-list"><li onclick="navigateKeyword('kino')">Kino &amp; Filme</li><li onclick="navigateKeyword('spiele')">Spiele</li><li onclick="navigateKeyword('musik')">Musik</li></ul>
+          <ul class="nav-cat-list"><li onclick="navigateKeyword('kino')">Kino &amp; Filme</li><li onclick="navigateKeyword('spiele')">Spiele</li><li onclick="navigateKeyword('musik')">Musik</li><li onclick="navigateKeyword('radio')">📻 Radio</li></ul>
         </div>
       </div>
     </div>
@@ -672,10 +680,10 @@ body {
             <div class="mail-table-box">
               <table class="mail-table">
                 <thead><tr><th>Typ</th><th>Datum</th><th>Absender</th><th>Betreff</th></tr></thead>
-                <tbody>
-                  <tr class="unread" onclick="previewMail('Steve Case','Willkommen bei AOI 9.0!','Hallo RetroSurfer! Google News werden jetzt live ins Breitband-Portal gestreamt!')"><td>✉️</td><td>Heute</td><td>Steve Case</td><td>Willkommen bei AOI 9.0!</td></tr>
-                  <tr class="unread" onclick="previewMail('SurfinJerry','Bist du online?','Hey! Schreib mir mal im Sofortnachrichten-Fenster. Ich bin noch bis 20 Uhr da 🏄')"><td>✉️</td><td>Heute</td><td>SurfinJerry</td><td>Bist du online?</td></tr>
-                  <tr class="unread" onclick="previewMail('AHPT Cloud','Tunnel bereit','Dein asymmetrischer HTTP Polling Tunnel ist aktiv.')"><td>✉️</td><td>Gestern</td><td>AHPT Cloud</td><td>Tunnel bereit</td></tr>
+                <tbody id="mail-tbody">
+                  <tr class="unread" id="mail-row-0" onclick="previewMail(this,'Steve Case','Heute','Willkommen bei AOI 9.0!','Hallo RetroSurfer! Google News werden jetzt live ins Breitband-Portal gestreamt!')" ondblclick="mailRead()"><td>✉️</td><td>Heute</td><td>Steve Case</td><td>Willkommen bei AOI 9.0!</td></tr>
+                  <tr class="unread" id="mail-row-1" onclick="previewMail(this,'SurfinJerry','Heute','Bist du online?','Hey! Schreib mir mal im Sofortnachrichten-Fenster. Ich bin noch bis 20 Uhr da 🏄')" ondblclick="mailRead()"><td>✉️</td><td>Heute</td><td>SurfinJerry</td><td>Bist du online?</td></tr>
+                  <tr class="unread" id="mail-row-2" onclick="previewMail(this,'AHPT Cloud','Gestern','Tunnel bereit','Dein asymmetrischer HTTP Polling Tunnel ist aktiv.')" ondblclick="mailRead()"><td>✉️</td><td>Gestern</td><td>AHPT Cloud</td><td>Tunnel bereit</td></tr>
                 </tbody>
               </table>
             </div>
@@ -683,9 +691,94 @@ body {
           </div>
         </div>
         <div class="mail-actions-bar">
-          <div style="display:flex;gap:4px;"><button class="btn-options">Lesen</button><button class="btn-options">Speichern ▾</button><button class="btn-options">Löschen</button></div>
+          <div style="display:flex;gap:4px;position:relative;">
+            <button class="btn-options" id="mail-btn-lesen"    onclick="mailRead()"   style="font-weight:bold;">Lesen</button>
+            <button class="btn-options" id="mail-btn-speichern" onclick="mailSaveToggle(event)">Speichern ▾</button>
+            <div id="mail-save-menu" style="display:none;position:absolute;bottom:28px;left:0;background:#ece9d8;border:1px solid #7f9db9;box-shadow:3px 3px 8px rgba(0,0,0,.25);z-index:9999;min-width:160px;">
+              <div class="mail-save-item" onclick="mailSaveAs()">💾 Als Textdatei speichern</div>
+              <div class="mail-save-item" onclick="mailReplyOpen()">↩️ Antworten</div>
+              <div class="mail-save-item" onclick="mailForwardOpen()">➡️ Weiterleiten</div>
+            </div>
+            <button class="btn-options" id="mail-btn-loeschen" onclick="mailDelete()">Löschen</button>
+          </div>
           <button class="btn-options" onclick="playSound('snd-mail')">🔔 Sound wiederholen</button>
         </div>
+      </div>
+    </div>
+
+    <!-- E-MAIL VERFASSEN -->
+    <div class="mdi-window" id="win-compose" style="top:80px;left:200px;width:560px;height:440px;z-index:28;display:none;">
+      <div class="title-bar" onmousedown="focusAndDrag(event,'win-compose')">
+        <div class="title-left"><span>✍️ Neue E-Mail verfassen</span></div>
+        <div class="title-controls"><div class="btn-win" onclick="minimizeWindow('win-compose')">_</div><div class="btn-win" onclick="toggleMaximize('win-compose')">□</div><div class="btn-win close" onclick="closeWindow('win-compose')">✕</div></div>
+      </div>
+      <div class="window-inner-content" style="flex:1;min-height:0;display:flex;flex-direction:column;overflow:hidden;">
+        <div style="background:#d8e6f3;border-bottom:1px solid #7faad0;padding:5px 8px;display:flex;flex-direction:column;gap:3px;">
+          <div style="display:flex;align-items:center;gap:4px;">
+            <label style="width:46px;font-size:11px;font-weight:bold;color:#07315c;flex-shrink:0;">An:</label>
+            <input id="compose-to" type="text" placeholder="Empfänger@aol.de" style="flex:1;font-size:11px;font-family:Tahoma;padding:2px 5px;border:1px solid #7f9db9;">
+          </div>
+          <div style="display:flex;align-items:center;gap:4px;">
+            <label style="width:46px;font-size:11px;font-weight:bold;color:#07315c;flex-shrink:0;">CC:</label>
+            <input id="compose-cc" type="text" placeholder="Optional" style="flex:1;font-size:11px;font-family:Tahoma;padding:2px 5px;border:1px solid #7f9db9;">
+          </div>
+          <div style="display:flex;align-items:center;gap:4px;">
+            <label style="width:46px;font-size:11px;font-weight:bold;color:#07315c;flex-shrink:0;">Betreff:</label>
+            <input id="compose-subject" type="text" placeholder="Betreff eingeben…" style="flex:1;font-size:11px;font-family:Tahoma;padding:2px 5px;border:1px solid #7f9db9;">
+          </div>
+        </div>
+        <div style="display:flex;gap:4px;padding:4px 6px;background:#eaf2fb;border-bottom:1px solid #c2d8ed;">
+          <button class="btn-options" style="font-size:10px;padding:1px 8px;" onclick="document.execCommand('bold')"><b>F</b></button>
+          <button class="btn-options" style="font-size:10px;padding:1px 8px;" onclick="document.execCommand('italic')"><i>K</i></button>
+          <button class="btn-options" style="font-size:10px;padding:1px 8px;" onclick="document.execCommand('underline')"><u>U</u></button>
+          <span style="border-left:1px solid #aaa;margin:0 3px;"></span>
+          <select style="font-size:10px;border:1px solid #7f9db9;" onchange="document.execCommand('fontName',false,this.value)">
+            <option>Tahoma</option><option>Arial</option><option>Times New Roman</option><option>Courier New</option>
+          </select>
+          <select style="font-size:10px;border:1px solid #7f9db9;" onchange="document.execCommand('fontSize',false,this.value)">
+            <option value="2">10</option><option value="3" selected>12</option><option value="4">14</option><option value="5">18</option>
+          </select>
+        </div>
+        <div id="compose-body" contenteditable="true"
+             style="flex:1;min-height:0;overflow-y:auto;padding:8px;font-size:12px;font-family:Tahoma,sans-serif;background:#fffff8;outline:none;line-height:1.5;"></div>
+        <div class="mail-actions-bar">
+          <div style="display:flex;gap:4px;">
+            <button class="btn-options" onclick="closeWindow('win-compose')">Abbrechen</button>
+            <button class="btn-options" onclick="composeAttach()">📎 Anhang</button>
+          </div>
+          <button class="btn-signon" style="border-radius:4px;padding:4px 20px;" onclick="composeSend()">📤 Senden</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- RADIO-FENSTER -->
+    <div class="mdi-window" id="win-radio" style="bottom:30px;left:20px;width:360px;height:280px;z-index:27;display:none;">
+      <div class="title-bar" onmousedown="focusAndDrag(event,'win-radio')">
+        <div class="title-left">
+          <svg style="width:14px;height:14px;margin-right:4px;" viewBox="0 0 100 100"><circle cx="50" cy="50" r="40" fill="none" stroke="#fff" stroke-width="12"/><circle cx="50" cy="50" r="12" fill="#fff"/></svg>
+          <span>📻 AOI Radio</span>
+        </div>
+        <div class="title-controls"><div class="btn-win" onclick="minimizeWindow('win-radio')">_</div><div class="btn-win" onclick="toggleMaximize('win-radio')">□</div><div class="btn-win close" onclick="closeWindow('win-radio')">✕</div></div>
+      </div>
+      <div class="window-inner-content" style="flex:1;min-height:0;display:flex;flex-direction:column;overflow:hidden;">
+        <div style="display:flex;align-items:center;gap:4px;padding:3px 6px;background:#d8e6f3;border-bottom:1px solid #7faad0;">
+          <span style="font-size:10px;color:#07315c;font-weight:bold;">Sender:</span>
+          <select id="radio-station-sel" style="flex:1;font-size:10px;font-family:Tahoma;border:1px solid #7f9db9;padding:1px 3px;" onchange="radioSelectStation()">
+            <option value="https://tunein.com/radio/Top-40-Hits-g39/">🌍 TuneIn – Top 40</option>
+            <option value="https://tunein.com/radio/Rock-g227/">🎸 TuneIn – Rock</option>
+            <option value="https://tunein.com/radio/80s-g57/">🕹 TuneIn – 80s Hits</option>
+            <option value="https://tunein.com/radio/Germany-r101200/">🇩🇪 TuneIn – Deutschland</option>
+            <option value="https://tunein.com/radio/s24895/">📻 KISS FM</option>
+            <option value="https://tunein.com/radio/s25071/">⚡ Energy Berlin</option>
+            <option value="https://tunein.com/radio/s25350/">🌊 WDR 2</option>
+            <option value="https://tunein.com/radio/s82991/">🎵 SWR3</option>
+            <option value="https://tunein.com/radio/NDR-2-s25071/">🎶 NDR 2</option>
+            <option value="https://tunein.com">🏠 TuneIn Startseite</option>
+          </select>
+          <button class="btn-options" style="font-size:10px;padding:1px 7px;" onclick="radioSelectStation()">▶</button>
+        </div>
+        <webview id="radio-frame" src="https://tunein.com/radio/Top-40-Hits-g39/"
+          style="flex:1;width:100%;border:none;background:#fff;" allowpopups></webview>
       </div>
     </div>
 
@@ -1104,6 +1197,8 @@ function applyDefaultPosition(id) {
   var w=document.getElementById(id); if(!w) return;
   w.classList.remove('maximized');
   if(id==='win-mailbox'){w.style.top='90px';w.style.left='320px';w.style.width='960px';w.style.height='540px';}
+  else if(id==='win-compose'){w.style.top='80px';w.style.left='200px';w.style.width='560px';w.style.height='440px';}
+  else if(id==='win-radio'){var ws=document.getElementById('mdi-workspace');w.style.width='360px';w.style.height='280px';w.style.left='20px';w.style.top=Math.max(10,ws.clientHeight-280-30)+'px';}
   else if(id==='win-im'){var ws=document.getElementById('mdi-workspace');w.style.width='340px';w.style.height='400px';w.style.left=Math.max(10,ws.clientWidth-340-15)+'px';w.style.top=Math.max(10,ws.clientHeight-400-25)+'px';}
 }
 function bringToFront(id) {
@@ -1302,6 +1397,7 @@ var AOI_KEYWORD_URLS = {
   'einkaufen':   'https://www.amazon.de',
   'karten':      'https://maps.google.de',
   'musik':       'https://open.spotify.com',
+  'radio':       null,           // intern: Radio-Fenster öffnen
   'suche':       'https://www.google.de',
   'stichwort':   null           // intern: URL-Leiste fokussieren
 };
@@ -1312,6 +1408,8 @@ function navigateKeyword(kw) {
     fetchLiveGoogleNews(); restorePortal(); switchPortalTab('news'); openWindow('win-main');
   } else if(kw==='sport'){
     restorePortal(); switchPortalTab('sport'); fetchSportNews(); openWindow('win-main');
+  } else if(kw==='radio'){
+    openWindow('win-radio');
   } else if(kw==='stichwort'){
     var bar=document.getElementById('url-bar'); bar.value=''; bar.focus();
   } else if(AOI_KEYWORD_URLS[kw]){
@@ -1356,6 +1454,17 @@ function openIM(name) {
   }
   openWindow('win-im');
   document.getElementById('im-message-input').focus();
+}
+
+function aoiReopenLastIM(){
+  if(currentIMBuddy) openIM(currentIMBuddy);
+}
+
+/* ===== RADIO ===== */
+function radioSelectStation() {
+  var sel = document.getElementById('radio-station-sel');
+  var wv  = document.getElementById('radio-frame');
+  if(sel && wv) wv.src = sel.value;
 }
 
 function aoiIMAddBuddy(){
@@ -1405,11 +1514,130 @@ function setMyAwayMessage() {
 function clearMyAwayMessage() { document.getElementById('my-status-badge').textContent='● Online'; document.getElementById('my-status-badge').style.color='#006600'; }
 
 /* ===== POSTFACH ===== */
-function previewMail(s,subj,txt) {
-  var esc=function(x){return x.replace(/</g,'&lt;').replace(/>/g,'&gt;');};
-  document.getElementById('mail-preview').innerHTML='<b>Von:</b> '+esc(s)+'<br><b>Betreff:</b> '+esc(subj)+'<br><br>'+esc(txt);
+var _selMail = null; // {row, from, date, subject, body}
+
+function previewMail(row, from, date, subj, txt) {
+  var e=function(x){return x.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');};
+  // Selektion markieren
+  document.querySelectorAll('#mail-tbody tr').forEach(function(r){r.classList.remove('mail-selected');});
+  row.classList.add('mail-selected');
+  row.classList.remove('unread');
+  // Als gelesen markieren: Emoji → gelesen
+  if(row.cells[0]) row.cells[0].textContent = '📨';
+  _selMail = { row:row, from:from, date:date, subject:subj, body:txt };
+  document.getElementById('mail-preview').innerHTML =
+    '<b>Von:</b> '+e(from)+'&nbsp;&nbsp;<span style="color:#888;font-size:10px;">'+e(date)+'</span><br>'+
+    '<b>Betreff:</b> '+e(subj)+'<br><hr style="border:none;border-top:1px solid #ccc;margin:5px 0;">'+
+    e(txt);
+  // Ungelesene zählen
+  mailUpdateCounter();
+}
+
+function mailUpdateCounter() {
+  var unread = document.querySelectorAll('#mail-tbody tr.unread').length;
+  var badge = document.getElementById('mail-counter');
+  if(badge) badge.textContent = unread > 0 ? unread : '';
+  var tabNew = document.getElementById('tab-new');
+  if(tabNew) tabNew.textContent = 'Neu'+(unread>0?' ('+unread+')':'');
+}
+
+function mailRead() {
+  if(!_selMail){ alert('Bitte zuerst eine E-Mail auswählen.'); return; }
+  var m=_selMail, e=function(x){return x.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');};
+  // Vollansicht als Overlay im Postfach-Fenster
+  var existing = document.getElementById('mail-read-overlay');
+  if(existing) existing.remove();
+  var inner = document.querySelector('#win-mailbox .window-inner-content');
+  var overlay = document.createElement('div');
+  overlay.id='mail-read-overlay';
+  overlay.className='mail-read-view';
+  overlay.innerHTML=
+    '<div class="mail-read-header">'+
+      '<b>Von:</b> '+e(m.from)+'&nbsp;&nbsp;<span style="color:#555;">'+e(m.date)+'</span><br>'+
+      '<b>Betreff:</b> '+e(m.subject)+
+    '</div>'+
+    '<div class="mail-read-body">'+e(m.body)+'</div>'+
+    '<div class="mail-read-bar">'+
+      '<button class="btn-options" onclick="document.getElementById(\'mail-read-overlay\').remove()">← Zurück</button>'+
+      '<button class="btn-options" onclick="document.getElementById(\'mail-read-overlay\').remove();mailReplyOpen()">↩️ Antworten</button>'+
+      '<button class="btn-options" onclick="document.getElementById(\'mail-read-overlay\').remove();mailForwardOpen()">➡️ Weiterleiten</button>'+
+    '</div>';
+  inner.style.position='relative';
+  inner.appendChild(overlay);
+}
+
+function mailSaveToggle(e) {
+  var menu=document.getElementById('mail-save-menu');
+  menu.style.display = menu.style.display==='none' ? 'block' : 'none';
+  e.stopPropagation();
+  // Schließen bei Klick außerhalb
+  setTimeout(function(){ document.addEventListener('click', function close(){ menu.style.display='none'; document.removeEventListener('click',close); }); },0);
+}
+
+function mailSaveAs() {
+  document.getElementById('mail-save-menu').style.display='none';
+  if(!_selMail){ alert('Bitte zuerst eine E-Mail auswählen.'); return; }
+  var m=_selMail;
+  var text='Von: '+m.from+'\nDatum: '+m.date+'\nBetreff: '+m.subject+'\n\n'+m.body;
+  var blob=new Blob([text],{type:'text/plain'});
+  var url=URL.createObjectURL(blob);
+  var a=document.createElement('a');
+  a.href=url; a.download=m.subject.replace(/[^a-zA-Z0-9 _-]/g,'_').slice(0,40)+'.txt';
+  document.body.appendChild(a); a.click();
+  document.body.removeChild(a); URL.revokeObjectURL(url);
+}
+
+function mailReplyOpen() {
+  document.getElementById('mail-save-menu').style.display='none';
+  if(!_selMail){ alert('Bitte zuerst eine E-Mail auswählen.'); return; }
+  openComposeMail(_selMail.from, 'Re: '+_selMail.subject,
+    '\n\n--- Original ---\nVon: '+_selMail.from+'\n'+_selMail.body);
+}
+
+function mailForwardOpen() {
+  document.getElementById('mail-save-menu').style.display='none';
+  if(!_selMail){ alert('Bitte zuerst eine E-Mail auswählen.'); return; }
+  openComposeMail('', 'Fwd: '+_selMail.subject,
+    '\n\n--- Weitergeleitet ---\nVon: '+_selMail.from+'\n'+_selMail.body);
+}
+
+function mailDelete() {
+  if(!_selMail){ alert('Bitte zuerst eine E-Mail auswählen.'); return; }
+  _selMail.row.remove();
+  _selMail=null;
+  document.getElementById('mail-preview').innerHTML='<i>Klicke auf eine E-Mail für die Vorschau...</i>';
+  mailUpdateCounter();
 }
 function selectMailTab(t) { document.querySelectorAll('.mail-tab').forEach(function(x){x.classList.remove('active');}); document.getElementById('tab-'+t).classList.add('active'); }
+
+/* ===== E-MAIL VERFASSEN ===== */
+function openComposeMail(to, subject, body) {
+  document.getElementById('compose-to').value      = to      || '';
+  document.getElementById('compose-cc').value      = '';
+  document.getElementById('compose-subject').value = subject || '';
+  document.getElementById('compose-body').innerHTML = body   || '';
+  openWindow('win-compose');
+  document.getElementById(to ? 'compose-subject' : 'compose-to').focus();
+}
+
+function composeSend() {
+  var to      = document.getElementById('compose-to').value.trim();
+  var subject = document.getElementById('compose-subject').value.trim();
+  var body    = document.getElementById('compose-body').innerText.trim();
+  if (!to)      { alert('Bitte einen Empfänger eingeben.'); return; }
+  if (!subject) { alert('Bitte einen Betreff eingeben.');   return; }
+  // Simuliert Senden – in einer echten AOI-Mail-Integration würde hier der SMTP/API-Call stehen
+  closeWindow('win-compose');
+  document.getElementById('compose-to').value      = '';
+  document.getElementById('compose-cc').value      = '';
+  document.getElementById('compose-subject').value = '';
+  document.getElementById('compose-body').innerHTML = '';
+  alert('✉️ E-Mail an «' + to + '» wurde in den Ausgang gelegt.');
+}
+
+function composeAttach() {
+  alert('📎 Dateianhang-Funktion: In einer echten AOI-Mail-Integration hier die Datei auswählen.');
+}
 
 window.addEventListener('DOMContentLoaded',function(){
   initResizers();
