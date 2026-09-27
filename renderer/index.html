@@ -466,7 +466,7 @@ body {
       <div class="tool-btn" onclick="openIM('SurfinJerry')"><span class="tool-icon">🏃</span><span class="tool-label">Nachricht</span></div>
       <div class="tool-btn" onclick="openWindow('win-buddylist')"><span class="tool-icon">👥</span><span class="tool-label">Buddies</span></div>
       <div class="tool-btn" onclick="toggleWindow('win-navigation')"><span class="tool-icon">🧭</span><span class="tool-label">Kanäle</span></div>
-      <div class="tool-btn"><span class="tool-icon">🛡️</span><span class="tool-label">Sicherheit</span></div>
+      <div class="tool-btn" onclick="openWindow('win-main');switchPortalTab('meinaoi');"><span class="tool-icon">🛡️</span><span class="tool-label">Sicherheit</span></div>
       <div class="tool-btn" onclick="openWindow('win-main');switchPortalTab('meinaoi');"><span class="tool-icon">⚙️</span><span class="tool-label">Einstellungen</span></div>
     </div>
     <div class="toolbar-right">
@@ -477,7 +477,7 @@ body {
   <div class="address-bar-row">
     <div class="address-left-block">
       <button class="nav-btn" onclick="restorePortal()">🏠</button>
-      <button class="nav-btn">◀</button><button class="nav-btn">▶</button>
+      <button class="nav-btn" title="Zurück" onclick="browserBack()">◀</button><button class="nav-btn" title="Vor" onclick="browserForward()">▶</button>
       <button class="btn-options" style="font-size:10px;padding:2px 5px;">Schnellstart</button>
     </div>
     <div class="address-center-block">
@@ -502,8 +502,8 @@ body {
         <div class="nav-icon-grid">
           <div class="nav-grid-item" onclick="navigateKeyword('suche')"><span>🔍</span>Suchen</div>
           <div class="nav-grid-item" onclick="navigateKeyword('stichwort')"><span>🔤</span>Stichwort</div>
-          <div class="nav-grid-item"><span>🛍️</span>Einkaufen</div>
-          <div class="nav-grid-item"><span>🗺️</span>Karten</div>
+          <div class="nav-grid-item" onclick="navigateKeyword('einkaufen')"><span>🛍️</span>Einkaufen</div>
+          <div class="nav-grid-item" onclick="navigateKeyword('karten')"><span>🗺️</span>Karten</div>
         </div>
         <div class="nav-category">
           <div class="nav-cat-header">Information <span>▸</span></div>
@@ -1265,6 +1265,8 @@ var AOI_KEYWORD_URLS = {
   'finanzen':    'https://www.finanzen.net',
   'kino':        'https://www.filmstarts.de',
   'spiele':      'https://www.rtlspiele.de',
+  'einkaufen':   'https://www.amazon.de',
+  'karten':      'https://maps.google.de',
   'musik':       'https://open.spotify.com',
   'suche':       'https://www.google.de',
   'stichwort':   null           // intern: URL-Leiste fokussieren
@@ -1283,6 +1285,15 @@ function navigateKeyword(kw) {
   } else {
     navigateUrl('https://www.google.de/search?q='+encodeURIComponent(kw));
   }
+}
+
+function browserBack() {
+  var wv = document.getElementById('browser-frame');
+  if(wv && wv.canGoBack && wv.canGoBack()) wv.goBack();
+}
+function browserForward() {
+  var wv = document.getElementById('browser-frame');
+  if(wv && wv.canGoForward && wv.canGoForward()) wv.goForward();
 }
 
 /* ===== IM ===== */
