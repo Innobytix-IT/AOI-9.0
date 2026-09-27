@@ -153,6 +153,15 @@ body {
 .menu-dd-sep { height:1px;background:#b0b0b0;margin:3px 4px; }
 .menu-dd-item.disabled { color:#888;cursor:default; }
 .menu-dd-item.disabled:hover { background:transparent;color:#888; }
+.addr-btn-wrap { position:relative;display:inline-block; }
+.addr-dropdown { display:none;position:absolute;top:100%;right:0;z-index:99999; }
+.addr-dropdown.open { display:block; }
+#search-panel { background:#fff;border:2px solid #0058ee;border-radius:0 0 6px 6px;box-shadow:4px 6px 16px rgba(0,0,0,.4);padding:10px;min-width:250px; }
+#search-panel .sp-label { font-size:11px;color:#444;margin-bottom:3px; }
+#search-panel .sp-row { display:flex;gap:4px;margin-bottom:2px; }
+#search-panel .sp-sep { height:1px;background:#c0d4e8;margin:8px 0; }
+#search-panel input { flex:1;padding:3px 5px;border:1px solid #7f9db9;font-size:11px;font-family:Tahoma; }
+#fav-panel { background:#ece9d8;border:1px solid #7faad0;box-shadow:3px 4px 8px rgba(0,0,0,.35);min-width:200px; }
 .electron-winctrls { margin-left:auto;display:flex;gap:2px;-webkit-app-region:no-drag; }
 .electron-winctrls button { width:18px;height:16px;border:1px solid #7faad0;background:linear-gradient(to bottom,#d4e7f7,#b0cce4);color:#0b335e;font-size:9px;cursor:pointer;padding:0;line-height:1; }
 .electron-winctrls button:hover { background:linear-gradient(to bottom,#e4f0fa,#c8ddf2); }
@@ -532,8 +541,38 @@ body {
       <button class="btn-go" onclick="navigateUrl()">Los</button>
     </div>
     <div class="address-right-block">
-      <button class="btn-options" style="font-size:10px;padding:2px 8px;">Suchen</button>
-      <button class="btn-options" style="font-size:10px;padding:2px 8px;">Favoriten ▾</button>
+      <div class="addr-btn-wrap">
+        <button class="btn-options" style="font-size:10px;padding:2px 8px;" onclick="toggleSearchPanel(event)">Suchen</button>
+        <div class="addr-dropdown" id="search-panel">
+          <div class="sp-label" style="font-weight:bold;color:#0b3464;font-size:12px;margin-bottom:6px;">🔍 AOI Suche</div>
+          <div class="sp-label">Im Web suchen:</div>
+          <div class="sp-row">
+            <input type="text" id="search-panel-input" placeholder="Suchbegriff…" onkeydown="if(event.key==='Enter')doWebSearch()">
+            <button class="btn-go" style="font-size:10px;padding:2px 8px;" onclick="doWebSearch()">Los</button>
+          </div>
+          <div class="sp-sep"></div>
+          <div class="sp-label">Buddy suchen:</div>
+          <div class="sp-row">
+            <input type="text" id="search-panel-buddy" placeholder="Screen-Name…" onkeydown="if(event.key==='Enter')doSearchPanelBuddy()">
+            <button class="btn-options" style="font-size:10px;padding:2px 8px;white-space:nowrap;" onclick="doSearchPanelBuddy()">Suchen</button>
+          </div>
+        </div>
+      </div>
+      <div class="addr-btn-wrap">
+        <button class="btn-options" style="font-size:10px;padding:2px 8px;" onclick="toggleFavPanel(event)">Favoriten ▾</button>
+        <div class="addr-dropdown" id="fav-panel">
+          <div class="menu-dd-item" onclick="closeAddrPanels();restorePortal()">🏠 AOI Startseite</div>
+          <div class="menu-dd-sep"></div>
+          <div class="menu-dd-item" onclick="closeAddrPanels();navigateUrl('https://www.wetter.com')">🌤️ Wetter</div>
+          <div class="menu-dd-item" onclick="closeAddrPanels();navigateUrl('https://www.kicker.de')">⚽ Sport</div>
+          <div class="menu-dd-item" onclick="closeAddrPanels();navigateUrl('https://www.tagesschau.de')">📰 Nachrichten</div>
+          <div class="menu-dd-item" onclick="closeAddrPanels();navigateUrl('https://www.last.fm')">🎵 Musik</div>
+          <div class="menu-dd-item" onclick="closeAddrPanels();navigateUrl('https://www.amazon.de')">🛒 Shopping</div>
+          <div class="menu-dd-item" onclick="closeAddrPanels();navigateUrl('https://www.google.de')">🔍 Google</div>
+          <div class="menu-dd-sep"></div>
+          <div class="menu-dd-item" onclick="closeAddrPanels();aoiShowAddBuddyDialog()">👥 Buddy suchen…</div>
+        </div>
+      </div>
     </div>
   </div>
 
@@ -600,7 +639,7 @@ body {
               <div class="portal-side-widgets">
                 <div class="widget-box" id="wetter-widget"><div class="widget-title">☀️ Wetter aktuell</div><div id="wetter-temp" style="font-size:18px;font-weight:bold;color:#d05800;">…</div><div id="wetter-ort" style="color:#555;margin-top:2px;">wird geladen</div><div id="wetter-morgen" style="font-size:10px;color:#777;margin-top:4px;"></div></div>
                 <div class="widget-box"><div class="widget-title">📬 Mein Postfach</div><div>Sie haben <b>3 neue</b> E-Mails!</div><button class="btn-options" style="margin-top:6px;width:100%;" onclick="openWindow('win-mailbox')">Post jetzt öffnen</button></div>
-                <div class="widget-box" style="background:#eaf2fb;"><div class="widget-title">🔍 AOI Suche</div><input type="text" style="width:100%;padding:2px;font-size:11px;border:1px solid #7f9db9;" placeholder="Suchbegriff..."></div>
+                <div class="widget-box" style="background:#eaf2fb;"><div class="widget-title">🔍 AOI Suche</div><input type="text" id="portal-search-input" style="width:100%;padding:2px;font-size:11px;border:1px solid #7f9db9;" placeholder="Suchbegriff…" onkeydown="if(event.key==='Enter')doPortalSearch()"><button class="btn-options" style="width:100%;margin-top:4px;font-size:10px;" onclick="doPortalSearch()">Suchen</button></div>
               </div>
             </div>
           </div>
@@ -1461,6 +1500,52 @@ function restorePortal() {
   document.getElementById('portal-view').style.display='flex';
   document.getElementById('browser-frame').style.display='none';
   document.getElementById('url-bar').value='aoi://willkommen'; openWindow('win-main');
+}
+function toggleSearchPanel(e) {
+  e.stopPropagation();
+  var panel = document.getElementById('search-panel');
+  var isOpen = panel.classList.contains('open');
+  closeAddrPanels();
+  if (!isOpen) {
+    panel.classList.add('open');
+    var urlVal = document.getElementById('url-bar').value;
+    if (urlVal && urlVal !== 'aoi://willkommen') {
+      document.getElementById('search-panel-input').value = urlVal;
+    }
+    setTimeout(function(){ document.getElementById('search-panel-input').focus(); }, 50);
+  }
+}
+function toggleFavPanel(e) {
+  e.stopPropagation();
+  var panel = document.getElementById('fav-panel');
+  var isOpen = panel.classList.contains('open');
+  closeAddrPanels();
+  if (!isOpen) panel.classList.add('open');
+}
+function closeAddrPanels() {
+  document.querySelectorAll('.addr-dropdown').forEach(function(el){ el.classList.remove('open'); });
+}
+document.addEventListener('click', closeAddrPanels);
+function doWebSearch() {
+  var q = document.getElementById('search-panel-input').value.trim();
+  if (!q) return;
+  closeAddrPanels();
+  navigateUrl('https://www.google.de/search?q=' + encodeURIComponent(q));
+}
+function doSearchPanelBuddy() {
+  var name = document.getElementById('search-panel-buddy').value.trim();
+  closeAddrPanels();
+  document.getElementById('inp-buddy-name').value = name;
+  document.getElementById('dlg-buddy-error').textContent = '';
+  document.getElementById('dlg-search-result').style.display = 'none';
+  document.getElementById('dlg-add-buddy').style.display = 'flex';
+  if (name) setTimeout(function(){ aoiSearchBuddy(); }, 50);
+  else setTimeout(function(){ document.getElementById('inp-buddy-name').focus(); }, 50);
+}
+function doPortalSearch() {
+  var q = document.getElementById('portal-search-input').value.trim();
+  if (!q) return;
+  navigateUrl('https://www.google.de/search?q=' + encodeURIComponent(q));
 }
 function navigateUrl(t) {
   var val=t||document.getElementById('url-bar').value.trim();
