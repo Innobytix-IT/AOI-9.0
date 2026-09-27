@@ -2285,7 +2285,8 @@ function aoiSearchBuddy(){
     var alreadyAdded=aoiGetBuddyList().some(function(b){ return b.name===name; });
     statusEl.innerHTML=online
       ? '<span style="color:#0a0;font-size:15px;line-height:1;">&#9679;</span>&nbsp;'+name+' ist gerade <b>online</b>'
-      : '<span style="color:#999;font-size:15px;line-height:1;">&#9679;</span>&nbsp;'+name+' ist gerade <b>offline</b>';
+      : '<span style="color:#bbb;font-size:15px;line-height:1;">&#9679;</span>&nbsp;'+name+' ist <b>nicht angemeldet</b>'
+        +'<div style="font-size:10px;color:#888;margin-top:3px;">Ob dieser Name existiert, lässt sich nur prüfen, wenn er gerade online ist.</div>';
     var addBtn=document.getElementById('btn-search-add');
     addBtn.textContent=alreadyAdded?'✓ Bereits in Liste':'+ Adden';
     addBtn.disabled=alreadyAdded;
@@ -2308,7 +2309,7 @@ function aoiConfirmAddBuddy(){
 
 function aoiSearchStartIM(){
   var name=_searchResultName;
-  if(!name) return;
+  if(!name||!aoi_known_buddies[name]) return;
   document.getElementById('dlg-add-buddy').style.display='none';
   openIM(name);
   if(!aoi_peers[name]) aoiInitiatePeer(name);
@@ -2440,7 +2441,7 @@ function aoiRenderBuddyListUI() {
     var statusTxt=connected?'🔗 P2P verbunden':(online?'● Online':'○ Offline');
     var dim=(!online&&inList)?'opacity:0.5;':'' ;
     var runnerStyle=online?'':'background:#ccc;border-color:#999;';
-    return '<div class="buddy-item" style="'+dim+'" onclick="aoiSelectBuddy(\''+safe+'\')" ondblclick="openIM(\''+safe+'\')" oncontextmenu="aoiBuddyContextMenu(event,\''+safe+'\')">'
+    return '<div class="buddy-item" style="'+dim+'" onclick="aoiSelectBuddy(\''+safe+'\')" ondblclick="aoiTryOpenIM(\''+safe+'\')" oncontextmenu="aoiBuddyContextMenu(event,\''+safe+'\')">'
       +'<span class="running-man" style="'+runnerStyle+'"></span><span>'+n+'</span>'
       +'<div class="away-bubble"><div class="away-name">'+n+'</div>'
       +'<div class="away-status">'+statusTxt+'</div></div></div>';
@@ -2497,7 +2498,14 @@ function aoiToggleGroup(el){
 }
 
 /* ===== BUDDY-FOOTER AKTIONEN ===== */
-function aoiIMSelected(){ if(aoi_selected_buddy) openIM(aoi_selected_buddy); }
+function aoiTryOpenIM(name) {
+  if (!aoi_known_buddies[name]) {
+    alert('"' + name + '" ist gerade offline.\nNachrichten können nur an online-Buddies gesendet werden.');
+    return;
+  }
+  openIM(name);
+}
+function aoiIMSelected(){ if(aoi_selected_buddy) aoiTryOpenIM(aoi_selected_buddy); }
 function aoiRemoveSelected(){
   if(!aoi_selected_buddy) return;
   if(confirm('Buddy "'+aoi_selected_buddy+'" aus der Liste entfernen?')){ aoiRemoveBuddy(aoi_selected_buddy); aoi_selected_buddy=''; }
@@ -2518,7 +2526,7 @@ function aoiBuddyContextMenu(e,name){
   menu.style.display='block'; menu.style.left=e.clientX+'px'; menu.style.top=e.clientY+'px';
 }
 document.addEventListener('click',function(){ var m=document.getElementById('buddy-ctx-menu'); if(m) m.style.display='none'; });
-function aoiCtxIM(){ if(aoi_ctx_buddy) openIM(aoi_ctx_buddy); }
+function aoiCtxIM(){ if(aoi_ctx_buddy) aoiTryOpenIM(aoi_ctx_buddy); }
 function aoiCtxAdd(){ if(aoi_ctx_buddy) aoiAddBuddy(aoi_ctx_buddy,'Buddies'); }
 function aoiCtxRemove(){
   if(!aoi_ctx_buddy) return;
