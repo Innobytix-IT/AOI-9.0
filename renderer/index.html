@@ -2515,7 +2515,7 @@ function aoiReceiveIM(fromName, text) {
   logEl.appendChild(d); logEl.scrollTop=logEl.scrollHeight;
   aoiSaveChatMsg(fromName,'in',d.innerHTML);
   playSound('snd-msg-recv');
-  if(!document.hasFocus()) aoiDesktopNotify('💬 Neue Nachricht von '+fromName, text.substring(0,80), 'im-'+fromName);
+  aoiDesktopNotify('💬 Neue Nachricht von '+fromName, text.substring(0,80), 'im-'+fromName);
 }
 
 function aoiShowBuddyOnline(name) {
@@ -3374,6 +3374,7 @@ function aoiRequestNotifPermission() {
 function aoiDesktopNotify(title, body, tag) {
   if(typeof Notification === 'undefined') return;
   if(Notification.permission !== 'granted') return;
+  if(document.hasFocus() && document.visibilityState !== 'hidden') return;
   try { new Notification(title, {body: body||'', tag: tag||'aoi', icon: '', silent: false}); } catch(e) {}
 }
 
