@@ -13,4 +13,5 @@ contextBridge.exposeInMainWorld('electronAPI', {
   emailTest:        (cfg) => ipcRenderer.invoke('email-test', cfg),
   emailFetch:       (cfg) => ipcRenderer.invoke('email-fetch', cfg),
   emailSend:        (args) => ipcRenderer.invoke('email-send', args),
+  onWindowFocus: (cb) => ipcRenderer.on('window-focus-changed', (_, focused) => cb(focused)),
 });
