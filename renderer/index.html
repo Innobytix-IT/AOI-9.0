@@ -1121,6 +1121,7 @@ function showWelcomeSplash(name) {
   document.getElementById('my-sn-display').textContent=name;
   document.getElementById('signon-screen').style.display='none';
   document.getElementById('desktop-shell').style.display='flex';
+  restorePortal();
   document.getElementById('welcome-splash').style.display='flex';
   if(window.electronAPI) window.electronAPI.maximizeForce();
   fetchLiveGoogleNews();
@@ -1380,6 +1381,14 @@ function doSignOff() {
     var wv = document.getElementById(id);
     if(wv) { try { wv.stop(); } catch(_){} wv.src = 'about:blank'; }
   });
+
+  // Portal-Zustand zurücksetzen, damit nach erneutem Einloggen kein about:blank erscheint
+  var portalView = document.getElementById('portal-view');
+  var browserFrame = document.getElementById('browser-frame');
+  var urlBar = document.getElementById('url-bar');
+  if(portalView) portalView.style.display = 'flex';
+  if(browserFrame) browserFrame.style.display = 'none';
+  if(urlBar) urlBar.value = 'aoi://willkommen';
 
   // Alle offenen MDI-Fenster schließen
   document.querySelectorAll('.mdi-window').forEach(function(w){
