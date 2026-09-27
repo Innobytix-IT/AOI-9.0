@@ -57,7 +57,9 @@ body {
 .safety-col:first-child { border-right:1px solid #9bbde2; }
 .safety-header { font-weight:bold;color:#0a3d6d;margin-bottom:4px; }
 .safety-item { display:flex;justify-content:space-between;margin-bottom:2px; }
-.status-on { color:#008000;font-weight:bold; }
+.status-on  { color:#008000;font-weight:bold; }
+.status-off { color:#cc0000;font-weight:bold; }
+.status-warn{ color:#cc6600;font-weight:bold; }
 
 /* ===== VERBINDE-OVERLAY ===== */
 #connecting-overlay {
@@ -384,7 +386,7 @@ body {
         </div>
         <div class="safety-panel">
           <div class="safety-col"><div class="safety-header">🛡 Sicherheit bei AOI</div><div class="safety-item"><span>E-Mail Spamschutz</span><span class="status-on">EIN</span></div><div class="safety-item"><span>Virenschutz</span><span class="status-on">EIN</span></div></div>
-          <div class="safety-col"><div class="safety-header">💻 Sicherheit auf meinem PC</div><div class="safety-item"><span>Firewall</span><span class="status-on">Aktiv</span></div><div class="safety-item"><span>AOI Schutzschild</span><span class="status-on">Läuft</span></div></div>
+          <div class="safety-col"><div class="safety-header">💻 Sicherheit auf meinem PC</div><div class="safety-item"><span>Firewall</span><span id="login-sec-fw" class="status-on">…</span></div><div class="safety-item"><span id="login-sec-av-name">Virenschutz</span><span id="login-sec-av" class="status-on">…</span></div></div>
         </div>
       </div>
     </div>
@@ -466,7 +468,7 @@ body {
       <div class="tool-btn" onclick="openIM('SurfinJerry')"><span class="tool-icon">🏃</span><span class="tool-label">Nachricht</span></div>
       <div class="tool-btn" onclick="openWindow('win-buddylist')"><span class="tool-icon">👥</span><span class="tool-label">Buddies</span></div>
       <div class="tool-btn" onclick="toggleWindow('win-navigation')"><span class="tool-icon">🧭</span><span class="tool-label">Kanäle</span></div>
-      <div class="tool-btn" onclick="openWindow('win-main');switchPortalTab('meinaoi');"><span class="tool-icon">🛡️</span><span class="tool-label">Sicherheit</span></div>
+      <div class="tool-btn" onclick="openSecurityCheck()"><span class="tool-icon">🛡️</span><span class="tool-label">Sicherheit</span></div>
       <div class="tool-btn" onclick="openWindow('win-main');switchPortalTab('meinaoi');"><span class="tool-icon">⚙️</span><span class="tool-label">Einstellungen</span></div>
     </div>
     <div class="toolbar-right">
@@ -810,6 +812,38 @@ body {
       <div class="aoi-modal-btns">
         <button class="btn-options" onclick="document.getElementById('dlg-add-buddy').style.display='none'">Schließen</button>
         <button class="btn-signon" style="border-radius:4px;padding:4px 16px;" onclick="aoiSearchBuddy()">Suchen</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ===== DIALOG: SICHERHEITSCHECK ===== -->
+<div class="aoi-modal" id="dlg-security">
+  <div class="aoi-modal-box" style="width:420px;">
+    <div class="aoi-modal-title">
+      <span>🛡️ Sicherheitscheck</span>
+      <span style="cursor:pointer;" onclick="document.getElementById('dlg-security').style.display='none'">✕</span>
+    </div>
+    <div class="aoi-modal-body" style="padding:12px 16px;">
+      <div id="dlg-sec-idle" style="text-align:center;padding:12px 0;">
+        <div style="font-size:28px;margin-bottom:8px;">🔍</div>
+        <div style="color:#555;margin-bottom:14px;font-size:11px;">Prüft Firewall und Virenschutz auf diesem Computer.</div>
+        <button class="btn-signon" style="border-radius:4px;padding:5px 24px;" onclick="aoiRunSecurityCheck()">Jetzt prüfen</button>
+      </div>
+      <div id="dlg-sec-loading" style="display:none;text-align:center;padding:18px 0;color:#555;">
+        <div style="font-size:22px;margin-bottom:8px;">⏳</div>Prüfe…
+      </div>
+      <div id="dlg-sec-results" style="display:none;">
+        <div style="font-weight:bold;color:#1a3c63;margin-bottom:8px;font-size:12px;border-bottom:1px solid #b0c4de;padding-bottom:4px;">🔥 Firewall</div>
+        <div id="dlg-sec-fw" style="margin-bottom:12px;"></div>
+        <div style="font-weight:bold;color:#1a3c63;margin-bottom:8px;font-size:12px;border-bottom:1px solid #b0c4de;padding-bottom:4px;">🦠 Virenschutz</div>
+        <div id="dlg-sec-av" style="margin-bottom:10px;"></div>
+        <div id="dlg-sec-summary" style="padding:7px 10px;border-radius:4px;font-size:11px;font-weight:bold;text-align:center;margin-top:4px;"></div>
+      </div>
+      <div id="dlg-sec-error" style="display:none;color:#c00;padding:10px 0;text-align:center;font-size:11px;"></div>
+      <div class="aoi-modal-btns" style="margin-top:10px;">
+        <button class="btn-options" onclick="document.getElementById('dlg-security').style.display='none'">Schließen</button>
+        <button class="btn-signon" id="dlg-sec-recheck" style="border-radius:4px;padding:4px 16px;display:none;" onclick="aoiRunSecurityCheck()">Erneut prüfen</button>
       </div>
     </div>
   </div>
@@ -1715,6 +1749,95 @@ function aoiSearchStartIM(){
   if(!aoi_peers[name]) aoiInitiatePeer(name);
 }
 
+/* ===== SICHERHEITSCHECK ===== */
+function openSecurityCheck(){
+  var dlg=document.getElementById('dlg-security');
+  dlg.style.display='flex';
+  // reset to idle state
+  document.getElementById('dlg-sec-idle').style.display='block';
+  document.getElementById('dlg-sec-loading').style.display='none';
+  document.getElementById('dlg-sec-results').style.display='none';
+  document.getElementById('dlg-sec-error').style.display='none';
+  document.getElementById('dlg-sec-recheck').style.display='none';
+}
+
+function aoiRunSecurityCheck(){
+  document.getElementById('dlg-sec-idle').style.display='none';
+  document.getElementById('dlg-sec-loading').style.display='block';
+  document.getElementById('dlg-sec-results').style.display='none';
+  document.getElementById('dlg-sec-error').style.display='none';
+  document.getElementById('dlg-sec-recheck').style.display='none';
+
+  if(!window.electronAPI || !window.electronAPI.securityCheck){
+    document.getElementById('dlg-sec-loading').style.display='none';
+    document.getElementById('dlg-sec-error').style.display='block';
+    document.getElementById('dlg-sec-error').textContent='Sicherheitscheck nur in der Desktop-App verfügbar.';
+    return;
+  }
+
+  window.electronAPI.securityCheck().then(function(r){
+    document.getElementById('dlg-sec-loading').style.display='none';
+    document.getElementById('dlg-sec-results').style.display='block';
+    document.getElementById('dlg-sec-recheck').style.display='inline-block';
+
+    var fwHtml='', avHtml='', allOk=true;
+
+    // Firewall rows
+    if(!r.firewalls || r.firewalls.length===0){
+      fwHtml='<div style="color:#888;font-size:11px;">Keine Firewall-Daten verfügbar.</div>';
+    } else {
+      r.firewalls.forEach(function(f){
+        var on=f.enabled;
+        if(!on) allOk=false;
+        fwHtml+='<div style="display:flex;align-items:center;justify-content:space-between;padding:3px 0;border-bottom:1px dotted #ddd;">'
+          +'<span style="color:#333;font-size:11px;">'+escHtml(f.name||'Firewall')+'</span>'
+          +'<span style="font-size:11px;font-weight:bold;color:'+(on?'#1a8a1a':'#cc0000')+';">'+(on?'✔ Aktiv':'✘ Inaktiv')+'</span>'
+          +'</div>';
+      });
+    }
+
+    // AV rows
+    if(!r.antiviruses || r.antiviruses.length===0){
+      avHtml='<div style="color:#888;font-size:11px;">Kein Virenschutz-Programm gefunden.</div>';
+      allOk=false;
+    } else {
+      r.antiviruses.forEach(function(a){
+        var on=a.enabled;
+        var defsOk=a.defsOk!==false; // treat undefined as ok
+        if(!on) allOk=false;
+        var defsStr='';
+        if(typeof a.defsOk!=='undefined'){
+          defsStr='<span style="font-size:10px;color:'+(defsOk?'#1a8a1a':'#cc6600')+';">&nbsp;'+(defsOk?'Signaturen aktuell':'Signaturen veraltet')+'</span>';
+        }
+        if(typeof a.sigAge==='number'&&a.sigAge>0){
+          defsStr+='<span style="font-size:10px;color:#888;">&nbsp;('+a.sigAge+'d)</span>';
+        }
+        avHtml+='<div style="display:flex;align-items:center;justify-content:space-between;padding:3px 0;border-bottom:1px dotted #ddd;">'
+          +'<span style="color:#333;font-size:11px;">'+escHtml(a.name||'Virenschutz')+defsStr+'</span>'
+          +'<span style="font-size:11px;font-weight:bold;color:'+(on?'#1a8a1a':'#cc0000')+';">'+(on?'✔ Aktiv':'✘ Inaktiv')+'</span>'
+          +'</div>';
+      });
+    }
+
+    document.getElementById('dlg-sec-fw').innerHTML=fwHtml;
+    document.getElementById('dlg-sec-av').innerHTML=avHtml;
+
+    var sum=document.getElementById('dlg-sec-summary');
+    if(allOk){
+      sum.style.background='#d4edda'; sum.style.color='#155724'; sum.style.border='1px solid #c3e6cb';
+      sum.textContent='✔ Dein Computer ist gut geschützt.';
+    } else {
+      sum.style.background='#f8d7da'; sum.style.color='#721c24'; sum.style.border='1px solid #f5c6cb';
+      sum.textContent='⚠ Es wurden inaktive Schutzdienste gefunden.';
+    }
+  }).catch(function(e){
+    document.getElementById('dlg-sec-loading').style.display='none';
+    document.getElementById('dlg-sec-error').style.display='block';
+    document.getElementById('dlg-sec-error').textContent='Fehler bei der Prüfung: '+(e&&e.message?e.message:String(e));
+    document.getElementById('dlg-sec-recheck').style.display='inline-block';
+  });
+}
+
 /* ===== BUDDY-LISTE RENDERN ===== */
 var aoi_selected_buddy = '';
 function aoiRenderBuddyListUI() {
@@ -1901,6 +2024,35 @@ function fetchWetter() {
 // Beim Start und stündlich aktualisieren
 setTimeout(fetchWetter, 2000);
 setInterval(fetchWetter, 3600000);
+
+/* ===== SICHERHEITSCHECK LOGIN-PANEL ===== */
+function aoiLoginSecurityCheck() {
+  if (!window.electronAPI || !window.electronAPI.securityCheck) return;
+  window.electronAPI.securityCheck().then(function(r) {
+    // Firewall: true wenn mindestens eines aktiv
+    var fwEl  = document.getElementById('login-sec-fw');
+    var avEl  = document.getElementById('login-sec-av');
+    var avNameEl = document.getElementById('login-sec-av-name');
+    if (!fwEl || !avEl) return;
+
+    var fwActive = r.firewalls && r.firewalls.some(function(f){ return f.enabled; });
+    fwEl.textContent = fwActive ? 'Aktiv' : 'Inaktiv';
+    fwEl.className   = fwActive ? 'status-on' : 'status-off';
+
+    var avActive = r.antiviruses && r.antiviruses.some(function(a){ return a.enabled; });
+    var avName   = r.antiviruses && r.antiviruses.find(function(a){ return a.enabled; });
+    if (!avName && r.antiviruses && r.antiviruses.length > 0) avName = r.antiviruses[0];
+
+    if (avNameEl && avName && avName.name && avName.name !== 'Kein AV gefunden') {
+      // Kürze langen Namen (max 14 Zeichen)
+      var n = avName.name.replace(/Windows /i,'');
+      avNameEl.textContent = n.length > 14 ? n.slice(0,13)+'…' : n;
+    }
+    avEl.textContent = avActive ? 'Aktiv' : 'Inaktiv';
+    avEl.className   = avActive ? 'status-on' : 'status-off';
+  }).catch(function(){});
+}
+setTimeout(aoiLoginSecurityCheck, 800);
 
 /* ===== DATEIÜBERTRAGUNG ===== */
 var AOI_CHUNK = 16384; // 16 KB pro Chunk
