@@ -551,7 +551,7 @@ body {
                 <div style="margin-top:auto;padding-top:10px;border-top:1px solid #dae7f4;font-size:10px;color:#555;">Tipp: Klicke auf eine Schlagzeile, um die Meldung direkt aufzurufen.</div>
               </div>
               <div class="portal-side-widgets">
-                <div class="widget-box"><div class="widget-title">☀️ Wetter aktuell</div><div style="font-size:18px;font-weight:bold;color:#d05800;">22°C Heiter</div><div style="color:#555;margin-top:2px;">Deutschland &amp; Region</div><div style="font-size:10px;color:#777;margin-top:4px;">Morgen: 20°C leicht bewölkt</div></div>
+                <div class="widget-box" id="wetter-widget"><div class="widget-title">☀️ Wetter aktuell</div><div id="wetter-temp" style="font-size:18px;font-weight:bold;color:#d05800;">…</div><div id="wetter-ort" style="color:#555;margin-top:2px;">wird geladen</div><div id="wetter-morgen" style="font-size:10px;color:#777;margin-top:4px;"></div></div>
                 <div class="widget-box"><div class="widget-title">📬 Mein Postfach</div><div>Sie haben <b>3 neue</b> E-Mails!</div><button class="btn-options" style="margin-top:6px;width:100%;" onclick="openWindow('win-mailbox')">Post jetzt öffnen</button></div>
                 <div class="widget-box" style="background:#eaf2fb;"><div class="widget-title">🔍 AOI Suche</div><input type="text" style="width:100%;padding:2px;font-size:11px;border:1px solid #7f9db9;" placeholder="Suchbegriff..."></div>
               </div>
@@ -1823,6 +1823,60 @@ function aoiSendViaDataChannel(name, text) {
   if(peer && peer.dc && peer.dc.readyState === 'open') { peer.dc.send(text); return true; }
   return false;
 }
+
+/* ===== WETTER-WIDGET ===== */
+var WETTER_DE = {
+  'Sunny':'Sonnig','Clear':'Klar','Partly cloudy':'Teilweise bewölkt',
+  'Cloudy':'Bewölkt','Overcast':'Bedeckt','Mist':'Nebelig','Fog':'Nebel',
+  'Light rain':'Leichter Regen','Moderate rain':'Regen','Heavy rain':'Starkregen',
+  'Light snow':'Leichter Schnee','Moderate snow':'Schnee','Heavy snow':'Starker Schnee',
+  'Thundery outbreaks possible':'Gewitter möglich','Blizzard':'Schneesturm',
+  'Patchy rain possible':'Vereinzelt Regen','Patchy snow possible':'Vereinzelt Schnee',
+  'Light drizzle':'Nieselregen','Freezing drizzle':'Gefrierender Niesel',
+  'Light sleet':'Leichter Graupel','Moderate or heavy sleet':'Graupel',
+  'Thunderstorm':'Gewitter','Light rain shower':'Leichte Schauer',
+  'Moderate or heavy rain shower':'Schauer','Torrential rain shower':'Starke Schauer',
+  'Partly Cloudy':'Teilweise bewölkt'
+};
+function wetterSymbol(desc) {
+  var d=(desc||'').toLowerCase();
+  if(d.includes('sunny')||d.includes('clear')) return '☀️';
+  if(d.includes('partly')) return '⛅';
+  if(d.includes('overcast')||d.includes('cloudy')) return '☁️';
+  if(d.includes('thunder')) return '⛈️';
+  if(d.includes('snow')||d.includes('blizzard')) return '❄️';
+  if(d.includes('sleet')||d.includes('drizzle')) return '🌧️';
+  if(d.includes('rain')||d.includes('shower')) return '🌦️';
+  if(d.includes('fog')||d.includes('mist')) return '🌫️';
+  return '🌡️';
+}
+function fetchWetter() {
+  fetch('https://wttr.in/?format=j1')
+    .then(function(r){ return r.json(); })
+    .then(function(d) {
+      var cur = d.current_condition[0];
+      var area = d.nearest_area[0];
+      var tmr = d.weather[1] || d.weather[0];
+      var temp = cur.temp_C;
+      var desc = (cur.weatherDesc[0]||{}).value||'';
+      var descDE = WETTER_DE[desc] || desc;
+      var sym = wetterSymbol(desc);
+      var ort = ((area.areaName[0]||{}).value||'') + ', ' + ((area.country[0]||{}).value||'');
+      var tmrMax = tmr ? tmr.maxtempC : '';
+      var tmrDesc = tmr ? ((tmr.hourly[4]||tmr.hourly[0]||{}).weatherDesc||[{}])[0].value||'' : '';
+      var tmrDE = WETTER_DE[tmrDesc] || tmrDesc;
+      document.getElementById('wetter-temp').textContent = sym+' '+temp+'°C '+descDE;
+      document.getElementById('wetter-ort').textContent = ort;
+      if(tmrMax) document.getElementById('wetter-morgen').textContent = 'Morgen: '+tmrMax+'°C '+(WETTER_DE[tmrDE]||tmrDE);
+      // Widget-Titel auch aktualisieren
+      var title = document.querySelector('#wetter-widget .widget-title');
+      if(title) title.textContent = sym+' Wetter aktuell';
+    })
+    .catch(function(){ /* kein Netz oder blockiert – still ignorieren */ });
+}
+// Beim Start und stündlich aktualisieren
+setTimeout(fetchWetter, 2000);
+setInterval(fetchWetter, 3600000);
 
 /* ===== DATEIÜBERTRAGUNG ===== */
 var AOI_CHUNK = 16384; // 16 KB pro Chunk
