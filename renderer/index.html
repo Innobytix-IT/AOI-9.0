@@ -1343,7 +1343,6 @@ function showWelcomeSplash(name) {
   mailInitDemoEmails(name);
   document.getElementById('welcome-splash').style.display='flex';
   if(window.electronAPI) window.electronAPI.maximizeForce();
-  aoiRequestNotifPermission();
   fetchLiveGoogleNews();
   startOnlineTimer();
   detectBandwidth();
@@ -2516,14 +2515,12 @@ function aoiReceiveIM(fromName, text) {
   logEl.appendChild(d); logEl.scrollTop=logEl.scrollHeight;
   aoiSaveChatMsg(fromName,'in',d.innerHTML);
   playSound('snd-msg-recv');
-  aoiDesktopNotify('💬 Neue Nachricht von '+fromName, text.substring(0,80), 'im-'+fromName);
 }
 
 function aoiShowBuddyOnline(name) {
   showBuddyNotify(name, 'hat sich angemeldet');
   if(!buddyData[name]) buddyData[name] = {away:'● Online', avatar:'🟢', reply:null};
   aoiUpdateIMStatus(name);
-  aoiDesktopNotify('🏃 '+name+' ist jetzt online', '', 'buddy-'+name);
 }
 
 function aoiShowBuddyOffline(name) {
@@ -3367,23 +3364,6 @@ function aoiReceiveTyping(fromName) {
   }, 3500);
 }
 
-/* ===== DESKTOP-BENACHRICHTIGUNGEN ===== */
-function aoiRequestNotifPermission() {
-  if(typeof Notification === 'undefined') return;
-  if(Notification.permission === 'default') Notification.requestPermission();
-}
-function aoiDesktopNotify(title, body, tag) {
-  if(typeof Notification === 'undefined') return;
-  if(Notification.permission !== 'granted') return;
-  var doNotify = function() {
-    try { new Notification(title, {body: body||'', tag: tag||'aoi', icon: '', silent: false}); } catch(e) {}
-  };
-  if(window.electronAPI && window.electronAPI.isWindowFocused) {
-    window.electronAPI.isWindowFocused().then(function(focused) { if(!focused) doNotify(); });
-  } else {
-    doNotify();
-  }
-}
 
 /* ===== BUDDY-STATUS ===== */
 function aoiSetMyStatus(v) {
