@@ -1730,80 +1730,65 @@ function clearMyAwayMessage() { document.getElementById('my-status-badge').textC
 var _selMail = null; // {row, from, date, subject, body}
 
 var WELCOME_MAIL_ID = 'welcome_v1';
-var WELCOME_MAIL_BODY =
-'Hallo und herzlich willkommen bei AOI 9.0 Nostalgia!\n\n' +
-'Du hast die Software erfolgreich gestartet – diese E-Mail erklärt dir alles, was du wissen musst.\n\n' +
-'━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n' +
-'WAS IST AOI 9.0 NOSTALGIA?\n' +
-'━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n' +
-'AOI 9.0 Nostalgia ist eine liebevoll nachgebaute Desktop-Software im Stil von AOL 9.0 aus den frühen 2000ern. ' +
-'Das ikonische Modem-Knarzen, das Türklingeln wenn ein Buddy online geht, die bunte Buddy-Liste – ' +
-'all das ist zurück. Unter der Haube steckt aber moderne Technik:\n' +
-'  • Electron (Desktop-App für Windows, Mac und Linux)\n' +
-'  • WebRTC (echte Peer-to-Peer-Verbindung zwischen Buddies)\n' +
-'  • PHP-Signaling-Server auf eigenem Webspace\n\n' +
-'━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n' +
-'WARUM GIBT ES AOI 9.0?\n' +
-'━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n' +
-'Weil das Feeling der frühen Internetära unvergesslich war – und weil es schön ist, ' +
-'Dinge zu bauen, die Freude machen. AOI 9.0 ist ein Open-Source-Liebhaberprojekt, ' +
-'lizenziert unter der AGPL-3.0. Wer die Software auf einem öffentlichen Server betreibt, ' +
-'muss den Quellcode teilen.\n\n' +
-'━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n' +
-'DER FUNKTIONSUMFANG\n' +
-'━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n' +
-'BUDDY-LISTE\n' +
-'  Sieh in Echtzeit, wer von deinen Freunden gerade online ist. Ordne Kontakte in Gruppen ' +
-'  (Buddies, Kollegen, Familie) und erhalte Sound-Benachrichtigungen wenn jemand kommt oder geht.\n\n' +
-'SOFORTNACHRICHTEN (P2P)\n' +
-'  Schreibe direkte Nachrichten an online-Buddies. Die Verbindung läuft vollständig ' +
-'  WebRTC-verschlüsselt von Gerät zu Gerät – kein zentraler Server liest mit. ' +
-'  Texte können fett, kursiv und farbig formatiert werden.\n\n' +
-'DATEIÜBERTRAGUNG\n' +
-'  Sende beliebig große Dateien direkt an einen Buddy – ohne Umweg über einen Server, ' +
-'  ohne Größenbegrenzung, direkt über den P2P-DataChannel.\n\n' +
-'POSTFACH (diese App!)\n' +
-'  Verbinde dein echtes E-Mail-Konto und lese und schreibe E-Mails direkt aus AOI. ' +
-'  Unterstützte Anbieter: GMX, Gmail, Outlook, iCloud, Yahoo, AOL. ' +
-'  Einrichtung unter Mein AOI → E-Mail-Einstellungen.\n\n' +
-'INTEGRIERTER BROWSER (Portal)\n' +
-'  Surfe im Web mit dem eingebauten Browser. Direktlinks zu Wetter, Sport, ' +
-'  Nachrichten, Musik und mehr über Favoriten und den Schnellstart.\n\n' +
-'NEWS (Aktuelles)\n' +
-'  Aktuelle Schlagzeilen direkt auf der Startseite – live aus Google News.\n\n' +
-'RADIO\n' +
-'  Höre Internetradio über TuneIn – direkt in AOI, ohne extra Browser.\n\n' +
-'SICHERHEITSCHECK\n' +
-'  Prüft ob Firewall und Virenschutz auf deinem System aktiv und aktuell sind.\n\n' +
-'MEHRERE SCREEN-NAMEN\n' +
-'  Lege beliebig viele Namen für dich an. Beim Anmelden kannst du zwischen ihnen wählen.\n\n' +
-'BUDDY SUCHEN\n' +
-'  Suche gezielt nach anderen AOI-Nutzern über die Suchen-Funktion in der Adressleiste.\n\n' +
-'━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n' +
-'ERSTE SCHRITTE – EINRICHTUNG\n' +
-'━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n' +
-'1. SCREEN-NAME ANLEGEN\n' +
-'   Beim ersten Start hast du deinen Screen-Namen vergeben. Er identifiziert dich ' +
-'   eindeutig im AOI-Netzwerk. Weitere Namen kannst du über "+ Neu" im Anmeldefenster anlegen.\n\n' +
-'2. BUDDY HINZUFÜGEN\n' +
-'   In der Buddy-Liste auf "+ Buddy" klicken und den Screen-Namen eines Freundes eingeben. ' +
-'   Sobald dein Freund auch eingeloggt ist, erscheint er grün in der Liste.\n\n' +
-'3. E-MAIL EINRICHTEN (optional)\n' +
-'   Willkommens-Tab → Mein AOI → E-Mail-Einstellungen. Dort Provider wählen, ' +
-'   Benutzername und Passwort eingeben und testen.\n\n' +
-'4. EIGENER SIGNALING-SERVER (optional)\n' +
-'   Der Standard-Server läuft über innobytix-it.de. Für eine eigene Installation:\n' +
-'   aoi_signal.php und .htaccess_aoi auf deinen Webspace laden, eine aoi_token.php ' +
-'   mit deinem Shared Secret anlegen, und die URL im Anmeldefenster unter "AHPT-Server" eintragen.\n\n' +
-'━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n' +
-'WICHTIGER HINWEIS\n' +
-'━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n' +
-'Sofortnachrichten können nur an Buddies gesendet werden, die gerade online sind. ' +
-'Ist ein Buddy offline, wird die P2P-Verbindung automatisch aufgebaut, sobald beide eingeloggt sind.\n\n' +
-'Viel Spaß beim Retro-Surfen! 🌐\n\n' +
-'Herzliche Grüße,\n' +
-'Das AOI 9.0 Nostalgia-Team\n' +
-'https://github.com/Innobytix-IT/AOI-9.0';
+function buildWelcomeMailHtml(userName) {
+  function section(title) {
+    return '<div style="background:#0048aa;color:#fff;padding:5px 10px;margin:14px 0 7px;border-radius:3px;font-weight:bold;font-size:11px;letter-spacing:0.3px;">'+title+'</div>';
+  }
+  var h = '<div style="font-family:Tahoma,Arial,sans-serif;font-size:11px;line-height:1.7;color:#1a1a1a;padding:2px 4px;">';
+  h += '<p style="margin:0 0 10px;">Hallo <b>'+userName+'</b>! Herzlich willkommen bei <b>AOI\u00a09.0 Nostalgia</b>! '
+     + 'Du hast die Software erfolgreich gestartet\u00a0\u2013 diese E-Mail erkl\u00e4rt dir alles, was du wissen musst.</p>';
+  h += section('Was ist AOI\u00a09.0 Nostalgia?');
+  h += '<p style="margin:0 0 6px;">AOI\u00a09.0 Nostalgia ist eine liebevoll nachgebaute Desktop-Software im Stil von AOL\u00a09.0 aus den fr\u00fchen 2000ern. '
+     + 'Das ikonische Modem-Knarzen, das T\u00fcrklingeln wenn ein Buddy online geht, die bunte Buddy-Liste\u00a0\u2013 all das ist zur\u00fcck. '
+     + 'Unter der Haube steckt moderne Technik:</p>'
+     + '<ul style="margin:0 0 6px;padding-left:20px;">'
+     + '<li>Electron\u00a0\u2013 Desktop-App f\u00fcr Windows, Mac und Linux</li>'
+     + '<li>WebRTC\u00a0\u2013 echte Peer-to-Peer-Verbindung zwischen Buddies</li>'
+     + '<li>PHP-Signaling-Server\u00a0\u2013 l\u00e4uft auf jedem Standard-Webspace</li>'
+     + '</ul>';
+  h += section('Warum gibt es AOI\u00a09.0?');
+  h += '<p style="margin:0 0 6px;">Weil das Feeling der fr\u00fchen Internetara unvergesslich war\u00a0\u2013 und weil es sch\u00f6n ist, Dinge zu bauen, die Freude machen. '
+     + 'AOI\u00a09.0 ist ein Open-Source-Liebhaberprojekt (<b>AGPL-3.0</b>). '
+     + 'Wer die Software auf einem \u00f6ffentlichen Server betreibt, muss den Quellcode ver\u00f6ffentlichen.</p>';
+  h += section('Der Funktionsumfang');
+  var rows = [
+    ['\ud83d\udc65','Buddy-Liste','Sieh in Echtzeit, wer von deinen Freunden online ist. Gruppen: Buddies, Kollegen, Familie. Sound-Benachrichtigungen beim Kommen und Gehen.'],
+    ['\ud83d\udcac','Sofortnachrichten (P2P)','WebRTC-P2P-Chat direkt von Ger\u00e4t zu Ger\u00e4t\u00a0\u2013 kein Server liest mit. Texte lassen sich fett, kursiv und farbig formatieren.'],
+    ['\ud83d\udcce','Datei\u00fcbertragung','Beliebig gro\u00dfe Dateien direkt an einen Buddy\u00a0\u2013 ohne Server, ohne Gr\u00f6\u00dfenlimit, direkt per P2P-DataChannel.'],
+    ['\ud83d\udcec','Postfach','Verbinde dein echtes E-Mail-Konto (GMX, Gmail, Outlook, iCloud, Yahoo, AOL) und lies und schreibe E-Mails direkt aus AOI.'],
+    ['\ud83c\udf10','Browser (Portal)','Eingebauter Webbrowser mit Direktlinks zu Wetter, Sport, Nachrichten, Musik und mehr\u00a0\u2013 \u00fcber Favoriten und Schnellstart.'],
+    ['\ud83d\udcf0','News (Aktuelles)','Live-Schlagzeilen aus Google News direkt auf der Startseite.'],
+    ['\ud83d\udcfb','Radio','Internetradio \u00fcber TuneIn direkt in AOI h\u00f6ren, ohne externen Browser.'],
+    ['\ud83d\udee1\ufe0f','Sicherheitscheck','Pr\u00fcft ob Firewall und Virenschutz auf deinem System aktiv und aktuell sind.'],
+    ['\ud83d\udd0d','Buddy suchen','Suche nach anderen AOI-Nutzern \u00fcber die Suchen-Schaltfl\u00e4che in der Adressleiste.'],
+  ];
+  h += '<table style="width:100%;border-collapse:collapse;margin-bottom:10px;">';
+  rows.forEach(function(r,i){
+    var bg = i%2===1 ? 'background:#f4f8ff;' : '';
+    h += '<tr style="'+bg+'">'
+       + '<td style="padding:5px 8px;border-bottom:1px solid #dde;font-size:14px;width:26px;vertical-align:top;">'+r[0]+'</td>'
+       + '<td style="padding:5px 8px;border-bottom:1px solid #dde;font-weight:bold;color:#003399;white-space:nowrap;vertical-align:top;width:155px;">'+r[1]+'</td>'
+       + '<td style="padding:5px 8px;border-bottom:1px solid #dde;vertical-align:top;">'+r[2]+'</td>'
+       + '</tr>';
+  });
+  h += '</table>';
+  h += section('Erste Schritte\u00a0\u2013 Einrichtung');
+  h += '<ol style="margin:0 0 8px;padding-left:20px;">'
+     + '<li style="margin-bottom:5px;"><b>Screen-Name:</b> Bereits erledigt! Weitere Namen \u00fcber <i>\"+\u00a0Neu\"</i> im Anmeldefenster anlegen.</li>'
+     + '<li style="margin-bottom:5px;"><b>Buddy hinzuf\u00fcgen:</b> In der Buddy-Liste auf <i>\"+\u00a0Buddy\"</i> klicken und den Screen-Namen eines Freundes eingeben. Sobald dein Freund eingeloggt ist, erscheint er gr\u00fcn in der Liste.</li>'
+     + '<li style="margin-bottom:5px;"><b>E-Mail einrichten (optional):</b> <i>Mein AOI \u2192 E-Mail-Einstellungen</i>\u00a0\u2013 Provider w\u00e4hlen, Zugangsdaten eingeben, testen.</li>'
+     + '<li style="margin-bottom:5px;"><b>Eigener Signaling-Server (optional):</b> <code>aoi_signal.php</code> und <code>.htaccess_aoi</code> auf deinen Webspace laden, '
+     + '<code>aoi_token.php</code> mit deinem Shared Secret anlegen und die URL im Anmeldefenster unter <i>\"AHPT-Server\"</i> eintragen.</li>'
+     + '</ol>';
+  h += '<div style="background:#fff8e1;border-left:3px solid #f5a623;padding:8px 12px;margin:10px 0;border-radius:0 3px 3px 0;">'
+     + '<b>Hinweis:</b> Sofortnachrichten k\u00f6nnen nur an online-Buddies gesendet werden. '
+     + 'Die P2P-Verbindung wird automatisch aufgebaut, sobald beide gleichzeitig eingeloggt sind.'
+     + '</div>';
+  h += '<p style="margin:12px 0 4px;color:#555;">Viel Spa\u00df beim Retro-Surfen! \ud83c\udf10</p>'
+     + '<p style="margin:0;"><b>Herzliche Gr\u00fc\u00dfe,<br>Das AOI\u00a09.0 Nostalgia-Team</b></p>'
+     + '</div>';
+  return h;
+}
 
 function mailInitDemoEmails(userName) {
   var deleted = false;
@@ -1816,27 +1801,25 @@ function mailInitDemoEmails(userName) {
   tr.className = 'unread';
   tr.dataset.demoId = WELCOME_MAIL_ID;
   tr.innerHTML = '<td>✉️</td><td>'+dateStr+'</td><td>AOI 9.0 Nostalgia-Team</td><td>Willkommen bei AOI 9.0 Nostalgia!</td>';
-  var body = WELCOME_MAIL_BODY.replace('Hallo und herzlich willkommen', 'Hallo '+(userName||'')+'!\n\nHerzlich willkommen');
-  tr.onclick = function(){ previewMail(tr,'AOI 9.0 Nostalgia-Team',dateStr,'Willkommen bei AOI 9.0 Nostalgia!',body); };
+  var body = buildWelcomeMailHtml(userName||'');
+  tr.onclick = function(){ previewMail(tr,'AOI 9.0 Nostalgia-Team',dateStr,'Willkommen bei AOI 9.0 Nostalgia!',body,true); };
   tr.ondblclick = mailRead;
   tbody.insertBefore(tr, tbody.firstChild);
   mailUpdateCounter();
 }
 
-function previewMail(row, from, date, subj, txt) {
+function previewMail(row, from, date, subj, txt, isHtml) {
   var e=function(x){return x.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');};
-  // Selektion markieren
   document.querySelectorAll('#mail-tbody tr').forEach(function(r){r.classList.remove('mail-selected');});
   row.classList.add('mail-selected');
   row.classList.remove('unread');
-  // Als gelesen markieren: Emoji → gelesen
   if(row.cells[0]) row.cells[0].textContent = '📨';
-  _selMail = { row:row, from:from, date:date, subject:subj, body:txt };
+  _selMail = { row:row, from:from, date:date, subject:subj, body:txt, isHtml:!!isHtml };
+  var bodyHtml = isHtml ? txt : e(txt).replace(/\n/g,'<br>');
   document.getElementById('mail-preview').innerHTML =
     '<b>Von:</b> '+e(from)+'&nbsp;&nbsp;<span style="color:#888;font-size:10px;">'+e(date)+'</span><br>'+
     '<b>Betreff:</b> '+e(subj)+'<br><hr style="border:none;border-top:1px solid #ccc;margin:5px 0;">'+
-    e(txt);
-  // Ungelesene zählen
+    bodyHtml;
   mailUpdateCounter();
 }
 
@@ -1856,19 +1839,19 @@ function mailUpdateCounter() {
 function mailRead() {
   if(!_selMail){ alert('Bitte zuerst eine E-Mail auswählen.'); return; }
   var m=_selMail, e=function(x){return x.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');};
-  // Vollansicht als Overlay im Postfach-Fenster
   var existing = document.getElementById('mail-read-overlay');
   if(existing) existing.remove();
   var inner = document.querySelector('#win-mailbox .window-inner-content');
   var overlay = document.createElement('div');
   overlay.id='mail-read-overlay';
   overlay.className='mail-read-view';
+  var bodyHtml = m.isHtml ? m.body : e(m.body).replace(/\n/g,'<br>');
   overlay.innerHTML=
     '<div class="mail-read-header">'+
       '<b>Von:</b> '+e(m.from)+'&nbsp;&nbsp;<span style="color:#555;">'+e(m.date)+'</span><br>'+
       '<b>Betreff:</b> '+e(m.subject)+
     '</div>'+
-    '<div class="mail-read-body">'+e(m.body)+'</div>'+
+    '<div class="mail-read-body">'+bodyHtml+'</div>'+
     '<div class="mail-read-bar">'+
       '<button class="btn-options" onclick="document.getElementById(\'mail-read-overlay\').remove()">← Zurück</button>'+
       '<button class="btn-options" onclick="document.getElementById(\'mail-read-overlay\').remove();mailReplyOpen()">↩️ Antworten</button>'+
