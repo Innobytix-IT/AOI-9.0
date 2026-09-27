@@ -810,6 +810,7 @@ body {
             <button class="buddy-act-btn" onclick="aoiShowAddBuddyDialog()">+ Buddy</button>
             <button class="buddy-act-btn" onclick="aoiRemoveSelected()">Entfernen</button>
             <button class="buddy-act-btn" onclick="aoiShowBuddyInfo()">Info</button>
+            <button class="buddy-act-btn" onclick="aoiCreateGroup()" style="grid-column:span 2;">➕ Neue Gruppe</button>
             <button class="buddy-act-btn" onclick="openWindow('win-userdir');aoiLoadUserDir()" style="grid-column:span 2;">🔍 Nutzersuche</button>
           </div>
           <div style="font-size:9px;text-align:center;color:#555;">AOI-Stichwort: <b>Buddy</b></div>
@@ -1003,11 +1004,15 @@ body {
   <div class="ctx-item" onclick="aoiCtxIM()">💬 Nachricht senden</div>
   <div class="ctx-item" onclick="aoiCtxAdd()">➕ Zu Buddys hinzufügen</div>
   <div class="ctx-sep"></div>
-  <div class="ctx-item" onclick="aoiCtxMoveGroup('Buddies')">▸ Gruppe: Buddies</div>
-  <div class="ctx-item" onclick="aoiCtxMoveGroup('Kollegen')">▸ Gruppe: Kollegen</div>
-  <div class="ctx-item" onclick="aoiCtxMoveGroup('Familie')">▸ Gruppe: Familie</div>
+  <div id="ctx-group-items"><!-- dynamisch --></div>
   <div class="ctx-sep"></div>
   <div class="ctx-item" onclick="aoiCtxRemove()" style="color:#c00;">✕ Aus Liste entfernen</div>
+</div>
+
+<!-- ===== KONTEXT-MENÜ GRUPPEN ===== -->
+<div id="group-ctx-menu" style="display:none;position:fixed;z-index:9999;background:#fff;border:1px solid #6b98c3;border-radius:3px;box-shadow:2px 2px 6px rgba(0,0,0,.25);min-width:150px;padding:2px 0;">
+  <div class="ctx-item" onclick="aoiCtxGroupRename()">✏️ Umbenennen</div>
+  <div class="ctx-item" id="ctx-group-delete-btn" onclick="aoiCtxGroupDelete()">🗑️ Löschen</div>
 </div>
 
 <!-- ===== DIALOG: NEUEN NAMEN ERSTELLEN ===== -->
@@ -1163,11 +1168,7 @@ body {
         <div id="dlg-search-status" style="display:flex;align-items:center;gap:6px;margin-bottom:6px;font-weight:bold;font-size:12px;"></div>
         <div class="aoi-modal-row" style="margin-bottom:6px;">
           <label>Gruppe:</label>
-          <select id="dlg-buddy-group">
-            <option value="Buddies">Buddies</option>
-            <option value="Kollegen">Kollegen</option>
-            <option value="Familie">Familie</option>
-          </select>
+          <select id="dlg-buddy-group"></select>
         </div>
         <div style="display:flex;gap:6px;">
           <button class="btn-signon" style="border-radius:4px;padding:4px 12px;flex:1;" id="btn-search-add" onclick="aoiConfirmAddBuddy()">+ Adden</button>
@@ -1344,6 +1345,7 @@ function showWelcomeSplash(name) {
   document.getElementById('welcome-splash').style.display='flex';
   if(window.electronAPI) window.electronAPI.maximizeForce();
   fetchLiveGoogleNews();
+  aoiRefreshGroupDropdowns();
   startOnlineTimer();
   detectBandwidth();
   var modem=document.getElementById('snd-modem'); if(modem){ modem.pause(); modem.currentTime=0; }
@@ -2992,7 +2994,7 @@ function aoiRenderBuddyListUI() {
   }
 
   var html='';
-  var groupOrder=['Buddies','Kollegen','Familie'];
+  var groupOrder=aoiGetGroups();
   Object.keys(groups).forEach(function(g){ if(groupOrder.indexOf(g)===-1) groupOrder.push(g); });
 
   groupOrder.forEach(function(gName){
@@ -3000,7 +3002,8 @@ function aoiRenderBuddyListUI() {
     if(members.length===0&&gName!=='Buddies') return;
     var sorted=sortNames(members);
     var onlineCount=sorted.filter(function(n){ return !!onlineSet[n]; }).length;
-    html+='<div class="buddy-group" onclick="aoiToggleGroup(this)">▾ '+gName+' ('+onlineCount+'/'+sorted.length+')</div>'
+    var safeG=gName.replace(/'/g,"\\'").replace(/</g,'&lt;');
+    html+='<div class="buddy-group" onclick="aoiToggleGroup(this)" oncontextmenu="aoiGroupContextMenu(event,\''+safeG+'\')">▾ '+gName+' ('+onlineCount+'/'+sorted.length+')</div>'
         +'<div class="buddy-group-items">';
     if(sorted.length===0){
       html+='<div style="color:#aaa;font-size:9px;padding:2px 10px;">Noch niemand in dieser Gruppe.</div>';
@@ -3079,10 +3082,14 @@ var aoi_ctx_buddy='';
 function aoiBuddyContextMenu(e,name){
   e.preventDefault(); e.stopPropagation();
   aoi_ctx_buddy=name; aoi_selected_buddy=name;
+  aoiRefreshGroupDropdowns();
   var menu=document.getElementById('buddy-ctx-menu');
   menu.style.display='block'; menu.style.left=e.clientX+'px'; menu.style.top=e.clientY+'px';
 }
-document.addEventListener('click',function(){ var m=document.getElementById('buddy-ctx-menu'); if(m) m.style.display='none'; });
+document.addEventListener('click',function(){
+  var m=document.getElementById('buddy-ctx-menu'); if(m) m.style.display='none';
+  var g=document.getElementById('group-ctx-menu'); if(g) g.style.display='none';
+});
 function aoiCtxIM(){ if(aoi_ctx_buddy) aoiTryOpenIM(aoi_ctx_buddy); }
 function aoiCtxAdd(){ if(aoi_ctx_buddy) aoiAddBuddy(aoi_ctx_buddy,'Buddies'); }
 function aoiCtxRemove(){
@@ -3092,6 +3099,68 @@ function aoiCtxRemove(){
 function aoiCtxMoveGroup(group){
   if(aoi_ctx_buddy) aoiMoveBuddyGroup(aoi_ctx_buddy,group);
 }
+
+/* ===== BUDDY-GRUPPEN VERWALTEN ===== */
+function aoiGetGroups(){
+  var stored=null; try{ stored=localStorage.getItem('aoi_groups_'+aoi_name); }catch(e){}
+  if(stored){ try{ var a=JSON.parse(stored); if(Array.isArray(a)&&a.length) return a; }catch(e){} }
+  return ['Buddies','Kollegen','Familie'];
+}
+function aoiSaveGroups(arr){
+  try{ localStorage.setItem('aoi_groups_'+aoi_name, JSON.stringify(arr)); }catch(e){}
+}
+function aoiRefreshGroupDropdowns(){
+  var grps=aoiGetGroups();
+  // Add-Buddy-Dialog
+  var sel=document.getElementById('dlg-buddy-group');
+  if(sel){ var cur=sel.value; sel.innerHTML=grps.map(function(g){ return '<option value="'+g+'">'+g+'</option>'; }).join(''); if(grps.indexOf(cur)!==-1) sel.value=cur; }
+  // Buddy-Kontextmenü Gruppe-Items
+  var box=document.getElementById('ctx-group-items');
+  if(box){ box.innerHTML=grps.map(function(g){ return '<div class="ctx-item" onclick="aoiCtxMoveGroup(\''+g.replace(/'/g,"\\'").replace(/</g,'&lt;')+'\')">▸ Gruppe: '+g+'</div>'; }).join(''); }
+}
+function aoiCreateGroup(){
+  var name=prompt('Name der neuen Gruppe:','');
+  if(!name) return; name=name.trim(); if(!name) return;
+  var grps=aoiGetGroups();
+  if(grps.indexOf(name)!==-1){ alert('Gruppe "'+name+'" existiert bereits.'); return; }
+  grps.push(name); aoiSaveGroups(grps);
+  aoiRenderBuddyListUI(); aoiRefreshGroupDropdowns();
+}
+function aoiRenameGroup(oldName){
+  if(oldName==='Buddies'){ alert('"Buddies" kann nicht umbenannt werden.'); return; }
+  var newName=prompt('Neuer Name für Gruppe "'+oldName+'":', oldName);
+  if(!newName) return; newName=newName.trim(); if(!newName||newName===oldName) return;
+  var grps=aoiGetGroups();
+  if(grps.indexOf(newName)!==-1){ alert('Gruppe "'+newName+'" existiert bereits.'); return; }
+  var idx=grps.indexOf(oldName); if(idx===-1) return;
+  grps[idx]=newName; aoiSaveGroups(grps);
+  var list=aoiGetBuddyList();
+  list.forEach(function(b){ if(b.group===oldName) b.group=newName; }); aoiSaveBuddyList(list);
+  aoiRenderBuddyListUI(); aoiRefreshGroupDropdowns();
+}
+function aoiDeleteGroup(name){
+  if(name==='Buddies'){ alert('"Buddies" kann nicht gelöscht werden.'); return; }
+  var members=aoiGetBuddyList().filter(function(b){ return b.group===name; });
+  var msg=members.length>0
+    ? 'Gruppe "'+name+'" löschen?\nDie '+members.length+' Buddy(s) werden nach "Buddies" verschoben.'
+    : 'Gruppe "'+name+'" löschen?';
+  if(!confirm(msg)) return;
+  var list=aoiGetBuddyList();
+  list.forEach(function(b){ if(b.group===name) b.group='Buddies'; }); aoiSaveBuddyList(list);
+  aoiSaveGroups(aoiGetGroups().filter(function(g){ return g!==name; }));
+  aoiRenderBuddyListUI(); aoiRefreshGroupDropdowns();
+}
+var _ctxGroupName='';
+function aoiGroupContextMenu(e,name){
+  e.preventDefault(); e.stopPropagation();
+  _ctxGroupName=name;
+  var btn=document.getElementById('ctx-group-delete-btn');
+  if(btn){ btn.style.color=name==='Buddies'?'#aaa':'#c00'; btn.style.cursor=name==='Buddies'?'default':'pointer'; }
+  var m=document.getElementById('group-ctx-menu');
+  m.style.left=e.clientX+'px'; m.style.top=e.clientY+'px'; m.style.display='block';
+}
+function aoiCtxGroupRename(){ document.getElementById('group-ctx-menu').style.display='none'; aoiRenameGroup(_ctxGroupName); }
+function aoiCtxGroupDelete(){ if(_ctxGroupName==='Buddies') return; document.getElementById('group-ctx-menu').style.display='none'; aoiDeleteGroup(_ctxGroupName); }
 
 function aoiUpdateBuddyListUI() { aoiRenderBuddyListUI(); }
 
