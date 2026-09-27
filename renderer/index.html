@@ -1899,7 +1899,13 @@ function aoiSendExtraIM(name) {
   logEl.appendChild(d); inputEl.innerHTML=''; logEl.scrollTop=logEl.scrollHeight;
   aoiSaveChatMsg(name,'out',d.innerHTML);
   playSound('snd-msg-sent');
-  aoiSendViaDataChannel(name, text);
+  if(!aoiSendViaDataChannel(name, text)) {
+    aoiQueueOfflineMsg(name, text, d.innerHTML);
+    var hint=document.createElement('div');
+    hint.style.cssText='font-size:10px;color:#999;font-style:italic;margin-left:4px;';
+    hint.textContent='↪ Wird zugestellt sobald '+name+' online ist.';
+    logEl.appendChild(hint); logEl.scrollTop=logEl.scrollHeight;
+  }
 }
 
 function aoiExtraIMKey(e, name) {
@@ -1933,12 +1939,12 @@ function sendIMMessage() {
   log.appendChild(d); input.innerHTML=''; log.scrollTop=log.scrollHeight; playSound('snd-msg-sent');
   aoiSaveChatMsg(currentIMBuddy,'out',d.innerHTML);
   if(aoiSendViaDataChannel(currentIMBuddy, text)) return;
-  var bd=buddyData[currentIMBuddy];
-  if(bd && bd.reply) setTimeout(function(){
-    var r=document.createElement('div'); r.innerHTML='<b style="color:#aa0000;">'+currentIMBuddy+':</b> '+bd.reply;
-    playSound('snd-msg-recv'); log.appendChild(r); log.scrollTop=log.scrollHeight;
-    aoiSaveChatMsg(currentIMBuddy,'in',r.innerHTML);
-  },900+Math.random()*600);
+  // Buddy offline oder P2P noch nicht aufgebaut → in Queue legen
+  aoiQueueOfflineMsg(currentIMBuddy, text, d.innerHTML);
+  var hint=document.createElement('div');
+  hint.style.cssText='font-size:10px;color:#999;font-style:italic;margin-left:4px;';
+  hint.textContent='↪ Wird zugestellt sobald '+currentIMBuddy+' online ist.';
+  log.appendChild(hint); log.scrollTop=log.scrollHeight;
 }
 
 /* ===== FORMAT ===== */
@@ -3039,11 +3045,24 @@ function aoiToggleGroup(el){
 
 /* ===== BUDDY-FOOTER AKTIONEN ===== */
 function aoiTryOpenIM(name) {
-  if (!aoi_known_buddies[name]) {
-    alert('"' + name + '" ist gerade offline.\nNachrichten können nur an online-Buddies gesendet werden.');
-    return;
-  }
   openIM(name);
+  // Offline-Hinweis im Fenster anzeigen
+  if(!aoi_known_buddies[name]) aoiShowIMOfflineHint(name);
+  if(aoi_peers[name]) return;
+  if(aoi_known_buddies[name]) aoiInitiatePeer(name);
+}
+function aoiShowIMOfflineHint(name) {
+  var logEl;
+  if(aoi_im_wins[name]) logEl=aoi_im_wins[name].querySelector('.im-extra-log');
+  else if(currentIMBuddy===name) logEl=document.getElementById('im-chat-log');
+  if(!logEl) return;
+  // Nur einmal pro Session anzeigen
+  if(logEl.querySelector('.im-offline-hint')) return;
+  var hint=document.createElement('div');
+  hint.className='im-offline-hint';
+  hint.style.cssText='margin:6px 0;padding:5px 8px;background:#fff8e0;border:1px solid #e8c84a;border-radius:3px;font-size:10px;color:#7a5c00;';
+  hint.innerHTML='⚠️ <b>'+escHtml(name)+'</b> ist gerade offline. Deine Nachrichten werden gespeichert und automatisch zugestellt, sobald ihr beide wieder online seid.';
+  logEl.appendChild(hint); logEl.scrollTop=logEl.scrollHeight;
 }
 function aoiIMSelected(){ if(aoi_selected_buddy) aoiTryOpenIM(aoi_selected_buddy); }
 function aoiRemoveSelected(){
@@ -3398,14 +3417,23 @@ function aoiDeliverPendingMsgs(name) {
   if(!msgs||!msgs.length) return;
   var peer=aoi_peers[name];
   if(!peer||!peer.dc||peer.dc.readyState!=='open') return;
+  var logEl;
+  if(aoi_im_wins[name]) logEl=aoi_im_wins[name].querySelector('.im-extra-log');
+  else if(currentIMBuddy===name) logEl=document.getElementById('im-chat-log');
+  // "Wird zugestellt"-Zeilen entfernen
+  if(logEl) { logEl.querySelectorAll('.im-offline-hint').forEach(function(el){ el.remove(); }); }
+  var sent=0;
   msgs.forEach(function(m){
-    try { peer.dc.send(m.text); } catch(e) {}
-    // Im eigenen Log als nachträglich gesendet markieren
-    var logEl; if(aoi_im_wins[name]) logEl=aoi_im_wins[name].querySelector('.im-extra-log'); else if(currentIMBuddy===name) logEl=document.getElementById('im-chat-log');
-    if(logEl){ var d=document.createElement('div'); d.innerHTML='<b style="color:#0000aa;">Ich</b> <span style="font-size:9px;color:#888;">(gesendet)</span>: '+escHtml(m.text); logEl.appendChild(d); logEl.scrollTop=logEl.scrollHeight; }
+    try { peer.dc.send(m.text); sent++; } catch(e) {}
   });
   _pendingMsgs[name]=[];
   try { localStorage.removeItem('aoi_pending_'+name); } catch(e) {}
+  if(!logEl||!sent) return;
+  // "Zugestellt"-Bestätigung + Nachrichten nochmal anzeigen (aus History geladen, bleiben erhalten)
+  var note=document.createElement('div');
+  note.style.cssText='margin:6px 0;padding:5px 8px;background:#eaf5ea;border:1px solid #6aaa6a;border-radius:3px;font-size:10px;color:#256025;';
+  note.innerHTML='✓ <b>'+escHtml(name)+'</b> ist online – '+sent+(sent===1?' Nachricht wurde':' Nachrichten wurden')+' automatisch zugestellt.';
+  logEl.appendChild(note); logEl.scrollTop=logEl.scrollHeight;
 }
 </script>
 
