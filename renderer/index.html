@@ -722,7 +722,11 @@ body {
         </div>
         <div class="im-history" id="im-chat-log"><div style="color:#888;font-style:italic;font-size:10px;">Direkte P2P-Verbindung aufgebaut.</div></div>
         <div id="im-message-input" class="im-input-ce" contenteditable="true" onkeydown="handleIMKey(event)"></div>
-        <div class="im-send-row"><button class="btn-options" onclick="sendIMMessage()">Senden</button></div>
+        <input type="file" id="im-file-input" style="display:none" onchange="aoiSendFile(this)">
+        <div class="im-send-row">
+          <button class="btn-options" title="Datei senden" onclick="document.getElementById('im-file-input').click()" style="padding:4px 8px;font-size:13px;">📎</button>
+          <button class="btn-options" onclick="sendIMMessage()">Senden</button>
+        </div>
       </div>
     </div>
 
@@ -764,30 +768,39 @@ body {
   </div>
 </div>
 
-<!-- ===== DIALOG: BUDDY HINZUFÜGEN ===== -->
+<!-- ===== DIALOG: BUDDY SUCHEN ===== -->
 <div class="aoi-modal" id="dlg-add-buddy">
-  <div class="aoi-modal-box">
+  <div class="aoi-modal-box" style="width:340px;">
     <div class="aoi-modal-title">
-      <span>Buddy hinzufügen</span>
+      <span>Buddy suchen</span>
       <span style="cursor:pointer;" onclick="document.getElementById('dlg-add-buddy').style.display='none'">✕</span>
     </div>
     <div class="aoi-modal-body">
+      <p style="font-size:11px;color:#555;margin-bottom:8px;">Gib den genauen Screen-Namen ein, um zu prüfen ob jemand online ist.</p>
       <div class="aoi-modal-row">
         <label>Screen-Name:</label>
-        <input type="text" id="inp-buddy-name" maxlength="32" placeholder="z.B. SurfinJerry" onkeydown="if(event.key==='Enter')aoiConfirmAddBuddy()">
+        <input type="text" id="inp-buddy-name" maxlength="32" placeholder="z.B. SurfinJerry"
+               onkeydown="if(event.key==='Enter')aoiSearchBuddy()">
       </div>
-      <div class="aoi-modal-row">
-        <label>Gruppe:</label>
-        <select id="dlg-buddy-group">
-          <option value="Buddies">Buddies</option>
-          <option value="Kollegen">Kollegen</option>
-          <option value="Familie">Familie</option>
-        </select>
+      <div id="dlg-search-result" style="display:none;margin:8px 0;padding:8px;border:1px solid #b0c4de;border-radius:4px;background:#f0f6ff;">
+        <div id="dlg-search-status" style="display:flex;align-items:center;gap:6px;margin-bottom:6px;font-weight:bold;font-size:12px;"></div>
+        <div class="aoi-modal-row" style="margin-bottom:6px;">
+          <label>Gruppe:</label>
+          <select id="dlg-buddy-group">
+            <option value="Buddies">Buddies</option>
+            <option value="Kollegen">Kollegen</option>
+            <option value="Familie">Familie</option>
+          </select>
+        </div>
+        <div style="display:flex;gap:6px;">
+          <button class="btn-signon" style="border-radius:4px;padding:4px 12px;flex:1;" id="btn-search-add" onclick="aoiConfirmAddBuddy()">+ Adden</button>
+          <button class="btn-options" style="flex:1;" id="btn-search-im" onclick="aoiSearchStartIM()">Nachricht schreiben</button>
+        </div>
       </div>
       <div class="aoi-modal-error" id="dlg-buddy-error"></div>
       <div class="aoi-modal-btns">
-        <button class="btn-options" onclick="document.getElementById('dlg-add-buddy').style.display='none'">Abbrechen</button>
-        <button class="btn-signon" style="border-radius:4px;padding:4px 16px;" onclick="aoiConfirmAddBuddy()">Hinzufügen</button>
+        <button class="btn-options" onclick="document.getElementById('dlg-add-buddy').style.display='none'">Schließen</button>
+        <button class="btn-signon" style="border-radius:4px;padding:4px 16px;" onclick="aoiSearchBuddy()">Suchen</button>
       </div>
     </div>
   </div>
@@ -1409,7 +1422,10 @@ function aoiPresenceHeartbeat() {
   aoiPost({aktion:'presence', name:aoi_name, session:aoi_session}, function(err, data) {
     if(err || !data || !data.ok) return;
     var buddies = data.buddies || [];
+    // Nur gespeicherte Buddies berücksichtigen – keine Fremden anzeigen
+    var savedNames = aoiGetBuddyList().map(function(b){ return b.name; });
     buddies.forEach(function(buddy) {
+      if(savedNames.indexOf(buddy) === -1) return;
       if(!aoi_known_buddies[buddy]) {
         aoi_known_buddies[buddy] = true;
         aoiShowBuddyOnline(buddy);
@@ -1498,6 +1514,11 @@ function aoiSetupDataChannel(dc, fromName) {
 }
 
 function aoiReceiveIM(fromName, text) {
+  // Datei-Protokoll-Pakete abfangen
+  if(typeof text === 'string' && text.indexOf('{"aoi":"file"') === 0) {
+    try { var msg = JSON.parse(text); aoiReceiveFileMsg(fromName, msg); } catch(e){}
+    return;
+  }
   if(currentIMBuddy !== fromName) openIM(fromName);
   var log = document.getElementById('im-chat-log');
   if(!log) return;
@@ -1590,22 +1611,62 @@ function aoiMoveBuddyGroup(name,group){
   aoiSaveBuddyList(list); aoiRenderBuddyListUI();
 }
 
+var _searchResultName = '';
+
 function aoiShowAddBuddyDialog(){
   document.getElementById('dlg-add-buddy').style.display='flex';
   document.getElementById('inp-buddy-name').value='';
   document.getElementById('dlg-buddy-group').value='Buddies';
   document.getElementById('dlg-buddy-error').textContent='';
+  document.getElementById('dlg-search-result').style.display='none';
+  _searchResultName='';
   setTimeout(function(){ document.getElementById('inp-buddy-name').focus(); },50);
 }
-function aoiConfirmAddBuddy(){
+
+function aoiSearchBuddy(){
   var name=document.getElementById('inp-buddy-name').value.trim();
-  var group=document.getElementById('dlg-buddy-group').value;
+  var errEl=document.getElementById('dlg-buddy-error');
+  var resultEl=document.getElementById('dlg-search-result');
+  var statusEl=document.getElementById('dlg-search-status');
+  errEl.textContent=''; resultEl.style.display='none'; _searchResultName='';
+  if(!aoiNameValid(name)){ errEl.textContent='Ungültiger Name (Buchstaben, Zahlen, _ - .)'; return; }
+  if(name===aoi_name){ errEl.textContent='Das bist du selbst.'; return; }
+  errEl.textContent='Suche läuft…';
+  aoiPost({aktion:'check_name',name:name}, function(err,data){
+    errEl.textContent='';
+    if(err||!data||!data.ok){ errEl.textContent='Verbindungsfehler.'; return; }
+    _searchResultName=name;
+    var online=data.taken;
+    var alreadyAdded=aoiGetBuddyList().some(function(b){ return b.name===name; });
+    statusEl.innerHTML=online
+      ? '<span style="color:#0a0;font-size:15px;line-height:1;">&#9679;</span>&nbsp;'+name+' ist gerade <b>online</b>'
+      : '<span style="color:#999;font-size:15px;line-height:1;">&#9679;</span>&nbsp;'+name+' ist gerade <b>offline</b>';
+    var addBtn=document.getElementById('btn-search-add');
+    addBtn.textContent=alreadyAdded?'✓ Bereits in Liste':'+ Adden';
+    addBtn.disabled=alreadyAdded;
+    document.getElementById('btn-search-im').disabled=!online;
+    resultEl.style.display='block';
+  });
+}
+
+function aoiConfirmAddBuddy(){
+  var name=_searchResultName||document.getElementById('inp-buddy-name').value.trim();
+  var group=document.getElementById('dlg-buddy-group').value||'Buddies';
   var errEl=document.getElementById('dlg-buddy-error');
   if(!aoiNameValid(name)){ errEl.textContent='Ungültiger Name.'; return; }
   var list=aoiGetBuddyList();
   if(list.some(function(b){ return b.name===name; })){ errEl.textContent='Buddy ist bereits in der Liste.'; return; }
   aoiAddBuddy(name,group);
   document.getElementById('dlg-add-buddy').style.display='none';
+  aoiPresenceHeartbeat();
+}
+
+function aoiSearchStartIM(){
+  var name=_searchResultName;
+  if(!name) return;
+  document.getElementById('dlg-add-buddy').style.display='none';
+  openIM(name);
+  if(!aoi_peers[name]) aoiInitiatePeer(name);
 }
 
 /* ===== BUDDY-LISTE RENDERN ===== */
@@ -1739,5 +1800,98 @@ function aoiSendViaDataChannel(name, text) {
   var peer = aoi_peers[name];
   if(peer && peer.dc && peer.dc.readyState === 'open') { peer.dc.send(text); return true; }
   return false;
+}
+
+/* ===== DATEIÜBERTRAGUNG ===== */
+var AOI_CHUNK = 16384; // 16 KB pro Chunk
+var _fileTransfers = {}; // laufende Empfänge: name -> {name,mime,chunks:[],total}
+
+function aoiSendFile(input) {
+  var file = input.files[0];
+  input.value = '';
+  if(!file) return;
+  var name = currentIMBuddy;
+  var peer = aoi_peers[name];
+  if(!peer || !peer.dc || peer.dc.readyState !== 'open') {
+    alert('Keine P2P-Verbindung zu '+name+'. Bitte warte bis der Buddy verbunden ist.');
+    return;
+  }
+  var reader = new FileReader();
+  reader.onload = function(e) {
+    var buf = e.target.result;
+    var total = Math.ceil(buf.byteLength / AOI_CHUNK) || 1;
+    // Startmeldung
+    var startMsg = JSON.stringify({aoi:'file',phase:'start',name:file.name,size:buf.byteLength,mime:file.type||'application/octet-stream',total:total});
+    peer.dc.send(startMsg);
+    // Chunks senden
+    var i = 0;
+    function sendNext() {
+      if(i >= total) {
+        peer.dc.send(JSON.stringify({aoi:'file',phase:'end',name:file.name}));
+        return;
+      }
+      var slice = buf.slice(i*AOI_CHUNK, (i+1)*AOI_CHUNK);
+      var b64 = btoa(String.fromCharCode.apply(null, new Uint8Array(slice)));
+      peer.dc.send(JSON.stringify({aoi:'file',phase:'chunk',n:i,data:b64}));
+      i++;
+      // Kleines yield damit der DC nicht blockiert
+      setTimeout(sendNext, 0);
+    }
+    sendNext();
+    // Im eigenen Chat anzeigen
+    var log = document.getElementById('im-chat-log');
+    var d = document.createElement('div');
+    d.innerHTML = '<b style="color:#0000aa;">Ich:</b> <span style="background:#e8f4ff;border:1px solid #b0d0ff;border-radius:4px;padding:2px 6px;font-size:11px;">📎 '+escHtml(file.name)+' ('+aoiFileSize(buf.byteLength)+') wird gesendet…</span>';
+    log.appendChild(d); log.scrollTop=log.scrollHeight;
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+function aoiReceiveFileMsg(fromName, msg) {
+  if(msg.phase === 'start') {
+    if(currentIMBuddy !== fromName) openIM(fromName);
+    _fileTransfers[fromName] = {name:msg.name, mime:msg.mime, chunks:[], total:msg.total, size:msg.size};
+    var log = document.getElementById('im-chat-log');
+    var d = document.createElement('div');
+    d.id = 'ft-progress-'+fromName;
+    d.innerHTML = '<b style="color:#aa0000;">'+escHtml(fromName)+':</b> <span style="background:#fff8e0;border:1px solid #e0c060;border-radius:4px;padding:2px 6px;font-size:11px;">📎 '+escHtml(msg.name)+' ('+aoiFileSize(msg.size)+') wird empfangen…</span>';
+    log.appendChild(d); log.scrollTop=log.scrollHeight;
+  } else if(msg.phase === 'chunk') {
+    var ft = _fileTransfers[fromName];
+    if(ft) ft.chunks[msg.n] = msg.data;
+  } else if(msg.phase === 'end') {
+    var ft2 = _fileTransfers[fromName];
+    if(!ft2) return;
+    delete _fileTransfers[fromName];
+    // Base64-Chunks zu Blob zusammenbauen
+    var parts = [];
+    for(var i=0;i<ft2.chunks.length;i++){
+      var b64 = ft2.chunks[i];
+      var bin = atob(b64);
+      var arr = new Uint8Array(bin.length);
+      for(var j=0;j<bin.length;j++) arr[j]=bin.charCodeAt(j);
+      parts.push(arr);
+    }
+    var blob = new Blob(parts, {type:ft2.mime});
+    var url = URL.createObjectURL(blob);
+    var prog = document.getElementById('ft-progress-'+fromName);
+    if(prog) {
+      prog.innerHTML = '<b style="color:#aa0000;">'+escHtml(fromName)+':</b> <span style="background:#e8ffe8;border:1px solid #60c060;border-radius:4px;padding:2px 6px;font-size:11px;">📎 <a href="'+url+'" download="'+escHtml(ft2.name)+'" style="color:#006600;text-decoration:underline;font-weight:bold;">'+escHtml(ft2.name)+'</a> ('+aoiFileSize(ft2.size)+') – Klicken zum Speichern</span>';
+    }
+    var log2 = document.getElementById('im-chat-log');
+    if(log2) log2.scrollTop=log2.scrollHeight;
+    playSound('snd-msg-recv');
+  }
+}
+
+function aoiFileSize(bytes) {
+  if(bytes < 1024) return bytes+' B';
+  if(bytes < 1048576) return (bytes/1024).toFixed(1)+' KB';
+  if(bytes < 1073741824) return (bytes/1048576).toFixed(1)+' MB';
+  return (bytes/1073741824).toFixed(2)+' GB';
+}
+
+function escHtml(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
 </script>
