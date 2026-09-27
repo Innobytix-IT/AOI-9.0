@@ -1374,6 +1374,18 @@ function startSignOn() {
 function doSignOff() {
   aoiStopOnline();
   if(onlineTimer){clearInterval(onlineTimer);onlineTimer=null;}
+
+  // Alle Webviews stoppen (Radio, Browser) damit kein Audio/Video weiterläuft
+  ['browser-frame','radio-frame'].forEach(function(id){
+    var wv = document.getElementById(id);
+    if(wv) { try { wv.stop(); } catch(_){} wv.src = 'about:blank'; }
+  });
+
+  // Alle offenen MDI-Fenster schließen
+  document.querySelectorAll('.mdi-window').forEach(function(w){
+    w.style.display = 'none';
+  });
+
   playSound('snd-bis-bald');
   closeSplashNow();
   document.getElementById('desktop-shell').style.display='none';
