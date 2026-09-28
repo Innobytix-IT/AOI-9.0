@@ -1372,6 +1372,7 @@ body {
         <div style="display:flex;gap:6px;">
           <button class="btn-signon" style="border-radius:3px;padding:4px 14px;font-size:11px;" onclick="aoiSaveServerUrl()">Speichern</button>
           <button class="btn-options" style="font-size:11px;" onclick="aoiTestServerUrl()">Verbindung testen</button>
+          <button class="btn-options" style="font-size:11px;" onclick="aoiResetServerPin()" title="Gepinnten Server-Schlüssel löschen (z.B. nach Server-Neuinstallation)">🔑 Pin zurücksetzen</button>
         </div>
         <div id="srv-url-msg" style="font-size:10px;margin-top:4px;"></div>
       </div>
@@ -4035,6 +4036,13 @@ function aoiResetServerUrl() {
   var msg = document.getElementById('srv-url-msg');
   if(msg) { msg.style.color='#070'; msg.textContent='Auf Standard zurückgesetzt (Innobytix-Server).'; }
 }
+function aoiResetServerPin() {
+  var msg = document.getElementById('srv-url-msg');
+  var urlToReset = AOI_SIGNAL_URL;
+  var cacheKey = 'aoi_noise_spub_' + btoa(urlToReset).replace(/[^a-zA-Z0-9]/g,'_').slice(0,40);
+  try { localStorage.removeItem(cacheKey); } catch(e) {}
+  if(msg) { msg.style.color='#070'; msg.textContent='✔ Server-Schlüssel-Pin gelöscht. Beim nächsten Login wird neu gepinnt.'; }
+}
 function aoiSaveToken() {
   var inp = document.getElementById('meinaoi-token-input');
   var msg = document.getElementById('meinaoi-token-msg');
@@ -5592,19 +5600,14 @@ async function aoiNoiseInit(name) {
   try { await crypto.subtle.generateKey({name:'X25519'}, false, ['deriveBits']); }
   catch(e) { return; }
 
-  // Statisches Schlüsselpaar: privater Key im Tresor, öffentlicher in localStorage
+  // Statisches Schlüsselpaar: Tresor (Linux/Mac) oder localStorage (Windows/Fallback)
   try {
     var privStored = aoiTresorGet('noise_priv');
-    var pubStored  = localStorage.getItem('aoi_noise_pub_'+name);
-    // Migration: alter ungeschützter Key aus localStorage in Tresor übernehmen
-    if (!privStored) {
-      var legacyPriv = localStorage.getItem('aoi_noise_priv_'+name);
-      if (legacyPriv) {
-        privStored = legacyPriv;
-        await aoiTresorSet(name, 'noise_priv', legacyPriv);
-        try { localStorage.removeItem('aoi_noise_priv_'+name); } catch(e) {}
-      }
+    // Windows-Fallback: Tresor nicht aktiv → localStorage
+    if (!privStored && !aoiUseTresor()) {
+      try { privStored = localStorage.getItem('aoi_noise_priv_'+name); } catch(e) {}
     }
+    var pubStored  = localStorage.getItem('aoi_noise_pub_'+name);
     if (privStored && pubStored) {
       _aoiNoiseSpkPriv = await crypto.subtle.importKey('pkcs8', _noiseB64dec(privStored), {name:'X25519'}, false, ['deriveBits']);
       _aoiNoiseSpkPub  = _noiseB64dec(pubStored);
@@ -5612,7 +5615,11 @@ async function aoiNoiseInit(name) {
       var kp       = await crypto.subtle.generateKey({name:'X25519'}, true, ['deriveBits']);
       var privPkcs8 = new Uint8Array(await crypto.subtle.exportKey('pkcs8', kp.privateKey));
       var pubRaw    = new Uint8Array(await crypto.subtle.exportKey('raw',   kp.publicKey));
-      await aoiTresorSet(name, 'noise_priv', _noiseB64enc(privPkcs8));
+      if (aoiUseTresor()) {
+        await aoiTresorSet(name, 'noise_priv', _noiseB64enc(privPkcs8));
+      } else {
+        try { localStorage.setItem('aoi_noise_priv_'+name, _noiseB64enc(privPkcs8)); } catch(e) {}
+      }
       try { localStorage.setItem('aoi_noise_pub_'+name, _noiseB64enc(pubRaw)); } catch(e) {}
       _aoiNoiseSpkPriv = await crypto.subtle.importKey('pkcs8', privPkcs8, {name:'X25519'}, false, ['deriveBits']);
       _aoiNoiseSpkPub  = pubRaw;
