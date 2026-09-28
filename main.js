@@ -416,7 +416,7 @@ ipcMain.handle('email-mark-read', async (_, {cfg, folder, uid}) => {
   try {
     await client.connect();
     const lock = await client.getMailboxLock(folder);
-    try { await client.messageFlagsAdd({uid}, ['\\Seen'], {uid: true}); }
+    try { await client.messageFlagsAdd(uid, ['\\Seen'], {uid: true}); }
     finally { lock.release(); }
     await client.logout();
     return { ok: true };

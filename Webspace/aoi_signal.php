@@ -764,7 +764,7 @@ if ($aktion === 'federation_servers') {
 if ($aktion === 'federation_join') {
     if (!FEDERATION_ENABLED) aoi_fehler('Nicht im AOI-Netz.', 403);
     $new_url = isset($ein['server_url']) ? trim((string)$ein['server_url']) : '';
-    if (!$new_url || strlen($new_url) > 256 || !filter_var($new_url, FILTER_VALIDATE_URL)) aoi_fehler('Ungueltige Server-URL.');
+    if (!$new_url || strlen($new_url) > 256 || !fed_url_safe($new_url)) aoi_fehler('Ungueltige Server-URL.');
     $servers = lies(FED_SERVERS_FILE);
     $key = substr(hash('sha256', $new_url), 0, 16);
     $entry = array('url' => $new_url, 'joined' => isset($servers[$key]['joined']) ? $servers[$key]['joined'] : time(), 'last_seen' => time());
@@ -793,7 +793,7 @@ if ($aktion === 'federation_presence') {
     if (!FEDERATION_ENABLED) aoi_fehler('Nicht im AOI-Netz.', 403);
     $users = isset($ein['users']) ? (array)$ein['users'] : array();
     $server_url = isset($ein['server_url']) ? trim((string)$ein['server_url']) : '';
-    if (!$server_url || !filter_var($server_url, FILTER_VALIDATE_URL) || $server_url === FEDERATION_URL) aoi_fehler('Ungueltige Server-URL.');
+    if (!$server_url || !fed_url_safe($server_url) || $server_url === FEDERATION_URL) aoi_fehler('Ungueltige Server-URL.');
     // Sender als bekannten Peer speichern
     $fed_srv = lies(FED_SERVERS_FILE);
     $srv_key = substr(hash('sha256', $server_url), 0, 16);
