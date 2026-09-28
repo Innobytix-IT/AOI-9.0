@@ -412,7 +412,10 @@ body {
       <div class="title-controls"><div class="btn-win close" onclick="if(window.electronAPI)window.electronAPI.close()" title="Beenden">✕</div></div>
     </div>
     <div class="window-body">
-      <div style="display:flex;justify-content:flex-end;margin-bottom:8px;"><button class="btn-options" onclick="window.open('https://github.com/Innobytix-IT/AOI-9.0','_blank')">Hilfe</button></div>
+      <div style="display:flex;justify-content:flex-end;gap:6px;margin-bottom:8px;">
+        <button class="btn-options" onclick="openDatenschutz()">🔒 Datenschutz</button>
+        <button class="btn-options" onclick="window.open('https://github.com/Innobytix-IT/AOI-9.0','_blank')">Hilfe</button>
+      </div>
       <div class="main-card">
         <div class="card-top">
           <div class="logo-container">
@@ -529,7 +532,13 @@ body {
     <span class="menu-item" onclick="toggleWindow('win-navigation')">Kanäle</span>
     <span class="menu-item" onclick="openWindow('win-main')">Willkommen</span>
     <span class="menu-item" style="color:#b31e00;font-weight:bold;" onclick="doSignOff()">Abmelden</span>
-    <span class="menu-item" onclick="window.open('https://github.com/Innobytix-IT/AOI-9.0','_blank')">Hilfe</span>
+    <span class="menu-item" onclick="menuToggle(event,'menu-hilfe')">Hilfe
+      <div class="menu-dropdown" id="menu-hilfe">
+        <div class="menu-dd-item" onclick="window.open('https://github.com/Innobytix-IT/AOI-9.0','_blank')">📖 GitHub / Dokumentation</div>
+        <div class="menu-dd-sep"></div>
+        <div class="menu-dd-item" onclick="menuClose();openDatenschutz()">🔒 Datenschutz &amp; Datenverarbeitung</div>
+      </div>
+    </span>
     <div class="electron-winctrls" id="electron-winctrls" style="display:none;">
       <button onclick="if(window.electronAPI)window.electronAPI.minimize()" title="Minimieren">_</button>
       <button onclick="if(window.electronAPI)window.electronAPI.maximize()" title="Maximieren">□</button>
@@ -1307,6 +1316,134 @@ body {
 </div>
 
 <!-- ===== DIALOG: SICHERHEITSCHECK ===== -->
+<div class="aoi-modal" id="dlg-datenschutz">
+  <div class="aoi-modal-box" style="width:560px;max-height:85vh;display:flex;flex-direction:column;">
+    <div class="aoi-modal-title">
+      <span>🔒 Datenschutz &amp; Datenverarbeitung</span>
+      <span style="cursor:pointer;" onclick="document.getElementById('dlg-datenschutz').style.display='none'">✕</span>
+    </div>
+    <div class="aoi-modal-body" style="padding:12px 16px;overflow-y:auto;font-size:12px;line-height:1.6;">
+
+      <div style="background:#fff8e0;border:1px solid #e0c060;border-radius:4px;padding:8px 10px;margin-bottom:12px;font-size:11px;">
+        <b>AOI 9.0 ist dezentrale Open-Source-Software – kein zentraler Dienst.</b><br>
+        Datenschutzrechtlich Verantwortlicher ist jeweils der <b>Betreiber des Signaling-Servers</b>, mit dem Sie sich verbinden – nicht der App-Entwickler. Für den Betrieb des Servers unter <i>innobytix-it.de</i> gilt: Kontakt über <a href="#" onclick="return false;" style="color:#003dd0;">info@innobytix-it.de</a>. Wer einen eigenen Server betreibt, ist selbst verantwortlich.
+      </div>
+
+      <b style="color:#003dd0;font-size:12px;">1. Welche Daten werden verarbeitet?</b>
+      <table style="width:100%;border-collapse:collapse;margin:6px 0 12px 0;font-size:11px;">
+        <tr style="background:#e8f0ff;">
+          <th style="text-align:left;padding:4px 6px;border:1px solid #c0cce8;">Daten</th>
+          <th style="text-align:left;padding:4px 6px;border:1px solid #c0cce8;">Wo</th>
+          <th style="text-align:left;padding:4px 6px;border:1px solid #c0cce8;">Wie lange</th>
+        </tr>
+        <tr>
+          <td style="padding:4px 6px;border:1px solid #c0cce8;"><b>Screen Name</b></td>
+          <td style="padding:4px 6px;border:1px solid #c0cce8;">Signaling-Server (Präsenz-Heartbeat)</td>
+          <td style="padding:4px 6px;border:1px solid #c0cce8;">Max. 120 Sek. (TTL), danach automatisch gelöscht</td>
+        </tr>
+        <tr style="background:#f5f8ff;">
+          <td style="padding:4px 6px;border:1px solid #c0cce8;"><b>IP-Adresse</b></td>
+          <td style="padding:4px 6px;border:1px solid #c0cce8;">WebRTC ICE → an Chat-Partner übermittelt</td>
+          <td style="padding:4px 6px;border:1px solid #c0cce8;">Nur während der Verbindung, nicht gespeichert</td>
+        </tr>
+        <tr>
+          <td style="padding:4px 6px;border:1px solid #c0cce8;"><b>Chat-Nachrichten</b></td>
+          <td style="padding:4px 6px;border:1px solid #c0cce8;">Ausschließlich P2P (kein Server)</td>
+          <td style="padding:4px 6px;border:1px solid #c0cce8;">Lokal im Gerätespeicher (localStorage)</td>
+        </tr>
+        <tr style="background:#f5f8ff;">
+          <td style="padding:4px 6px;border:1px solid #c0cce8;"><b>Offline-Nachrichten</b></td>
+          <td style="padding:4px 6px;border:1px solid #c0cce8;">Temporär auf Signaling-Server</td>
+          <td style="padding:4px 6px;border:1px solid #c0cce8;">Bis zur Zustellung, max. 48 Stunden</td>
+        </tr>
+        <tr>
+          <td style="padding:4px 6px;border:1px solid #c0cce8;"><b>Dateiübertragungen</b></td>
+          <td style="padding:4px 6px;border:1px solid #c0cce8;">Ausschließlich P2P (kein Server)</td>
+          <td style="padding:4px 6px;border:1px solid #c0cce8;">Nicht gespeichert – direkt übertragen</td>
+        </tr>
+        <tr style="background:#f5f8ff;">
+          <td style="padding:4px 6px;border:1px solid #c0cce8;"><b>E-Mail-Passwort</b></td>
+          <td style="padding:4px 6px;border:1px solid #c0cce8;">Nur lokal, verschlüsselt</td>
+          <td style="padding:4px 6px;border:1px solid #c0cce8;">Bis zur manuellen Löschung</td>
+        </tr>
+        <tr>
+          <td style="padding:4px 6px;border:1px solid #c0cce8;"><b>E-Mail-Inhalte</b></td>
+          <td style="padding:4px 6px;border:1px solid #c0cce8;">Direkt vom E-Mail-Provider</td>
+          <td style="padding:4px 6px;border:1px solid #c0cce8;">AOI-Server sehen diese Daten nie</td>
+        </tr>
+      </table>
+
+      <b style="color:#003dd0;font-size:12px;">2. Eingesetzte Technologien</b>
+      <table style="width:100%;border-collapse:collapse;margin:6px 0 12px 0;font-size:11px;">
+        <tr style="background:#e8f0ff;">
+          <th style="text-align:left;padding:4px 6px;border:1px solid #c0cce8;">Technologie</th>
+          <th style="text-align:left;padding:4px 6px;border:1px solid #c0cce8;">Zweck</th>
+          <th style="text-align:left;padding:4px 6px;border:1px solid #c0cce8;">Anbieter</th>
+        </tr>
+        <tr>
+          <td style="padding:4px 6px;border:1px solid #c0cce8;"><b>Electron</b></td>
+          <td style="padding:4px 6px;border:1px solid #c0cce8;">Desktop-Anwendungs-Framework</td>
+          <td style="padding:4px 6px;border:1px solid #c0cce8;">OpenJS Foundation</td>
+        </tr>
+        <tr style="background:#f5f8ff;">
+          <td style="padding:4px 6px;border:1px solid #c0cce8;"><b>WebRTC (DTLS/SRTP)</b></td>
+          <td style="padding:4px 6px;border:1px solid #c0cce8;">P2P-Chat &amp; Dateiübertragung, E2E-verschlüsselt</td>
+          <td style="padding:4px 6px;border:1px solid #c0cce8;">W3C-Standard (im Browser integriert)</td>
+        </tr>
+        <tr>
+          <td style="padding:4px 6px;border:1px solid #c0cce8;"><b>STUN-Server</b></td>
+          <td style="padding:4px 6px;border:1px solid #c0cce8;">NAT-Traversal (öffentliche IP ermitteln)</td>
+          <td style="padding:4px 6px;border:1px solid #c0cce8;">Google LLC (stun.l.google.com)</td>
+        </tr>
+        <tr style="background:#f5f8ff;">
+          <td style="padding:4px 6px;border:1px solid #c0cce8;"><b>PHP Signaling-Server</b></td>
+          <td style="padding:4px 6px;border:1px solid #c0cce8;">Präsenz &amp; WebRTC-Vermittlung</td>
+          <td style="padding:4px 6px;border:1px solid #c0cce8;">Betreiber des gewählten Servers</td>
+        </tr>
+        <tr>
+          <td style="padding:4px 6px;border:1px solid #c0cce8;"><b>localStorage</b></td>
+          <td style="padding:4px 6px;border:1px solid #c0cce8;">Lokale Einstellungen, Buddy-Liste, Nachrichten</td>
+          <td style="padding:4px 6px;border:1px solid #c0cce8;">Nur auf diesem Gerät</td>
+        </tr>
+        <tr style="background:#f5f8ff;">
+          <td style="padding:4px 6px;border:1px solid #c0cce8;"><b>Electron safeStorage</b></td>
+          <td style="padding:4px 6px;border:1px solid #c0cce8;">Verschlüsselte Passwort-Speicherung</td>
+          <td style="padding:4px 6px;border:1px solid #c0cce8;">Windows DPAPI / macOS Keychain</td>
+        </tr>
+        <tr>
+          <td style="padding:4px 6px;border:1px solid #c0cce8;"><b>ImapFlow / Nodemailer</b></td>
+          <td style="padding:4px 6px;border:1px solid #c0cce8;">E-Mail-Empfang (IMAP) und -Versand (SMTP)</td>
+          <td style="padding:4px 6px;border:1px solid #c0cce8;">Direkt zum konfigurierten E-Mail-Provider</td>
+        </tr>
+      </table>
+
+      <b style="color:#003dd0;font-size:12px;">3. Wer sieht welche Daten?</b>
+      <div style="margin:6px 0 12px 0;font-size:11px;">
+        <div style="padding:3px 0;">🟢 <b>Signaling-Server-Betreiber:</b> Screen Name + Zeitstempel der Online-Präsenz (max. 120 Sek.)</div>
+        <div style="padding:3px 0;">🟡 <b>Chat-Partner:</b> Öffentliche IP-Adresse (WebRTC-ICE, technisch unvermeidbar für P2P)</div>
+        <div style="padding:3px 0;">🟡 <b>Google (STUN):</b> Öffentliche IP-Adresse für NAT-Traversal</div>
+        <div style="padding:3px 0;">🔴 <b>Niemand:</b> Chat-Nachrichten, Datei-Inhalte, E-Mails, Passwörter</div>
+      </div>
+
+      <b style="color:#003dd0;font-size:12px;">4. Ihre Rechte (DSGVO Art. 15–21)</b>
+      <div style="margin:6px 0 12px 0;font-size:11px;">
+        <div style="padding:3px 0;"><b>Auskunft &amp; Löschung:</b> Abmelden löscht Ihren Präsenz-Eintrag sofort. Offline-Nachrichten werden nach Zustellung bzw. spätestens nach 48 Stunden automatisch gelöscht. Wenden Sie sich für weitergehende Anfragen an den Betreiber Ihres Servers.</div>
+        <div style="padding:3px 0;margin-top:4px;"><b>Datenminimierung:</b> AOI 9.0 überträgt nur das technisch Notwendige. Nachrichten und Dateien verlassen Ihr Gerät ausschließlich verschlüsselt und direkt zum Empfänger.</div>
+        <div style="padding:3px 0;margin-top:4px;"><b>Portabilität:</b> Alle lokalen Daten liegen im localStorage dieses Geräts und können jederzeit über die Browser-Entwicklertools eingesehen werden.</div>
+      </div>
+
+      <div style="background:#f0f0f0;border:1px solid #ccc;border-radius:4px;padding:8px 10px;font-size:10px;color:#555;">
+        AOI 9.0 ist quelloffene Software (AGPL-3.0) –
+        <a href="#" onclick="window.open('https://github.com/Innobytix-IT/AOI-9.0','_blank');return false;" style="color:#003dd0;">Quellcode auf GitHub</a>.
+        Jeder Nutzer kann den Signaling-Server selbst betreiben und ist dann selbst datenschutzrechtlich Verantwortlicher im Sinne der DSGVO Art. 4 Nr. 7.
+      </div>
+    </div>
+    <div style="padding:8px 16px;border-top:1px solid #c0cce8;text-align:right;">
+      <button class="btn-options" onclick="document.getElementById('dlg-datenschutz').style.display='none'">Schließen</button>
+    </div>
+  </div>
+</div>
+
 <div class="aoi-modal" id="dlg-security">
   <div class="aoi-modal-box" style="width:420px;">
     <div class="aoi-modal-title">
@@ -3206,6 +3343,10 @@ function aoiSearchStartIM(){
 }
 
 /* ===== SICHERHEITSCHECK ===== */
+function openDatenschutz(){
+  document.getElementById('dlg-datenschutz').style.display='flex';
+}
+
 function openSecurityCheck(){
   var dlg=document.getElementById('dlg-security');
   dlg.style.display='flex';
