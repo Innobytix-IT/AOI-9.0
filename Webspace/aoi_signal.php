@@ -139,9 +139,15 @@ function token_ok($eingabe) {
 }
 
 // HTTP-POST zu einem anderen Federation-Server (kein Token – Server-zu-Server)
-// SSRF-Schutz: nur HTTPS, keine privaten IPs
+// SSRF-Schutz: http:// und https:// erlaubt, keine privaten IPs.
+// Bewusste Entscheidung: HTTPS-Pflicht würde kostenlose Webspaces (z.B. beplaced)
+// ausschließen, die kein TLS anbieten. Der eigentliche SSRF-Schutz ist der
+// private-IP-Check unten – nicht das Protokoll. WebRTC-Inhalte sind ohnehin
+// immer E2E-verschlüsselt (DTLS/SRTP); lediglich Signalmetadaten (wer verbindet
+// sich mit wem) könnten über HTTP-Server unverschlüsselt übertragen werden.
+// Wer maximale Privatsphäre will, betreibt einen HTTPS-Server.
 function fed_url_safe($url) {
-    if (!preg_match('#^https://#i', $url)) return false;
+    if (!preg_match('#^https?://#i', $url)) return false;
     $host = parse_url($url, PHP_URL_HOST);
     if (!$host) return false;
     $ip = @gethostbyname($host);
