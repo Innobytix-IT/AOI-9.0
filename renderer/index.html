@@ -1842,10 +1842,9 @@ function showWelcomeSplash(name) {
   splashTimer=setTimeout(function(){ splashTimer=null; closeSplashNow(); }, 6000);
   var _loginPwHash = localStorage.getItem('aoi_pw_hash_'+name) || null;
   aoiInitPendingKey(_loginPwHash);
-  Promise.all([
-    aoiNoiseInit(name),
-    aoiTresorInit(name, _loginPwHash)
-  ]).then(function(){
+  aoiTresorInit(name, _loginPwHash).then(function(){
+    return aoiNoiseInit(name);
+  }).then(function(){
     aoiStartOnline(name);
     emailLoadSettings();
   });
@@ -5589,10 +5588,19 @@ async function aoiNoiseInit(name) {
   try { await crypto.subtle.generateKey({name:'X25519'}, false, ['deriveBits']); }
   catch(e) { return; }
 
-  // Statisches Schlüsselpaar laden oder neu erzeugen
+  // Statisches Schlüsselpaar: privater Key im Tresor, öffentlicher in localStorage
   try {
-    var privStored = localStorage.getItem('aoi_noise_priv_'+name);
+    var privStored = aoiTresorGet('noise_priv');
     var pubStored  = localStorage.getItem('aoi_noise_pub_'+name);
+    // Migration: alter ungeschützter Key aus localStorage in Tresor übernehmen
+    if (!privStored) {
+      var legacyPriv = localStorage.getItem('aoi_noise_priv_'+name);
+      if (legacyPriv) {
+        privStored = legacyPriv;
+        await aoiTresorSet(name, 'noise_priv', legacyPriv);
+        try { localStorage.removeItem('aoi_noise_priv_'+name); } catch(e) {}
+      }
+    }
     if (privStored && pubStored) {
       _aoiNoiseSpkPriv = await crypto.subtle.importKey('pkcs8', _noiseB64dec(privStored), {name:'X25519'}, false, ['deriveBits']);
       _aoiNoiseSpkPub  = _noiseB64dec(pubStored);
@@ -5600,10 +5608,8 @@ async function aoiNoiseInit(name) {
       var kp       = await crypto.subtle.generateKey({name:'X25519'}, true, ['deriveBits']);
       var privPkcs8 = new Uint8Array(await crypto.subtle.exportKey('pkcs8', kp.privateKey));
       var pubRaw    = new Uint8Array(await crypto.subtle.exportKey('raw',   kp.publicKey));
-      try {
-        localStorage.setItem('aoi_noise_priv_'+name, _noiseB64enc(privPkcs8));
-        localStorage.setItem('aoi_noise_pub_'+name,  _noiseB64enc(pubRaw));
-      } catch(e) {}
+      await aoiTresorSet(name, 'noise_priv', _noiseB64enc(privPkcs8));
+      try { localStorage.setItem('aoi_noise_pub_'+name, _noiseB64enc(pubRaw)); } catch(e) {}
       _aoiNoiseSpkPriv = await crypto.subtle.importKey('pkcs8', privPkcs8, {name:'X25519'}, false, ['deriveBits']);
       _aoiNoiseSpkPub  = pubRaw;
     }
