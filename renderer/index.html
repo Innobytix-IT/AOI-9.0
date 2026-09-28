@@ -485,6 +485,20 @@ body {
 
 <div id="buddy-notify" onclick="this.style.display='none'"></div>
 
+<!-- CHATROOM-EINLADUNGS-POPUP -->
+<div id="room-invite-popup" style="display:none;position:fixed;bottom:60px;right:16px;z-index:99998;width:280px;background:#ece9d8;border:2px solid #7faad0;box-shadow:4px 5px 12px rgba(0,0,0,.45);border-radius:3px;font-family:Tahoma,Arial,sans-serif;overflow:hidden;">
+  <div style="background:linear-gradient(to bottom,#3168cc 0%,#1a4aaa 100%);color:#fff;padding:4px 8px;font-size:11px;font-weight:bold;display:flex;align-items:center;gap:6px;">
+    <span>💬</span><span id="rip-title">Chatroom-Einladung</span>
+  </div>
+  <div style="padding:10px 12px 8px;">
+    <div id="rip-text" style="font-size:11px;color:#0b3464;margin-bottom:10px;line-height:1.5;"></div>
+    <div style="display:flex;gap:6px;justify-content:flex-end;">
+      <button onclick="aoiRipDecline()" style="font-size:10px;padding:2px 12px;cursor:pointer;">Ablehnen</button>
+      <button id="rip-join-btn" onclick="aoiRipJoin()" style="font-size:10px;padding:2px 12px;cursor:pointer;background:#316ac5;color:#fff;border:none;border-radius:2px;font-weight:bold;">Beitreten</button>
+    </div>
+  </div>
+</div>
+
 <!-- WILLKOMMEN-SPLASH -->
 <div id="welcome-splash">
   <div id="welcome-dialog">
@@ -5816,9 +5830,30 @@ function aoiSendRoomInvite(buddyName) {
   aoiRoomAppendSys('Einladung an <b>'+escHtml(buddyName)+'</b> gesendet'+(sent?' (direkt ✓)':' (wird zugestellt wenn '+escHtml(buddyName)+' online kommt ⏳)')+' ');
 }
 
+var _ripRoom = '', _ripFrom = '';
+function aoiRipDecline() {
+  document.getElementById('room-invite-popup').style.display = 'none';
+  _ripRoom = ''; _ripFrom = '';
+}
+function aoiRipJoin() {
+  var room = _ripRoom;
+  document.getElementById('room-invite-popup').style.display = 'none';
+  _ripRoom = ''; _ripFrom = '';
+  if(!room) return;
+  openWindow('win-chatroom');
+  aoiRoomRefresh();
+  setTimeout(function(){ aoiRoomJoin(room); }, 300);
+}
+
 function aoiReceiveRoomInvite(fromName, msg) {
   var room = msg.room || '';
   if(!room) return;
+  // Popup anzeigen (prominent, immer sichtbar)
+  _ripRoom = room;
+  _ripFrom = fromName;
+  document.getElementById('rip-text').innerHTML = '<b>'+escHtml(fromName)+'</b> lädt dich ein, dem Raum <b>'+escHtml(room)+'</b> beizutreten.';
+  document.getElementById('room-invite-popup').style.display = 'block';
+  // Auch im IM-Log eintragen (als Erinnerung)
   var safeRoomJs = room.replace(/\\/g,'\\\\').replace(/'/g,"\\'");
   var html = '<div style="margin:3px 0;padding:5px 8px;background:#edf4fc;border:1px solid #b0c4de;border-radius:4px;font-size:10px;line-height:1.5;">'
     + '💬 <b>'+escHtml(fromName)+'</b> lädt dich ein: <b>'+escHtml(room)+'</b>'
@@ -5826,7 +5861,6 @@ function aoiReceiveRoomInvite(fromName, msg) {
     + 'onclick="openWindow(\'win-chatroom\');aoiRoomRefresh();setTimeout(function(){aoiRoomJoin(\''+safeRoomJs+'\')},300);">'
     + 'Beitreten</button>'
     + '</div>';
-  // In offenem IM-Fenster anzeigen
   var logEl = null;
   if(aoi_im_wins[fromName]) logEl = aoi_im_wins[fromName].querySelector('.im-extra-log');
   else if(currentIMBuddy === fromName) logEl = document.getElementById('im-chat-log');
@@ -5834,12 +5868,11 @@ function aoiReceiveRoomInvite(fromName, msg) {
     var d = document.createElement('div'); d.innerHTML = html;
     logEl.appendChild(d); logEl.scrollTop = logEl.scrollHeight;
   } else {
-    // IM-Fenster öffnen und Einladung anzeigen
     openIM(fromName);
     setTimeout(function(){
       var lg = aoi_im_wins[fromName] ? aoi_im_wins[fromName].querySelector('.im-extra-log') : (currentIMBuddy===fromName ? document.getElementById('im-chat-log') : null);
       if(lg){ var d2=document.createElement('div'); d2.innerHTML=html; lg.appendChild(d2); lg.scrollTop=lg.scrollHeight; }
-    }, 80);
+    }, 150);
   }
   if(aoiSoundAllowed('msg')) playSound('snd-msg-recv');
 }

@@ -472,7 +472,7 @@ app.on('web-contents-created', (_event, contents) => {
     webPreferences.contextIsolation = true;
     // Isolierte Storage-Partition je nach Webview-ID
     const src = params.src || '';
-    if (!src.startsWith('file://')) {
+    if (src && !src.startsWith('file://') && src !== 'about:blank') {
       webPreferences.partition = params.partition || 'persist:aoi-browser';
     }
   });
