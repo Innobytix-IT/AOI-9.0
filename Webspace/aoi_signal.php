@@ -224,6 +224,75 @@ function fed_post($url, $payload, $timeout = 5) {
     return ($result !== false && $result !== null) ? @json_decode($result, true) : null;
 }
 
+/* ===== FEDERATION NOISE (Server-zu-Server X25519+AES-256-GCM) ===== */
+function fed_get_json($url, $timeout = 5) {
+    if (function_exists('curl_init')) {
+        $ch = curl_init($url);
+        curl_setopt_array($ch, array(CURLOPT_RETURNTRANSFER=>true, CURLOPT_TIMEOUT=>$timeout, CURLOPT_SSL_VERIFYPEER=>true));
+        $r = @curl_exec($ch); curl_close($ch);
+    } else {
+        $ctx = stream_context_create(array('http'=>array('timeout'=>$timeout,'ignore_errors'=>true)));
+        $r = @file_get_contents($url, false, $ctx);
+    }
+    return ($r !== false && $r !== null) ? @json_decode($r, true) : null;
+}
+
+function fed_noise_pub($url) {
+    $key = substr(hash('sha256', $url), 0, 16);
+    $servers = lies(FED_SERVERS_FILE);
+    if (!empty($servers[$key]['noise_pub'])) return $servers[$key]['noise_pub'];
+    $info = fed_get_json($url);
+    if (!empty($info['noise_pub'])) {
+        $servers[$key]['noise_pub'] = $info['noise_pub'];
+        schreibe(FED_SERVERS_FILE, $servers);
+        return $info['noise_pub'];
+    }
+    return null;
+}
+
+function fed_encrypt($payload, $pub_b64) {
+    if (!function_exists('sodium_crypto_scalarmult') || !function_exists('openssl_encrypt')) return null;
+    $pub = base64_decode($pub_b64, true);
+    if (!$pub || strlen($pub) !== 32) return null;
+    $epk_priv = random_bytes(32);
+    $epk_pub  = sodium_crypto_scalarmult_base($epk_priv);
+    $dh  = sodium_crypto_scalarmult($epk_priv, $pub);
+    $key = hash_hkdf('sha256', $dh, 32, 'aoi-fed-req-v1');
+    $iv  = random_bytes(12); $tag = '';
+    $ct  = openssl_encrypt(json_encode($payload, JSON_UNESCAPED_UNICODE),
+                            'aes-256-gcm', $key, OPENSSL_RAW_DATA, $iv, $tag, $epk_pub);
+    if ($ct === false) return null;
+    return array('v'=>'fed1', 'epk'=>base64_encode($epk_pub),
+                 'iv'=>base64_encode($iv), 'body'=>base64_encode($ct.$tag));
+}
+
+function fed_decrypt($env) {
+    if (!function_exists('sodium_crypto_scalarmult') || !function_exists('openssl_decrypt')) return null;
+    $nkp = noise_server_keypair();
+    if (!$nkp) return null;
+    $srv_priv = base64_decode($nkp['priv'], true);
+    $epk_pub  = base64_decode($env['epk'] ?? '', true);
+    if (!$epk_pub || strlen($epk_pub) !== 32) return null;
+    $dh  = sodium_crypto_scalarmult($srv_priv, $epk_pub);
+    $key = hash_hkdf('sha256', $dh, 32, 'aoi-fed-req-v1');
+    $iv       = base64_decode($env['iv']   ?? '', true);
+    $combined = base64_decode($env['body'] ?? '', true);
+    if (!$iv || strlen($iv) !== 12 || !$combined || strlen($combined) < 17) return null;
+    $tag  = substr($combined, -16);
+    $ct   = substr($combined,  0, -16);
+    $plain = openssl_decrypt($ct, 'aes-256-gcm', $key, OPENSSL_RAW_DATA, $iv, $tag, $epk_pub);
+    return ($plain !== false) ? @json_decode($plain, true) : null;
+}
+
+function fed_post_noise($url, $payload, $timeout = 5) {
+    $pub = fed_noise_pub($url);
+    if ($pub) {
+        $env = fed_encrypt($payload, $pub);
+        if ($env) return fed_post($url, $env, $timeout);
+    }
+    return fed_post($url, $payload, $timeout); // Fallback: unverschlüsselt
+}
+
 function bereinige($liste, $ttl) {
     $jetzt = time(); $r = array();
     foreach ($liste as $k => $e) {
@@ -247,6 +316,12 @@ $body = (string)file_get_contents('php://input');
 if (strlen($body) > MAX_BODY) aoi_fehler('Anfrage zu gross.');
 $ein = @json_decode($body, true);
 if (!is_array($ein)) aoi_fehler('Kein gueltiges JSON.');
+
+// Föderations-Anfragen entschlüsseln (v:fed1)
+if (isset($ein['v']) && $ein['v'] === 'fed1') {
+    $dec = fed_decrypt($ein);
+    if (is_array($dec)) $ein = $dec;
+}
 
 $aktion = isset($ein['aktion']) ? (string)$ein['aktion'] : '';
 $name   = isset($ein['name'])   ? (string)$ein['name']   : '';
@@ -305,7 +380,11 @@ if (FEDERATION_ENABLED && in_array($aktion, array('federation_servers','federati
         if (!$new_url || strlen($new_url) > 256 || !fed_url_safe($new_url)) aoi_fehler('Ungueltige Server-URL.');
         $servers = lies(FED_SERVERS_FILE);
         $key = substr(hash('sha256', $new_url), 0, 16);
-        $servers[$key] = array('url' => $new_url, 'joined' => time(), 'last_seen' => time());
+        $entry = array('url' => $new_url, 'joined' => isset($servers[$key]['joined']) ? $servers[$key]['joined'] : time(), 'last_seen' => time());
+        // noise_pub des neuen Servers cachen (für spätere verschlüsselte Kommunikation)
+        $pub_info = fed_get_json($new_url);
+        if (!empty($pub_info['noise_pub'])) $entry['noise_pub'] = $pub_info['noise_pub'];
+        $servers[$key] = $entry;
         schreibe(FED_SERVERS_FILE, $servers);
         $list = array_values(array_map(function($s){ return $s['url']; }, $servers));
         if (!in_array(FEDERATION_URL, $list)) $list[] = FEDERATION_URL;
@@ -465,7 +544,7 @@ if ($aktion === 'presence') {
         $names_to_announce = array_keys($presence);
         foreach ($fed_servers as $srv) {
             if (empty($srv['url']) || $srv['url'] === FEDERATION_URL) continue;
-            @fed_post($srv['url'], array(
+            @fed_post_noise($srv['url'], array(
                 'aktion'     => 'federation_presence',
                 'users'      => $names_to_announce,
                 'server_url' => FEDERATION_URL,
@@ -473,7 +552,7 @@ if ($aktion === 'presence') {
         }
         // Beim ersten Mal: Seed-Server beitreten falls noch keine Peers bekannt
         if (empty($fed_servers) && FEDERATION_SEED !== '' && FEDERATION_SEED !== FEDERATION_URL) {
-            $res = fed_post(FEDERATION_SEED, array(
+            $res = fed_post_noise(FEDERATION_SEED, array(
                 'aktion'     => 'federation_join',
                 'name'       => $name,
                 'server_url' => FEDERATION_URL,
@@ -511,7 +590,7 @@ if ($aktion === 'signal') {
             $fed_pres = bereinige(lies(FED_PRESENCE_FILE), PRESENCE_TTL * 8);
             if (isset($fed_pres[strtolower($an)])) {
                 $target_server = $fed_pres[strtolower($an)]['server'];
-                $res = fed_post($target_server, array(
+                $res = fed_post_noise($target_server, array(
                     'aktion' => 'federation_signal', 'von' => $name, 'an' => $an,
                     'typ' => $typ, 'daten' => $daten, 'from_server' => FEDERATION_URL,
                 ));
@@ -688,7 +767,10 @@ if ($aktion === 'federation_join') {
     if (!$new_url || strlen($new_url) > 256 || !filter_var($new_url, FILTER_VALIDATE_URL)) aoi_fehler('Ungueltige Server-URL.');
     $servers = lies(FED_SERVERS_FILE);
     $key = substr(hash('sha256', $new_url), 0, 16);
-    $servers[$key] = array('url' => $new_url, 'joined' => time(), 'last_seen' => time());
+    $entry = array('url' => $new_url, 'joined' => isset($servers[$key]['joined']) ? $servers[$key]['joined'] : time(), 'last_seen' => time());
+    $pub_info = fed_get_json($new_url);
+    if (!empty($pub_info['noise_pub'])) $entry['noise_pub'] = $pub_info['noise_pub'];
+    $servers[$key] = $entry;
     schreibe(FED_SERVERS_FILE, $servers);
     $list = array_values(array_map(function($s){ return $s['url']; }, $servers));
     if (!in_array(FEDERATION_URL, $list)) $list[] = FEDERATION_URL;
