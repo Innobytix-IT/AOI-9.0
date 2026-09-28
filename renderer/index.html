@@ -5619,21 +5619,28 @@ async function aoiNoiseInit(name) {
     }
   } catch(e) { aoiNoiseLock(); return; }
 
-  // Server-Public-Key holen (GET-Anfrage, gecacht in localStorage)
+  // Server-Public-Key holen (TOFU: Trust on First Use)
   var urlCacheKey = 'aoi_noise_spub_' + btoa(AOI_SIGNAL_URL).replace(/[^a-zA-Z0-9]/g,'_').slice(0,40);
+  var pinnedKey = null;
+  try { pinnedKey = localStorage.getItem(urlCacheKey); } catch(e) {}
   try {
     var resp = await fetch(AOI_SIGNAL_URL, {method:'GET'});
     var info = await resp.json();
     if (info && info.noise_pub) {
+      if (pinnedKey && pinnedKey !== info.noise_pub) {
+        // Server-Key hat sich verändert – TOFU-Verletzung → Verbindung blockieren
+        var el = document.getElementById('status-text');
+        if (el) el.textContent = '⚠ Server-Schlüssel geändert! Möglicher Angriff. Bitte überprüfen.';
+        aoiNoiseLock(); return;
+      }
       _aoiServerNoisePub = await crypto.subtle.importKey('raw', _noiseB64dec(info.noise_pub), {name:'X25519'}, false, ['deriveBits']);
-      try { localStorage.setItem(urlCacheKey, info.noise_pub); } catch(e) {}
+      if (!pinnedKey) { try { localStorage.setItem(urlCacheKey, info.noise_pub); } catch(e) {} } // Erstmalig pinnen
     }
   } catch(e) {
-    // Fallback auf gecachten Key
-    try {
-      var cached = localStorage.getItem(urlCacheKey);
-      if (cached) _aoiServerNoisePub = await crypto.subtle.importKey('raw', _noiseB64dec(cached), {name:'X25519'}, false, ['deriveBits']);
-    } catch(e2) {}
+    // Offline-Fallback: gepinnten Key verwenden
+    if (pinnedKey) {
+      try { _aoiServerNoisePub = await crypto.subtle.importKey('raw', _noiseB64dec(pinnedKey), {name:'X25519'}, false, ['deriveBits']); } catch(e2) {}
+    }
   }
   if (!_aoiServerNoisePub) { aoiNoiseLock(); return; }
 
