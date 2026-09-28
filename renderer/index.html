@@ -1840,10 +1840,15 @@ function showWelcomeSplash(name) {
   if(wlk){ wlk.currentTime=0; wlk.onended=function(){ wlk.onended=null; if(hasUnread) playSound('snd-mail'); }; wlk.play().catch(function(){ if(hasUnread) setTimeout(function(){ playSound('snd-mail'); }, 1000); }); }
   else if(hasUnread) { setTimeout(function(){ playSound('snd-mail'); }, 1200); }
   splashTimer=setTimeout(function(){ splashTimer=null; closeSplashNow(); }, 6000);
-  aoiStartOnline(name);
   var _loginPwHash = localStorage.getItem('aoi_pw_hash_'+name) || null;
   aoiInitPendingKey(_loginPwHash);
-  aoiTresorInit(name, _loginPwHash).then(function(){ emailLoadSettings(); });
+  Promise.all([
+    aoiNoiseInit(name),
+    aoiTresorInit(name, _loginPwHash)
+  ]).then(function(){
+    aoiStartOnline(name);
+    emailLoadSettings();
+  });
   aoiUpdatePwStatus(name);
   aoiUpdatePubStatus(name);
   aoiInitTheme();
@@ -3554,8 +3559,7 @@ var aoi_known_buddies = {};  // name -> true (aktuell online lt. Server)
 var ICE_SERVERS = [{ urls: 'stun:stun.l.google.com:19302' }];
 
 function aoiPost(payload, cb) {
-  payload.token = AOI_TOKEN;
-  var ctrl = null, signal = undefined;
+  var ctrl = null, signal;
   try { ctrl = new AbortController(); signal = ctrl.signal; } catch(e) {}
   var timer = ctrl ? setTimeout(function(){ try{ctrl.abort();}catch(e){} }, 5000) : null;
   var done = false;
@@ -3564,16 +3568,28 @@ function aoiPost(payload, cb) {
     if(timer) clearTimeout(timer);
     if(cb) cb(err, d);
   }
-  try {
-    fetch(AOI_SIGNAL_URL, {
-      method: 'POST',
-      headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify(payload),
-      signal: signal
-    }).then(function(r){ return r.json(); })
-      .then(function(d){ finish(null, d); })
-      .catch(function(e){ finish(e, null); });
-  } catch(e) { finish(e, null); }
+  function doFetch(bodyJson, resKey) {
+    try {
+      fetch(AOI_SIGNAL_URL, {
+        method:'POST', headers:{'Content-Type':'application/json'},
+        body:bodyJson, signal:signal
+      }).then(function(r){ return r.json(); })
+        .then(function(d){
+          if(resKey && d && d.v === 1){
+            aoiNoiseUnwrap(d, resKey).then(function(plain){ finish(null, plain); }).catch(function(){ finish(null, d); });
+          } else { finish(null, d); }
+        }).catch(function(e){ finish(e, null); });
+    } catch(e) { finish(e, null); }
+  }
+  if(aoiNoiseReady()){
+    aoiNoiseWrap(payload).then(function(wrapped){
+      if(wrapped){ doFetch(JSON.stringify(wrapped.envelope), wrapped.resKey); }
+      else { payload.token = AOI_TOKEN; doFetch(JSON.stringify(payload), null); }
+    }).catch(function(){ payload.token = AOI_TOKEN; doFetch(JSON.stringify(payload), null); });
+  } else {
+    payload.token = AOI_TOKEN;
+    doFetch(JSON.stringify(payload), null);
+  }
 }
 
 function aoiStartOnline(name) {
@@ -3597,6 +3613,7 @@ function aoiStopOnline() {
   aoi_known_buddies = {};
   aoi_name = '';
   aoiTresorLock();
+  aoiNoiseLock();
   // E-Mail vollständig zurücksetzen
   _emailCfg = null;
   _emailKnownUids = null;
@@ -5543,6 +5560,116 @@ async function aoiTresorSet(username, field, value) {
 
 function aoiTresorLock() {
   _tresorKey = null; _tresorData = null; _tresorSalt = null; _aoiUseTresor = false;
+}
+
+/* ===== AOI NOISE IK (stateless X25519 + AES-256-GCM) ===== */
+var _aoiNoiseSpkPriv   = null; // CryptoKey – statischer privater Schlüssel des Clients
+var _aoiNoiseSpkPub    = null; // Uint8Array – statischer öffentlicher Schlüssel (32 Bytes)
+var _aoiServerNoisePub = null; // CryptoKey – öffentlicher Schlüssel des Servers
+
+function aoiNoiseReady() {
+  return _aoiNoiseSpkPriv !== null && _aoiNoiseSpkPub !== null && _aoiServerNoisePub !== null;
+}
+
+function aoiNoiseLock() {
+  _aoiNoiseSpkPriv = null; _aoiNoiseSpkPub = null; _aoiServerNoisePub = null;
+}
+
+function _noiseB64enc(ab) {
+  return btoa(String.fromCharCode.apply(null, ab instanceof Uint8Array ? ab : new Uint8Array(ab)));
+}
+function _noiseB64dec(s) {
+  return new Uint8Array(atob(s).split('').map(function(c){ return c.charCodeAt(0); }));
+}
+
+async function aoiNoiseInit(name) {
+  aoiNoiseLock();
+  if (!window.crypto || !crypto.subtle) return;
+  // X25519-Unterstützung prüfen
+  try { await crypto.subtle.generateKey({name:'X25519'}, false, ['deriveBits']); }
+  catch(e) { return; }
+
+  // Statisches Schlüsselpaar laden oder neu erzeugen
+  try {
+    var privStored = localStorage.getItem('aoi_noise_priv_'+name);
+    var pubStored  = localStorage.getItem('aoi_noise_pub_'+name);
+    if (privStored && pubStored) {
+      _aoiNoiseSpkPriv = await crypto.subtle.importKey('pkcs8', _noiseB64dec(privStored), {name:'X25519'}, false, ['deriveBits']);
+      _aoiNoiseSpkPub  = _noiseB64dec(pubStored);
+    } else {
+      var kp       = await crypto.subtle.generateKey({name:'X25519'}, true, ['deriveBits']);
+      var privPkcs8 = new Uint8Array(await crypto.subtle.exportKey('pkcs8', kp.privateKey));
+      var pubRaw    = new Uint8Array(await crypto.subtle.exportKey('raw',   kp.publicKey));
+      try {
+        localStorage.setItem('aoi_noise_priv_'+name, _noiseB64enc(privPkcs8));
+        localStorage.setItem('aoi_noise_pub_'+name,  _noiseB64enc(pubRaw));
+      } catch(e) {}
+      _aoiNoiseSpkPriv = await crypto.subtle.importKey('pkcs8', privPkcs8, {name:'X25519'}, false, ['deriveBits']);
+      _aoiNoiseSpkPub  = pubRaw;
+    }
+  } catch(e) { aoiNoiseLock(); return; }
+
+  // Server-Public-Key holen (GET-Anfrage, gecacht in localStorage)
+  var urlCacheKey = 'aoi_noise_spub_' + btoa(AOI_SIGNAL_URL).replace(/[^a-zA-Z0-9]/g,'_').slice(0,40);
+  try {
+    var resp = await fetch(AOI_SIGNAL_URL, {method:'GET'});
+    var info = await resp.json();
+    if (info && info.noise_pub) {
+      _aoiServerNoisePub = await crypto.subtle.importKey('raw', _noiseB64dec(info.noise_pub), {name:'X25519'}, false, ['deriveBits']);
+      try { localStorage.setItem(urlCacheKey, info.noise_pub); } catch(e) {}
+    }
+  } catch(e) {
+    // Fallback auf gecachten Key
+    try {
+      var cached = localStorage.getItem(urlCacheKey);
+      if (cached) _aoiServerNoisePub = await crypto.subtle.importKey('raw', _noiseB64dec(cached), {name:'X25519'}, false, ['deriveBits']);
+    } catch(e2) {}
+  }
+  if (!_aoiServerNoisePub) { aoiNoiseLock(); return; }
+
+  // Öffentlichen Schlüssel beim Server registrieren (einmal pro Login, mit altem Token)
+  try {
+    await fetch(AOI_SIGNAL_URL, {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({aktion:'noise_register', name:name, token:AOI_TOKEN, spk:_noiseB64enc(_aoiNoiseSpkPub)})
+    });
+  } catch(e) {}
+}
+
+async function aoiNoiseWrap(payload) {
+  try {
+    var epk = await crypto.subtle.generateKey({name:'X25519'}, true, ['deriveBits']);
+    var epkPubRaw = new Uint8Array(await crypto.subtle.exportKey('raw', epk.publicKey));
+    var dh1 = new Uint8Array(await crypto.subtle.deriveBits({name:'X25519', public:_aoiServerNoisePub}, epk.privateKey, 256));
+    var dh2 = new Uint8Array(await crypto.subtle.deriveBits({name:'X25519', public:_aoiServerNoisePub}, _aoiNoiseSpkPriv, 256));
+    var ikm = new Uint8Array(64); ikm.set(dh1, 0); ikm.set(dh2, 32);
+    var hkdfKey = await crypto.subtle.importKey('raw', ikm, {name:'HKDF'}, false, ['deriveBits']);
+    var reqKm = new Uint8Array(await crypto.subtle.deriveBits(
+      {name:'HKDF', hash:'SHA-256', salt:new Uint8Array(0), info:new TextEncoder().encode('aoi-noise-req-v1')},
+      hkdfKey, 256));
+    var resKm = new Uint8Array(await crypto.subtle.deriveBits(
+      {name:'HKDF', hash:'SHA-256', salt:new Uint8Array(0), info:new TextEncoder().encode('aoi-noise-res-v1')},
+      hkdfKey, 256));
+    var reqKey = await crypto.subtle.importKey('raw', reqKm, {name:'AES-GCM'}, false, ['encrypt']);
+    var resKey = await crypto.subtle.importKey('raw', resKm, {name:'AES-GCM'}, false, ['decrypt']);
+    var iv  = crypto.getRandomValues(new Uint8Array(12));
+    var aad = new Uint8Array(64); aad.set(epkPubRaw, 0); aad.set(_aoiNoiseSpkPub, 32);
+    var enc = await crypto.subtle.encrypt({name:'AES-GCM', iv:iv, additionalData:aad}, reqKey,
+                new TextEncoder().encode(JSON.stringify(payload)));
+    return {
+      envelope: {v:1, epk:_noiseB64enc(epkPubRaw), spk:_noiseB64enc(_aoiNoiseSpkPub), iv:_noiseB64enc(iv), body:_noiseB64enc(enc)},
+      resKey: resKey
+    };
+  } catch(e) { return null; }
+}
+
+async function aoiNoiseUnwrap(resp, resKey) {
+  try {
+    var iv  = _noiseB64dec(resp.iv);
+    var enc = _noiseB64dec(resp.body);
+    var dec = await crypto.subtle.decrypt({name:'AES-GCM', iv:iv}, resKey, enc);
+    return JSON.parse(new TextDecoder().decode(dec));
+  } catch(e) { return resp; }
 }
 
 /* ===== OFFLINE-NACHRICHTEN ZWISCHENSPEICHERN ===== */

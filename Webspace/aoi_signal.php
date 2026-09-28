@@ -73,9 +73,39 @@ define('FEDERATION_URL',       'https://innobytix-it.de/AOI_9/AOI_Treffpunkt/aoi
 define('FEDERATION_SEED',      '');
 define('FED_SERVERS_FILE',     DATEN_DIR . '/fed_servers.php');
 define('FED_PRESENCE_FILE',    DATEN_DIR . '/fed_presence.php');
+define('NOISE_CLIENTS_FILE',   DATEN_DIR . '/noise_clients.php');
+define('NOISE_SERVER_FILE',    DATEN_DIR . '/noise_server.php');
+
+/* ===== NOISE IK: Server-Keypair ===== */
+function noise_server_keypair() {
+    sicheres_daten_dir();
+    if (is_file(NOISE_SERVER_FILE)) {
+        $d = lies(NOISE_SERVER_FILE);
+        if (!empty($d['priv']) && !empty($d['pub'])) return $d;
+    }
+    if (!function_exists('sodium_crypto_box_keypair')) return null;
+    $kp   = sodium_crypto_box_keypair();
+    $priv = sodium_crypto_box_secretkey($kp);
+    $pub  = sodium_crypto_box_publickey($kp);
+    $d = array('priv' => base64_encode($priv), 'pub' => base64_encode($pub));
+    schreibe(NOISE_SERVER_FILE, $d);
+    return $d;
+}
+
+$noise_res_key = null; // gesetzt nach erfolgreicher Noise-Entschlüsselung
 
 function aoi_ok($daten = array()) {
-    echo json_encode(array_merge(array('ok' => true), $daten), JSON_UNESCAPED_UNICODE);
+    global $noise_res_key;
+    $payload = array_merge(array('ok' => true), $daten);
+    if ($noise_res_key !== null) {
+        $json = json_encode($payload, JSON_UNESCAPED_UNICODE);
+        $iv   = random_bytes(12);
+        $tag  = '';
+        $ct   = openssl_encrypt($json, 'aes-256-gcm', $noise_res_key, OPENSSL_RAW_DATA, $iv, $tag);
+        echo json_encode(array('ok'=>true,'v'=>1,'iv'=>base64_encode($iv),'body'=>base64_encode($ct.$tag)));
+    } else {
+        echo json_encode($payload, JSON_UNESCAPED_UNICODE);
+    }
     exit;
 }
 
@@ -204,9 +234,11 @@ function bereinige($liste, $ttl) {
 
 // GET -> Selbsttest
 if (!isset($_SERVER['REQUEST_METHOD']) || $_SERVER['REQUEST_METHOD'] === 'GET') {
+    $nkp = noise_server_keypair();
     aoi_ok(array('server'=>'AOI 9.0 Signal','version'=>'1.0','php'=>PHP_VERSION,
         'token_set'=>is_file(TOKEN_DATEI)&&trim((string)@file_get_contents(TOKEN_DATEI))!=='',
-        'daten_dir'=>is_dir(DATEN_DIR)?'vorhanden':'wird angelegt','zeit'=>date('c')));
+        'daten_dir'=>is_dir(DATEN_DIR)?'vorhanden':'wird angelegt','zeit'=>date('c'),
+        'noise_pub'=>$nkp ? $nkp['pub'] : null));
 }
 
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') aoi_fehler('Nur POST erlaubt.', 405);
@@ -221,9 +253,11 @@ $name   = isset($ein['name'])   ? (string)$ein['name']   : '';
 $token  = isset($ein['token'])  ? (string)$ein['token']  : (isset($_SERVER['HTTP_X_AOI_TOKEN']) ? (string)$_SERVER['HTTP_X_AOI_TOKEN'] : '');
 
 if ($aktion === 'info') {
+    $nkp = noise_server_keypair();
     aoi_ok(array('server'=>'AOI 9.0 Signal','version'=>'1.0','php'=>PHP_VERSION,
         'token_set'=>is_file(TOKEN_DATEI)&&trim((string)@file_get_contents(TOKEN_DATEI))!=='',
-        'daten_dir'=>is_dir(DATEN_DIR)?'vorhanden':'wird angelegt','zeit'=>date('c')));
+        'daten_dir'=>is_dir(DATEN_DIR)?'vorhanden':'wird angelegt','zeit'=>date('c'),
+        'noise_pub'=>$nkp ? $nkp['pub'] : null));
 }
 
 // federation_signal: kein eigener Token nötig – kommt von einem anderen AOI-Server
@@ -307,7 +341,66 @@ if (FEDERATION_ENABLED && in_array($aktion, array('federation_servers','federati
     }
 }
 
-if (!token_ok($token)) aoi_fehler('Ungueltiger Token.', 403);
+/* ===== NOISE IK: Client-Schlüssel registrieren ===== */
+if ($aktion === 'noise_register') {
+    if (!token_ok($token)) aoi_fehler('Ungueltiger Token.', 403);
+    if (!name_ok($name))   aoi_fehler('Ungueltiger Name.');
+    $spk = isset($ein['spk']) ? trim((string)$ein['spk']) : '';
+    $spk_bytes = base64_decode($spk, true);
+    if ($spk_bytes === false || strlen($spk_bytes) !== 32) aoi_fehler('Ungueltiger Public Key.');
+    $clients = lies(NOISE_CLIENTS_FILE);
+    $clients[$name] = array('spk' => $spk, 'ts' => time());
+    schreibe(NOISE_CLIENTS_FILE, $clients);
+    $nkp = noise_server_keypair();
+    aoi_ok(array('registered' => true, 'noise_pub' => $nkp ? $nkp['pub'] : null));
+}
+
+/* ===== NOISE IK: Anfrage entschlüsseln ===== */
+$noise_authenticated = false;
+if (isset($ein['v']) && (int)$ein['v'] === 1) {
+    if (!function_exists('sodium_crypto_scalarmult'))
+        aoi_fehler('Serverseite unterstützt kein Noise IK (libsodium fehlt).', 503);
+    $nkp = noise_server_keypair();
+    if (!$nkp) aoi_fehler('Server-Schlüssel nicht verfügbar.', 503);
+    $srv_priv = base64_decode($nkp['priv'], true);
+    $epk_pub  = base64_decode($ein['epk'] ?? '', true);
+    $spk_pub  = base64_decode($ein['spk'] ?? '', true);
+    if (!$epk_pub || !$spk_pub || strlen($epk_pub) !== 32 || strlen($spk_pub) !== 32)
+        aoi_fehler('Ungueltige Noise-Schluessel.', 400);
+    // SPK muss registriert sein
+    $clients = lies(NOISE_CLIENTS_FILE);
+    $noise_client_name = null;
+    foreach ($clients as $cn => $ci) {
+        if (isset($ci['spk']) && base64_decode($ci['spk'], true) === $spk_pub) {
+            $noise_client_name = $cn; break;
+        }
+    }
+    if ($noise_client_name === null) aoi_fehler('Unbekannter Client-Schluessel.', 403);
+    // DH + HKDF
+    $dh1     = sodium_crypto_scalarmult($srv_priv, $epk_pub);
+    $dh2     = sodium_crypto_scalarmult($srv_priv, $spk_pub);
+    $ikm     = $dh1 . $dh2;
+    $req_key = hash_hkdf('sha256', $ikm, 32, 'aoi-noise-req-v1');
+    $res_key = hash_hkdf('sha256', $ikm, 32, 'aoi-noise-res-v1');
+    // Entschlüsseln
+    $iv = base64_decode($ein['iv'] ?? '', true);
+    if (!$iv || strlen($iv) !== 12) aoi_fehler('Ungueltige IV.', 400);
+    $combined = base64_decode($ein['body'] ?? '', true);
+    if (!$combined || strlen($combined) < 17) aoi_fehler('Ciphertext zu kurz.', 400);
+    $tag        = substr($combined, -16);
+    $ciphertext = substr($combined, 0, -16);
+    $aad        = $epk_pub . $spk_pub;
+    $plain = openssl_decrypt($ciphertext, 'aes-256-gcm', $req_key, OPENSSL_RAW_DATA, $iv, $tag, $aad);
+    if ($plain === false) aoi_fehler('Entschluesselung fehlgeschlagen.', 403);
+    $ein = @json_decode($plain, true);
+    if (!is_array($ein)) aoi_fehler('Ungueltige verschluesselte Nutzlast.', 400);
+    $aktion = isset($ein['aktion']) ? (string)$ein['aktion'] : '';
+    $name   = isset($ein['name'])   ? (string)$ein['name']   : $noise_client_name;
+    $noise_res_key       = $res_key;
+    $noise_authenticated = true;
+}
+
+if (!$noise_authenticated && !token_ok($token)) aoi_fehler('Ungueltiger Token.', 403);
 
 // list_users braucht keinen Screen-Namen
 if ($aktion === 'list_users') {
