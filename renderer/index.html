@@ -1243,6 +1243,25 @@ body {
     <div id="srv-pane-download" style="display:none;flex:1;overflow-y:auto;padding:12px;font-size:11px;">
       <div style="font-weight:bold;font-size:12px;color:#003399;margin-bottom:10px;">Server-Dateien herunterladen</div>
       <div style="display:flex;flex-direction:column;gap:10px;">
+        <!-- FEDERATION OPTION -->
+        <div style="border:1px solid #5a9a5a;border-radius:4px;padding:10px;background:#f0fff0;">
+          <div style="font-weight:bold;margin-bottom:6px;color:#004400;">🌐 AOI-Netz (optional)</div>
+          <div style="color:#444;margin-bottom:8px;font-size:10px;line-height:1.5;">
+            Im <b>Inselmodus</b> (Standard) ist dein Server völlig autark – für dich, deine Familie, deine Freunde.<br>
+            Im <b>Netz-Modus</b> verbindet sich dein Server mit dem großen AOI-Netz: Nutzer verschiedener Server können sich gegenseitig finden und miteinander chatten.
+          </div>
+          <label style="display:flex;align-items:center;gap:8px;margin-bottom:8px;cursor:pointer;">
+            <input type="checkbox" id="fed-enabled" onchange="aoiToggleFedUi()" style="cursor:pointer;">
+            <span style="font-size:11px;font-weight:bold;">Am AOI-Netz teilnehmen (Netz-Modus)</span>
+          </label>
+          <div id="fed-url-block" style="display:none;flex-direction:column;gap:5px;">
+            <label style="font-size:10px;color:#333;">Öffentliche URL deines Servers <span style="color:#c00;">*</span></label>
+            <input type="text" id="fed-server-url" placeholder="https://mein-server.de/AOI/aoi_signal.php" maxlength="256"
+                   style="font-size:11px;font-family:monospace;border:1px solid #5a9a5a;padding:3px 6px;">
+            <div style="font-size:10px;color:#666;">Diese URL muss von außen erreichbar sein. Der Root-Server (innobytix-it.de) verwendet sie, um Signale weiterzuleiten.</div>
+          </div>
+          <div style="font-size:10px;color:#666;margin-top:6px;font-style:italic;">Die Checkbox-Wahl wird in der heruntergeladenen <code>aoi_signal.php</code> fest eingebaut.</div>
+        </div>
         <div style="border:1px solid #b0c8e0;border-radius:4px;padding:10px;background:#f0f6ff;">
           <div style="font-weight:bold;margin-bottom:4px;">📄 aoi_signal.php</div>
           <div style="color:#555;margin-bottom:8px;">Der Signalserver – das Herzstück. Regelt Anmeldung, Präsenz und WebRTC-Handshake.</div>
@@ -1260,25 +1279,6 @@ body {
             <input type="text" id="inp-token-secret" value="mein-aoi-passwort-2026" maxlength="64" style="flex:1;font-size:11px;font-family:monospace;border:1px solid #7f9db9;padding:3px 6px;">
           </div>
           <button class="btn-options" style="font-size:11px;" onclick="aoiDownloadServerFile('aoi_token.php')">⬇ aoi_token.php Vorlage herunterladen</button>
-        </div>
-        <!-- FEDERATION OPTION -->
-        <div style="border:1px solid #5a9a5a;border-radius:4px;padding:10px;background:#f0fff0;margin-top:4px;">
-          <div style="font-weight:bold;margin-bottom:6px;color:#004400;">🌐 AOI-Netz (optional)</div>
-          <div style="color:#444;margin-bottom:8px;font-size:10px;line-height:1.5;">
-            Im <b>Inselmodus</b> (Standard) ist dein Server völlig autark – für dich, deine Familie, deine Freunde.<br>
-            Im <b>Netz-Modus</b> verbindet sich dein Server mit dem großen AOI-Netz: Nutzer verschiedener Server können sich gegenseitig finden und miteinander chatten.
-          </div>
-          <label style="display:flex;align-items:center;gap:8px;margin-bottom:8px;cursor:pointer;">
-            <input type="checkbox" id="fed-enabled" onchange="aoiToggleFedUi()" style="cursor:pointer;">
-            <span style="font-size:11px;font-weight:bold;">Am AOI-Netz teilnehmen (Netz-Modus)</span>
-          </label>
-          <div id="fed-url-block" style="display:none;flex-direction:column;gap:5px;">
-            <label style="font-size:10px;color:#333;">Öffentliche URL deines Servers <span style="color:#c00;">*</span></label>
-            <input type="text" id="fed-server-url" placeholder="https://mein-server.de/AOI/aoi_signal.php" maxlength="256"
-                   style="font-size:11px;font-family:monospace;border:1px solid #5a9a5a;padding:3px 6px;">
-            <div style="font-size:10px;color:#666;">Diese URL muss von außen erreichbar sein. Der Root-Server (innobytix-it.de) verwendet sie, um Signale weiterzuleiten.</div>
-          </div>
-          <div style="font-size:10px;color:#666;margin-top:6px;font-style:italic;">Die Checkbox-Wahl wird in der heruntergeladenen <code>aoi_signal.php</code> fest eingebaut.</div>
         </div>
       </div>
     </div>
