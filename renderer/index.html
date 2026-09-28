@@ -1843,6 +1843,8 @@ function showWelcomeSplash(name) {
   var _loginPwHash = localStorage.getItem('aoi_pw_hash_'+name) || null;
   aoiInitPendingKey(_loginPwHash);
   aoiTresorInit(name, _loginPwHash).then(function(){
+    var storedTok = aoiTresorGet('signal_token');
+    if(storedTok) AOI_TOKEN = storedTok;
     return aoiNoiseInit(name);
   }).then(function(){
     aoiStartOnline(name);
@@ -4041,9 +4043,11 @@ function aoiSaveToken() {
   if(val) {
     AOI_TOKEN = val;
     try { localStorage.setItem('aoi_signal_token', val); } catch(e) {}
+    if(aoi_name && aoiUseTresor()) aoiTresorSet(aoi_name, 'signal_token', val);
   } else {
     AOI_TOKEN = defTok;
     try { localStorage.removeItem('aoi_signal_token'); } catch(e) {}
+    if(aoi_name && aoiUseTresor()) aoiTresorSet(aoi_name, 'signal_token', null);
   }
   if(msg) { msg.style.color='#070'; msg.textContent = val ? '✔ Token gespeichert.' : '✔ Standard-Token wiederhergestellt.'; }
 }
