@@ -9,10 +9,14 @@
     "dist:linux": "electron-builder --linux",
     "dist:all": "electron-builder --win --linux"
   },
+  "author": {
+    "name": "Innobytix IT",
+    "email": "info@innobytix-it.de"
+  },
   "build": {
     "appId": "de.aoi.aoi9",
     "productName": "AOI 9.0 Nostalgia",
-    "copyright": "AOI 9.0 Nostalgia",
+    "copyright": "Innobytix IT",
     "files": [
       "main.js",
       "preload.js",
