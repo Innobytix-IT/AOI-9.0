@@ -1,5 +1,11 @@
 # AOI 9.0 Nostalgia
 
+[![Release](https://img.shields.io/github/v/release/Innobytix-IT/AOI-9.0?label=Release&color=brightgreen)](https://github.com/Innobytix-IT/AOI-9.0/releases/latest)
+[![Build](https://img.shields.io/github/actions/workflow/status/Innobytix-IT/AOI-9.0/build.yml?label=Build)](https://github.com/Innobytix-IT/AOI-9.0/actions/workflows/build.yml)
+[![License: AGPL v3](https://img.shields.io/badge/License-AGPL%20v3-blue.svg)](https://www.gnu.org/licenses/agpl-3.0)
+[![Electron](https://img.shields.io/badge/Electron-32-47848F?logo=electron&logoColor=white)](https://www.electronjs.org/)
+[![Platform](https://img.shields.io/badge/Platform-Windows%20%7C%20Linux-lightgrey)](https://github.com/Innobytix-IT/AOI-9.0/releases/latest)
+
 **Retro AOL-style Electron desktop app with WebRTC P2P messaging**
 
 AOI 9.0 Nostalgia bringt das Feeling der frühen 2000er zurück – mit moderner Technik darunter.  
