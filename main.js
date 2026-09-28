@@ -434,7 +434,7 @@ ipcMain.handle('email-trash', async (_, {cfg, folder, uid, trashFolder}) => {
     const lock = await client.getMailboxLock(folder);
     try {
       if (trashFolder && trashFolder !== folder) {
-        await client.messageMove({uid}, trashFolder, {uid: true});
+        await client.messageMove(uid, trashFolder, {uid: true});
       } else {
         await client.messageFlagsAdd({uid}, ['\\Deleted'], {uid: true});
         await client.mailboxClose();

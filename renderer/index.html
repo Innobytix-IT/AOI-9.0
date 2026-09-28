@@ -1837,7 +1837,7 @@ function showWelcomeSplash(name) {
   detectBandwidth();
   var modem=document.getElementById('snd-modem'); if(modem){ modem.pause(); modem.currentTime=0; }
   var wlk=document.getElementById('snd-willkommen');
-  var hasUnread = document.querySelectorAll('#mail-tbody tr.unread').length > 0;
+  var hasUnread = document.querySelectorAll('#mail-tbody tr.unread[data-uid]').length > 0;
   if(wlk){ wlk.currentTime=0; wlk.onended=function(){ wlk.onended=null; if(hasUnread) playSound('snd-mail'); }; wlk.play().catch(function(){ if(hasUnread) setTimeout(function(){ playSound('snd-mail'); }, 1000); }); }
   else if(hasUnread) { setTimeout(function(){ playSound('snd-mail'); }, 1200); }
   splashTimer=setTimeout(function(){ splashTimer=null; closeSplashNow(); }, 6000);
@@ -2011,7 +2011,7 @@ function openWindow(id) {
   var w=document.getElementById(id); if(!w) return;
   if(w.classList.contains('minimized')) restoreWindow(id);
   else { if((id==='win-mailbox'||id==='win-im') && w.style.display==='none') applyDefaultPosition(id); w.style.display='flex'; bringToFront(id); }
-  if(id==='win-mailbox'){ if(document.querySelectorAll('#mail-tbody tr.unread').length>0) playSound('snd-mail'); if(_emailCfg) emailLoadFolders(); }
+  if(id==='win-mailbox'){ if(_emailCfg) emailLoadFolders(); }
   if(id==='win-userdir') aoiLoadUserDir();
   if(id==='win-server-setup') {
     aoiSrvTabInit();
@@ -3243,6 +3243,7 @@ function emailBackgroundPoll() {
     if (_emailKnownUids === null) {
       _emailKnownUids = new Set(uids);
       mailSetUnreadBadge(unread);
+      if (unread > 0) playSound('snd-mail');
       return;
     }
     var newOnes = uids.filter(function(uid) { return !_emailKnownUids.has(uid); });
