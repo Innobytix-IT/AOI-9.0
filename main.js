@@ -216,6 +216,36 @@ ipcMain.handle('email-load-config', async (_, username) => {
   } catch (_) { return { ok: false, config: null }; }
 });
 
+/* ===== AOI TRESOR IPC ===== */
+ipcMain.handle('is-encryption-available', async () => {
+  return safeStorage.isEncryptionAvailable();
+});
+
+function tresorPath(username) {
+  const safe = (username || 'default').replace(/[^a-zA-Z0-9_\-\.]/g, '_');
+  return path.join(app.getPath('userData'), 'aoi_tresor_' + safe + '.enc');
+}
+ipcMain.handle('tresor-read', async (_, username) => {
+  try {
+    const p = tresorPath(username);
+    if (!fs.existsSync(p)) return { ok: true, data: null };
+    return { ok: true, data: fs.readFileSync(p, 'utf8') };
+  } catch (e) { return { ok: false, error: e.message }; }
+});
+ipcMain.handle('tresor-write', async (_, username, blob) => {
+  try {
+    fs.writeFileSync(tresorPath(username), blob, 'utf8');
+    return { ok: true };
+  } catch (e) { return { ok: false, error: e.message }; }
+});
+ipcMain.handle('tresor-delete', async (_, username) => {
+  try {
+    const p = tresorPath(username);
+    if (fs.existsSync(p)) fs.unlinkSync(p);
+    return { ok: true };
+  } catch (e) { return { ok: false, error: e.message }; }
+});
+
 ipcMain.handle('email-test', async (_, cfg) => {
   const client = new ImapFlow({
     host: cfg.imapHost, port: cfg.imapPort,

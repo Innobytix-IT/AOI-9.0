@@ -1839,7 +1839,9 @@ function showWelcomeSplash(name) {
   else if(hasUnread) { setTimeout(function(){ playSound('snd-mail'); }, 1200); }
   splashTimer=setTimeout(function(){ splashTimer=null; closeSplashNow(); }, 6000);
   aoiStartOnline(name);
-  aoiInitPendingKey(localStorage.getItem('aoi_pw_hash_'+name) || null);
+  var _loginPwHash = localStorage.getItem('aoi_pw_hash_'+name) || null;
+  aoiInitPendingKey(_loginPwHash);
+  aoiTresorInit(name, _loginPwHash).then(function(){ emailLoadSettings(); });
   aoiUpdatePwStatus(name);
   aoiUpdatePubStatus(name);
   aoiInitTheme();
@@ -3153,14 +3155,39 @@ function emailSaveSettings() {
   var cfg = emailGetFormCfg();
   if(!cfg.user || !cfg.password || !cfg.imapHost) { emailSetResult('Bitte alle Felder ausfüllen.', false); return; }
   cfg.username = aoi_name;
-  window.electronAPI.emailSaveConfig(cfg).then(function(r){
-    if(r.ok){ _emailCfg = cfg; emailSetResult('✔ Gespeichert.', true); mailUpdateTitle(); emailLoadFolders(); emailStartPolling(); }
-    else emailSetResult('✘ Speichern fehlgeschlagen: ' + r.error, false);
-  });
+  if(aoiUseTresor()) {
+    aoiTresorSet(aoi_name, 'email_cfg', cfg).then(function(ok){
+      if(ok){ _emailCfg = cfg; emailSetResult('✔ Gespeichert (Tresor).', true); mailUpdateTitle(); emailLoadFolders(); emailStartPolling(); }
+      else emailSetResult('✘ Tresor-Fehler: Konnte Einstellungen nicht speichern.', false);
+    });
+  } else {
+    window.electronAPI.emailSaveConfig(cfg).then(function(r){
+      if(r.ok){ _emailCfg = cfg; emailSetResult('✔ Gespeichert.', true); mailUpdateTitle(); emailLoadFolders(); emailStartPolling(); }
+      else emailSetResult('✘ Speichern fehlgeschlagen: ' + r.error, false);
+    });
+  }
 }
 
 function emailLoadSettings() {
   if(!window.electronAPI) return;
+  if(aoiUseTresor()) {
+    var c = aoiTresorGet('email_cfg');
+    if(!c) return;
+    _emailCfg = c;
+    document.getElementById('email-imap-host').value = c.imapHost || '';
+    document.getElementById('email-imap-port').value = c.imapPort || 993;
+    document.getElementById('email-imap-ssl').checked = !!c.imapSsl;
+    document.getElementById('email-smtp-host').value = c.smtpHost || '';
+    document.getElementById('email-smtp-port').value = c.smtpPort || 465;
+    document.getElementById('email-smtp-ssl').checked = !!c.smtpSsl;
+    document.getElementById('email-user').value  = c.user || '';
+    document.getElementById('email-pass').value  = c.password || '';
+    document.getElementById('email-tls-ignore').checked = !!c.tlsIgnoreCert;
+    mailUpdateTitle();
+    emailLoadFolders();
+    emailStartPolling();
+    return;
+  }
   window.electronAPI.emailLoadConfig(aoi_name).then(function(r){
     if(!r.ok || !r.config) return;
     var c = r.config;
@@ -3546,7 +3573,6 @@ function aoiPost(payload, cb) {
 function aoiStartOnline(name) {
   aoi_name = name;
   aoi_session = 'aoi-' + Date.now() + '-' + Math.random().toString(36).slice(2, 8);
-  emailLoadSettings();
   aoiPresenceHeartbeat();
   aoi_presence_timer = setInterval(aoiPresenceHeartbeat, 20000);
   aoi_poll_timer = setInterval(aoiPollSignals, 3000);
@@ -3564,6 +3590,7 @@ function aoiStopOnline() {
   aoi_peers = {};
   aoi_known_buddies = {};
   aoi_name = '';
+  aoiTresorLock();
   // E-Mail vollständig zurücksetzen
   _emailCfg = null;
   _emailKnownUids = null;
@@ -5404,6 +5431,84 @@ async function _aoiPendingDecrypt(raw) {
     var buf = await crypto.subtle.decrypt({name:'AES-GCM',iv:combined.slice(0,12)}, _aoiPendingKey, combined.slice(12));
     return new TextDecoder().decode(buf);
   } catch(e) { return '[]'; }
+}
+
+/* ===== AOI TRESOR (Linux/Mac-Vault, AES-256-GCM + PBKDF2) ===== */
+var _tresorKey  = null;  // CryptoKey
+var _tresorData = null;  // plain object { email_cfg: {...}, ... }
+var _tresorSalt = null;  // Uint8Array (stored in .enc file)
+var _aoiUseTresor = false;
+
+function aoiUseTresor() { return _aoiUseTresor; }
+
+async function aoiTresorInit(username, pwHashHex) {
+  _aoiUseTresor = false;
+  _tresorKey = null; _tresorData = null; _tresorSalt = null;
+  if (!window.electronAPI || !window.electronAPI.isEncryptionAvailable) return;
+  try {
+    var avail = await window.electronAPI.isEncryptionAvailable();
+    if (avail) return; // DPAPI verfügbar – normaler Pfad
+    _aoiUseTresor = true;
+  } catch(e) { return; }
+  if (!pwHashHex || !window.crypto || !crypto.subtle) return;
+  try {
+    var pwBytes = new Uint8Array(pwHashHex.match(/.{2}/g).map(function(h){ return parseInt(h,16); }));
+    var pwKey = await crypto.subtle.importKey('raw', pwBytes, 'PBKDF2', false, ['deriveKey']);
+    var r = await window.electronAPI.tresorRead(username);
+    var salt;
+    if (r.ok && r.data) {
+      var stored = JSON.parse(r.data);
+      salt = new Uint8Array(atob(stored.salt).split('').map(function(c){ return c.charCodeAt(0); }));
+    } else {
+      salt = crypto.getRandomValues(new Uint8Array(16));
+    }
+    _tresorSalt = salt;
+    _tresorKey = await crypto.subtle.deriveKey(
+      { name:'PBKDF2', salt:salt, iterations:100000, hash:'SHA-256' },
+      pwKey,
+      { name:'AES-GCM', length:256 },
+      false,
+      ['encrypt','decrypt']
+    );
+    if (r.ok && r.data) {
+      var stored2 = JSON.parse(r.data);
+      var iv  = new Uint8Array(atob(stored2.iv).split('').map(function(c){ return c.charCodeAt(0); }));
+      var enc = new Uint8Array(atob(stored2.data).split('').map(function(c){ return c.charCodeAt(0); }));
+      var dec = await crypto.subtle.decrypt({name:'AES-GCM', iv:iv}, _tresorKey, enc);
+      _tresorData = JSON.parse(new TextDecoder().decode(dec));
+    } else {
+      _tresorData = {};
+    }
+  } catch(e) { _tresorKey = null; _tresorData = null; }
+}
+
+async function aoiTresorSave(username) {
+  if (!_tresorKey || !_aoiUseTresor || !window.electronAPI) return false;
+  try {
+    var iv  = crypto.getRandomValues(new Uint8Array(12));
+    var buf = await crypto.subtle.encrypt({name:'AES-GCM', iv:iv}, _tresorKey,
+                new TextEncoder().encode(JSON.stringify(_tresorData || {})));
+    var b64 = function(arr){ return btoa(String.fromCharCode.apply(null, arr instanceof Uint8Array ? arr : new Uint8Array(arr))); };
+    var blob = JSON.stringify({v:1, salt:b64(_tresorSalt), iv:b64(iv), data:b64(buf)});
+    var r = await window.electronAPI.tresorWrite(username, blob);
+    return r.ok;
+  } catch(e) { return false; }
+}
+
+function aoiTresorGet(field) {
+  if (!_tresorData) return null;
+  return _tresorData[field] !== undefined ? _tresorData[field] : null;
+}
+
+async function aoiTresorSet(username, field, value) {
+  if (!_aoiUseTresor) return false;
+  if (!_tresorData) _tresorData = {};
+  _tresorData[field] = value;
+  return aoiTresorSave(username);
+}
+
+function aoiTresorLock() {
+  _tresorKey = null; _tresorData = null; _tresorSalt = null; _aoiUseTresor = false;
 }
 
 /* ===== OFFLINE-NACHRICHTEN ZWISCHENSPEICHERN ===== */

@@ -18,6 +18,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
   emailTrash:       (args) => ipcRenderer.invoke('email-trash', args),
   emailTrashMany:   (args) => ipcRenderer.invoke('email-trash-many', args),
   emailMoveMany:    (args) => ipcRenderer.invoke('email-move-many', args),
-  readServerFile:   (name) => ipcRenderer.invoke('read-server-file', name),
-  openExternal:     (url)  => ipcRenderer.invoke('open-external', url),
+  readServerFile:        (name)    => ipcRenderer.invoke('read-server-file', name),
+  openExternal:          (url)     => ipcRenderer.invoke('open-external', url),
+  isEncryptionAvailable: ()        => ipcRenderer.invoke('is-encryption-available'),
+  tresorRead:            (u)       => ipcRenderer.invoke('tresor-read', u),
+  tresorWrite:           (u, b)    => ipcRenderer.invoke('tresor-write', u, b),
+  tresorDelete:          (u)       => ipcRenderer.invoke('tresor-delete', u),
 });
