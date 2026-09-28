@@ -5783,7 +5783,7 @@ function aoiSaveProfil() {
   if(!aoi_name) return;
   _currentAvatar = (document.getElementById('profil-avatar-preview')||{}).textContent || '😊';
   var data = {
-    aktion:'profile_save', name:aoi_name, token:aoi_token,
+    aktion:'profile_save', name:aoi_name, token:AOI_TOKEN,
     avatar: _currentAvatar,
     motto:  (document.getElementById('profil-motto')||{}).value||'',
     ort:    (document.getElementById('profil-ort')||{}).value||'',
@@ -5806,7 +5806,7 @@ function aoiSaveProfil() {
 }
 function aoiLoadOwnProfil() {
   if(!aoi_name) return;
-  aoiPost({aktion:'profile_get',name:aoi_name,token:aoi_token,ziel:aoi_name}, function(err,r){
+  aoiPost({aktion:'profile_get',name:aoi_name,token:AOI_TOKEN,ziel:aoi_name}, function(err,r){
     if(err||!r||!r.profil) return;
     var p=r.profil;
     if(p.avatar){ _currentAvatar=p.avatar; var av=document.getElementById('profil-avatar-preview'); if(av) av.textContent=p.avatar; }
@@ -5828,7 +5828,7 @@ function aoiShowProfil(name) {
     ? '<span class="status-on">● Online</span>'
     : '<span style="color:#888;">○ Offline</span>';
   dlg.style.display='flex';
-  aoiPost({aktion:'profile_get',name:aoi_name||'_',token:aoi_token,ziel:name}, function(err,r){
+  aoiPost({aktion:'profile_get',name:aoi_name||'_',token:AOI_TOKEN,ziel:name}, function(err,r){
     var p = (r&&r.profil)||{};
     document.getElementById('dlg-profil-avatar').textContent = p.avatar||'😊';
     document.getElementById('dlg-profil-motto').textContent  = p.motto ?'"'+p.motto+'"':'';
