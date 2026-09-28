@@ -486,16 +486,22 @@ body {
 <div id="buddy-notify" onclick="this.style.display='none'"></div>
 
 <!-- CHATROOM-EINLADUNGS-POPUP -->
-<div id="room-invite-popup" style="display:none;position:fixed;bottom:60px;right:16px;z-index:99998;width:280px;background:#ece9d8;border:2px solid #7faad0;box-shadow:4px 5px 12px rgba(0,0,0,.45);border-radius:3px;font-family:Tahoma,Arial,sans-serif;overflow:hidden;">
-  <div style="background:linear-gradient(to bottom,#3168cc 0%,#1a4aaa 100%);color:#fff;padding:4px 8px;font-size:11px;font-weight:bold;display:flex;align-items:center;gap:6px;">
-    <span>💬</span><span id="rip-title">Chatroom-Einladung</span>
+<div id="room-invite-popup" style="display:none;position:fixed;bottom:48px;right:16px;z-index:99998;width:310px;background:#ece9d8;border:2px solid #0055ea;border-radius:8px 8px 4px 4px;box-shadow:4px 8px 22px rgba(0,0,0,.55);font-family:Tahoma,'MS Sans Serif',sans-serif;overflow:hidden;">
+  <div style="height:26px;background:linear-gradient(to bottom,#0058ee 0%,#3593ff 10%,#288eff 30%,#0060ee 50%,#0052e0 80%,#003dd0 100%);display:flex;align-items:center;gap:6px;padding:0 8px;color:#fff;font-size:11px;font-weight:bold;text-shadow:1px 1px #0f3789;">
+    <svg width="14" height="14" viewBox="0 0 32 32" style="flex-shrink:0"><circle cx="16" cy="16" r="14" fill="#fff"/><text x="16" y="21" text-anchor="middle" font-size="16" font-weight="bold" fill="#0055cc" font-family="Arial">a</text></svg>
+    <span style="flex:1">AOI – Chatroom-Einladung</span>
+    <span onclick="aoiRipDecline()" title="Schließen" style="width:18px;height:18px;background:linear-gradient(to bottom,#e87a55 0%,#c43509 100%);border:1px solid rgba(255,255,255,.7);border-radius:3px;display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:10px;font-weight:bold;box-shadow:inset 0 1px 0 rgba(255,255,255,.4);flex-shrink:0;">✕</span>
   </div>
-  <div style="padding:10px 12px 8px;">
-    <div id="rip-text" style="font-size:11px;color:#0b3464;margin-bottom:10px;line-height:1.5;"></div>
-    <div style="display:flex;gap:6px;justify-content:flex-end;">
-      <button onclick="aoiRipDecline()" style="font-size:10px;padding:2px 12px;cursor:pointer;">Ablehnen</button>
-      <button id="rip-join-btn" onclick="aoiRipJoin()" style="font-size:10px;padding:2px 12px;cursor:pointer;background:#316ac5;color:#fff;border:none;border-radius:2px;font-weight:bold;">Beitreten</button>
+  <div style="padding:12px 14px 10px;display:flex;gap:11px;align-items:flex-start;">
+    <div style="font-size:26px;line-height:1;margin-top:2px;flex-shrink:0;">💬</div>
+    <div>
+      <div style="font-size:12px;font-weight:bold;color:#0b3967;margin-bottom:5px;">Du wurdest eingeladen!</div>
+      <div id="rip-text" style="font-size:11px;color:#333;line-height:1.55;"></div>
     </div>
+  </div>
+  <div style="border-top:1px solid #bbb;padding:7px 12px;background:linear-gradient(to bottom,#f0ede5 0%,#ddd9cf 100%);display:flex;gap:6px;justify-content:flex-end;align-items:center;">
+    <button onclick="aoiRipDecline()" style="background:linear-gradient(to bottom,#fff 0%,#d8e5f2 100%);border:1px solid #5d8cb9;border-radius:3px;padding:3px 12px;font-size:11px;font-weight:bold;color:#0b3967;cursor:pointer;font-family:Tahoma,sans-serif;">Ablehnen</button>
+    <button onclick="aoiRipJoin()" style="background:linear-gradient(to bottom,#a3e874 0%,#4da722 50%,#307e0c 100%);border:1px solid #235c09;border-radius:10px;padding:4px 18px;font-size:11px;font-weight:bold;color:#fff;text-shadow:1px 1px #164003;cursor:pointer;font-family:Tahoma,sans-serif;">Beitreten ▶</button>
   </div>
 </div>
 
