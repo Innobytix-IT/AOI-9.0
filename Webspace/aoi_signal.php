@@ -2,6 +2,7 @@
 /**
  * aoi_signal.php  –  AOI 9.0 Buddy-Finder & WebRTC-Signaling
  * ============================================================
+ * Kompatibel mit PHP 7.2+
  *
  * ZWECK
  * -----
@@ -9,71 +10,27 @@
  * Dieser Server sieht nur: wer ist online und wer will mit wem verbinden.
  * Den Inhalt der Gespräche sieht er nie.
  *
- * WAS ÜBER DIESEN SERVER LÄUFT
- * ----------------------------
- *   presence   – Herzschlag "Ich bin online", Rückgabe der Buddy-Liste
+ * AKTIONEN (POST mit JSON-Body)
+ * ------------------------------
+ *   info       – Selbsttest, kein Token nötig
+ *   presence   – Herzschlag "Ich bin online", gibt Buddy-Liste zurück
  *   signal     – WebRTC SDP-Offer / SDP-Answer / ICE-Kandidat zustellen
- *   poll       – Eingangssignale abholen (einmalig – Inbox wird geleert)
- *   bye        – Abmelden (optional; TTL räumt sowieso auf)
- *
- * WAS NICHT ÜBER DIESEN SERVER LÄUFT
- * ------------------------------------
- * Sobald WebRTC steht, kommunizieren die Clients direkt. Kein IM-Text,
- * keine Dateien, keine Audio – nichts davon berührt diesen Server.
- *
- * DATEI-LAYOUT AUF DEM WEBSPACE
- * -------------------------------
- *   aoi_signal.php          ← diese Datei
- *   aoi_token.php           ← gemeinsames Geheimnis (einzeilig, kein PHP-Tag)
- *   aoi_data/               ← Zustandsverzeichnis (vom Server angelegt)
- *     presence.php          ← wer ist online (PHP-Schutz gegen Direktabruf)
- *     inbox_<hash>.php      ← Eingangsbox je Buddy
- *   .htaccess               ← sperrt aoi_data/ gegen direkte HTTP-Abrufe
- *
- * SICHERHEITSMODELL
- * -----------------
- *   • Shared Token  –  alle AOI-Nutzer kennen dasselbe Geheimnis.
- *     Es steht in aoi_token.php und wird bei jeder Anfrage geprüft.
- *     Ohne Token kommt niemand rein – kein Fremder kann die Buddy-Liste
- *     auslesen oder Signale einschleusen.
- *   • PHP-Schutz    –  Zustandsdateien haben .php-Endung und beginnen
- *     mit <?php exit; ?> – der Server führt sie aus statt sie auszuliefern.
- *   • .htaccess     –  zweite Schranke; greift auch wenn der PHP-Schutz
- *     durch einen kaputten Upload wegfällt.
- *   • TTL           –  alte Einträge werden automatisch bereinigt.
- *     Kein Aufräumjob nötig.
- *   • Kein Inhalt   –  SDP und ICE-Kandidaten sind kurzlebige Metadaten,
- *     kein Chat-Inhalt. Die eigentliche Verschlüsselung macht WebRTC (DTLS).
+ *   poll       – Eingangssignale abholen (Inbox wird danach geleert)
+ *   bye        – Sauber abmelden (optional, TTL räumt sowieso auf)
  *
  * EINRICHTEN
  * ----------
- * 1. Beide Dateien hochladen: aoi_signal.php  und  .htaccess (s.u.)
- * 2. aoi_token.php anlegen:
- *      (keine PHP-Tags, nur das Geheimnis in der ersten Zeile)
- *      z.B.:  mein-super-geheimes-passwort-2026
- * 3. Im AOI-9.0-Client die URL eintragen:
- *      https://mein-webspace.de/aoi/aoi_signal.php
- *    und denselben Token wie in aoi_token.php.
- * 4. Fertig. Das aoi_data/-Verzeichnis legt das Script selbst an.
+ * 1. aoi_signal.php  hochladen
+ * 2. .htaccess       hochladen (schützt aoi_data/)
+ * 3. aoi_token.php   selbst anlegen – nur eine Zeile, kein PHP-Tag:
+ *                    mein-geheimes-passwort-hier
+ * 4. Das aoi_data/-Verzeichnis legt das Script beim ersten Aufruf selbst an.
  *
- * .htaccess-INHALT (separat hochladen als ".htaccess" im selben Verzeichnis)
- * ---------------------------------------------------------------------------
- *   <IfModule mod_authz_core.c>
- *     <Directory "aoi_data">
- *       Require all denied
- *     </Directory>
- *   </IfModule>
- *   <IfModule !mod_authz_core.c>
- *     <Directory "aoi_data">
- *       Order deny,allow
- *       Deny from all
- *     </Directory>
- *   </IfModule>
+ * SELBSTTEST
+ * ----------
+ * GET-Anfrage an die URL -> gibt {"ok":true,"server":"AOI 9.0 Signal",...}
  */
 
-declare(strict_types=1);
-
-// ── HTTP-Header ───────────────────────────────────────────────────────────
 header('Content-Type: application/json; charset=utf-8');
 header('Access-Control-Allow-Origin: *');
 header('Access-Control-Allow-Methods: POST, OPTIONS');
@@ -81,242 +38,584 @@ header('Access-Control-Allow-Headers: Content-Type, X-AOI-Token');
 header('Cache-Control: no-store, no-cache');
 header('X-Content-Type-Options: nosniff');
 
-if (($_SERVER['REQUEST_METHOD'] ?? '') === 'OPTIONS') {
+if (isset($_SERVER['REQUEST_METHOD']) && $_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
     http_response_code(204);
     exit;
 }
 
-// ── Konfiguration ─────────────────────────────────────────────────────────
 define('DATEN_DIR',     __DIR__ . '/aoi_data');
-define('PRESENCE_FILE', DATEN_DIR . '/presence.php');
-define('INBOX_PREFIX',  DATEN_DIR . '/inbox_');
+define('PRESENCE_FILE',  DATEN_DIR . '/presence.php');
+define('DIRECTORY_FILE', DATEN_DIR . '/directory.php');
+define('INBOX_PREFIX',   DATEN_DIR . '/inbox_');
 define('TOKEN_DATEI',   __DIR__ . '/aoi_token.php');
+define('PRESENCE_TTL',  45);
+define('SIGNAL_TTL',    120);
+define('MAX_SIGNALE',   64);
+define('MAX_NAME',      32);
+define('MAX_SDP',       16384);
+define('MAX_ICE',       2048);
+define('MAX_BODY',      65536);
+define('OFFLINE_PREFIX', DATEN_DIR . '/offline_');
+define('PROFILE_PREFIX', DATEN_DIR . '/profile_');
+define('ROOMS_FILE',     DATEN_DIR . '/rooms.php');
+define('ROOM_PREFIX',    DATEN_DIR . '/room_');
+define('OFFLINE_TTL',    604800);
+define('MAX_OFFLINE',    50);
+define('MAX_MSG_LEN',      2000);
+define('MAX_ROOM_MEMBERS', 25);
+define('ROOM_TTL',         7200);
 
-define('PRESENCE_TTL',  45);     // s – ohne Herzschlag gilt Buddy als offline
-define('SIGNAL_TTL',    120);    // s – ältere Signale werden weggeräumt
-define('MAX_SIGNALE',   64);     // Signale je Inbox bevor sie voll ist
-define('MAX_NAME',      32);     // Zeichen – maximale Screen-Name-Länge
-define('MAX_SDP',       16384);  // Bytes – SDP-Offer/Answer (kann groß sein)
-define('MAX_ICE',        2048);  // Bytes – einzelner ICE-Kandidat
-define('MAX_BODY',      32768);  // Bytes – gesamter Anfrage-Body
+/* ===== FEDERATION (Verteiltes AOI-Netz) ===== */
+// Alle Server sind gleichberechtigt – kein Root-Zwang.
+// FEDERATION_SEED = erster bekannter Server zum Netz-Beitritt (leer = keiner)
+define('FEDERATION_ENABLED',   true);
+define('FEDERATION_URL',       'https://innobytix-it.de/AOI_9/AOI_Treffpunkt/aoi_signal.php');
+define('FEDERATION_SEED',      '');
+define('FED_SERVERS_FILE',     DATEN_DIR . '/fed_servers.php');
+define('FED_PRESENCE_FILE',    DATEN_DIR . '/fed_presence.php');
 
-// ── Hilfsfunktionen ───────────────────────────────────────────────────────
-
-function ok(array $daten = []): void
-{
-    echo json_encode(['ok' => true] + $daten, JSON_UNESCAPED_UNICODE);
+function aoi_ok($daten = array()) {
+    echo json_encode(array_merge(array('ok' => true), $daten), JSON_UNESCAPED_UNICODE);
     exit;
 }
 
-function fehler(string $text, int $code = 400): never
-{
+function aoi_fehler($text, $code = 400) {
     http_response_code($code);
-    echo json_encode(['ok' => false, 'fehler' => $text], JSON_UNESCAPED_UNICODE);
+    echo json_encode(array('ok' => false, 'fehler' => $text), JSON_UNESCAPED_UNICODE);
     exit;
 }
 
-/** Schreibt atomar: erst tmp, dann rename – kein halbfertiger Zustand. */
-function schreibe_atomar(string $ziel, string $inhalt): bool
-{
+function sicheres_daten_dir() {
     if (!is_dir(DATEN_DIR)) {
         @mkdir(DATEN_DIR, 0750, true);
+        // .htaccess im Datenordner anlegen – schützt gegen Direktabruf
+        $htaccess = DATEN_DIR . '/.htaccess';
+        if (!is_file($htaccess)) {
+            @file_put_contents($htaccess,
+                "# AOI 9.0 – kein Direktzugriff\n" .
+                "<IfModule mod_authz_core.c>\n  Require all denied\n</IfModule>\n" .
+                "<IfModule !mod_authz_core.c>\n  Order deny,allow\n  Deny from all\n</IfModule>\n"
+            );
+        }
     }
+}
+
+function schreibe_atomar($ziel, $inhalt) {
+    sicheres_daten_dir();
     $tmp = $ziel . '.' . bin2hex(random_bytes(4)) . '.tmp';
     if (@file_put_contents($tmp, $inhalt, LOCK_EX) === false) return false;
     if (!@rename($tmp, $ziel)) { @unlink($tmp); return false; }
     return true;
 }
 
-/**
- * Liest eine PHP-geschützte Datei und gibt den JSON-Inhalt als Array zurück.
- * Die erste Zeile (<?php exit; ?>) wird weggeworfen.
- */
-function lies(string $pfad): array
-{
-    if (!is_file($pfad)) return [];
+function lies($pfad) {
+    if (!is_file($pfad)) return array();
     $roh = @file_get_contents($pfad);
-    if ($roh === false || $roh === '') return [];
-    // BOM entfernen (manche FTP-Clients setzen ihn)
-    if (str_starts_with($roh, "\xEF\xBB\xBF")) $roh = substr($roh, 3);
-    // Erste Zeile (PHP-Schutzzeile) abschneiden
-    $zeilenende = strcspn($roh, "\r\n");
-    if ($zeilenende >= strlen($roh)) return [];
-    $json = ltrim(substr($roh, $zeilenende), "\r\n");
-    $data = @json_decode($json, true);
-    return is_array($data) ? $data : [];
+    if ($roh === false || $roh === '') return array();
+    if (strncmp($roh, "\xEF\xBB\xBF", 3) === 0) $roh = substr($roh, 3);
+    $nl = strcspn($roh, "\r\n");
+    if ($nl >= strlen($roh)) return array();
+    $data = @json_decode(ltrim(substr($roh, $nl), "\r\n"), true);
+    return is_array($data) ? $data : array();
 }
 
-/** Schreibt eine PHP-geschützte Datei mit JSON-Inhalt. */
-function schreibe(string $pfad, array $data): bool
-{
-    return schreibe_atomar(
-        $pfad,
-        "<?php exit; ?>\n" . json_encode($data, JSON_UNESCAPED_UNICODE)
-    );
+function schreibe($pfad, $data) {
+    return schreibe_atomar($pfad, "<?php exit; ?>\n" . json_encode($data, JSON_UNESCAPED_UNICODE));
 }
 
-/** Pfad zur Inbox eines Buddys (kein Klarname im Dateinamen). */
-function inbox(string $name): string
-{
-    return INBOX_PREFIX . substr(hash('sha256', mb_strtolower($name)), 0, 16) . '.php';
+function inbox_pfad($name) {
+    return INBOX_PREFIX . substr(hash('sha256', strtolower($name)), 0, 16) . '.php';
 }
 
-/** Prüft ob ein Screen-Name gültig ist. */
-function name_ok(string $name): bool
-{
-    return strlen($name) >= 1
-        && strlen($name) <= MAX_NAME
+function name_ok($name) {
+    return strlen($name) >= 1 && strlen($name) <= MAX_NAME
         && preg_match('/^[a-zA-Z0-9_\-\.]+$/', $name) === 1;
 }
 
-/**
- * Prüft den Shared Token.
- * Ist aoi_token.php leer oder fehlt sie, ist der Server offen –
- * nützlich beim ersten Einrichten, danach unbedingt Token setzen.
- */
-function token_ok(string $eingabe): bool
-{
+function token_ok($eingabe) {
     if (!is_file(TOKEN_DATEI)) return true;
     $soll = trim((string)(@file_get_contents(TOKEN_DATEI) ?: ''));
-    if ($soll === '') return true; // Noch kein Token eingerichtet
-    return hash_equals($soll, $eingabe);
+    return $soll === '' || hash_equals($soll, $eingabe);
 }
 
-// ── Anfrage einlesen ──────────────────────────────────────────────────────
-
-if (($_SERVER['REQUEST_METHOD'] ?? '') !== 'POST') {
-    fehler('Nur POST erlaubt.', 405);
+// HTTP-POST zu einem anderen Federation-Server (kein Token – Server-zu-Server)
+function fed_post($url, $payload, $timeout = 5) {
+    $body = json_encode($payload, JSON_UNESCAPED_UNICODE);
+    if (function_exists('curl_init')) {
+        $ch = curl_init($url);
+        curl_setopt_array($ch, array(
+            CURLOPT_POST           => true,
+            CURLOPT_POSTFIELDS     => $body,
+            CURLOPT_HTTPHEADER     => array('Content-Type: application/json', 'Content-Length: ' . strlen($body)),
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_TIMEOUT        => $timeout,
+            CURLOPT_SSL_VERIFYPEER => true,
+        ));
+        $result = @curl_exec($ch);
+        curl_close($ch);
+    } else {
+        $opts = array('http' => array(
+            'method'        => 'POST',
+            'header'        => "Content-Type: application/json\r\nContent-Length: " . strlen($body) . "\r\n",
+            'content'       => $body,
+            'timeout'       => $timeout,
+            'ignore_errors' => true,
+        ));
+        $result = @file_get_contents($url, false, stream_context_create($opts));
+    }
+    return ($result !== false && $result !== null) ? @json_decode($result, true) : null;
 }
+
+function bereinige($liste, $ttl) {
+    $jetzt = time(); $r = array();
+    foreach ($liste as $k => $e) {
+        if (is_array($e) && isset($e['ts']) && ($e['ts'] + $ttl) > $jetzt) $r[$k] = $e;
+    }
+    return $r;
+}
+
+// GET -> Selbsttest
+if (!isset($_SERVER['REQUEST_METHOD']) || $_SERVER['REQUEST_METHOD'] === 'GET') {
+    aoi_ok(array('server'=>'AOI 9.0 Signal','version'=>'1.0','php'=>PHP_VERSION,
+        'token_set'=>is_file(TOKEN_DATEI)&&trim((string)@file_get_contents(TOKEN_DATEI))!=='',
+        'daten_dir'=>is_dir(DATEN_DIR)?'vorhanden':'wird angelegt','zeit'=>date('c')));
+}
+
+if ($_SERVER['REQUEST_METHOD'] !== 'POST') aoi_fehler('Nur POST erlaubt.', 405);
 
 $body = (string)file_get_contents('php://input');
-if (strlen($body) > MAX_BODY) fehler('Anfrage zu groß.');
-
+if (strlen($body) > MAX_BODY) aoi_fehler('Anfrage zu gross.');
 $ein = @json_decode($body, true);
-if (!is_array($ein)) fehler('Kein gültiges JSON.');
+if (!is_array($ein)) aoi_fehler('Kein gueltiges JSON.');
 
-$aktion  = (string)($ein['aktion'] ?? '');
-$name    = (string)($ein['name']   ?? '');
-$token   = (string)($ein['token']  ?? $_SERVER['HTTP_X_AOI_TOKEN'] ?? '');
+$aktion = isset($ein['aktion']) ? (string)$ein['aktion'] : '';
+$name   = isset($ein['name'])   ? (string)$ein['name']   : '';
+$token  = isset($ein['token'])  ? (string)$ein['token']  : (isset($_SERVER['HTTP_X_AOI_TOKEN']) ? (string)$_SERVER['HTTP_X_AOI_TOKEN'] : '');
 
-// Token und Name prüfen (für alle Aktionen außer 'info')
-if ($aktion !== 'info') {
-    if (!token_ok($token))  fehler('Ungültiger Token.',       403);
-    if (!name_ok($name))    fehler('Ungültiger Screen-Name.');
-}
-
-// ── Aktionen ──────────────────────────────────────────────────────────────
-
-// INFO – Selbsttest (kein Token nötig)
 if ($aktion === 'info') {
-    ok([
-        'server'    => 'AOI 9.0 Signal',
-        'version'   => '1.0',
-        'token_set' => is_file(TOKEN_DATEI) && trim((string)@file_get_contents(TOKEN_DATEI)) !== '',
-        'zeit'      => date('c'),
-    ]);
+    aoi_ok(array('server'=>'AOI 9.0 Signal','version'=>'1.0','php'=>PHP_VERSION,
+        'token_set'=>is_file(TOKEN_DATEI)&&trim((string)@file_get_contents(TOKEN_DATEI))!=='',
+        'daten_dir'=>is_dir(DATEN_DIR)?'vorhanden':'wird angelegt','zeit'=>date('c')));
 }
 
-// PRESENCE – Herzschlag: "Ich bin online"
-// Gibt Liste aller aktuell online Buddys zurück (außer dem Absender selbst).
+// federation_signal: kein eigener Token nötig – kommt von einem anderen AOI-Server
+// Wird vor dem Token-Check behandelt, da fremde Server unser Passwort nicht kennen.
+if ($aktion === 'federation_signal') {
+    if (!FEDERATION_ENABLED) aoi_fehler('Nicht im AOI-Netz.', 403);
+    $an          = isset($ein['an'])          ? (string)$ein['an']          : '';
+    $von         = isset($ein['von'])         ? (string)$ein['von']         : '';
+    $typ         = isset($ein['typ'])         ? (string)$ein['typ']         : '';
+    $daten       = isset($ein['daten'])       ? $ein['daten']               : null;
+    $from_server = isset($ein['from_server']) ? (string)$ein['from_server'] : '';
+    if (!name_ok($an) || !name_ok($von)) aoi_fehler('Ungueltige Namen.');
+    if (!in_array($typ, array('offer','answer','ice'), true)) aoi_fehler('Unbekannter Signaltyp.');
+    if ($daten === null) aoi_fehler('Kein Signal-Inhalt.');
+    $daten_json = json_encode($daten);
+    if (strlen($daten_json) > ($typ === 'ice' ? MAX_ICE * 2 : MAX_SDP)) aoi_fehler('Signal zu gross.');
+    $pfad  = inbox_pfad($an);
+    $inbox = array_values(bereinige(lies($pfad), SIGNAL_TTL));
+    if (count($inbox) < MAX_SIGNALE) {
+        $inbox[] = array('von' => $von, 'typ' => $typ, 'daten' => $daten, 'ts' => time(), 'from_server' => $from_server);
+        schreibe($pfad, $inbox);
+    }
+    aoi_ok(array('relayed' => true));
+}
+
+// Weitere Server-zu-Server-Endpunkte: kein lokaler Token nötig
+if (FEDERATION_ENABLED && in_array($aktion, array('federation_servers','federation_join','federation_name_check','federation_presence'), true)) {
+    if ($aktion === 'federation_servers') {
+        $servers = lies(FED_SERVERS_FILE);
+        $list = array_values(array_map(function($s){ return $s['url']; }, $servers));
+        if (!in_array(FEDERATION_URL, $list)) $list[] = FEDERATION_URL;
+        aoi_ok(array('servers' => $list));
+    }
+    if ($aktion === 'federation_join') {
+        $new_url = isset($ein['server_url']) ? trim((string)$ein['server_url']) : '';
+        if (!$new_url || strlen($new_url) > 256 || !filter_var($new_url, FILTER_VALIDATE_URL)) aoi_fehler('Ungueltige Server-URL.');
+        $servers = lies(FED_SERVERS_FILE);
+        $key = substr(hash('sha256', $new_url), 0, 16);
+        $servers[$key] = array('url' => $new_url, 'joined' => time(), 'last_seen' => time());
+        schreibe(FED_SERVERS_FILE, $servers);
+        $list = array_values(array_map(function($s){ return $s['url']; }, $servers));
+        if (!in_array(FEDERATION_URL, $list)) $list[] = FEDERATION_URL;
+        aoi_ok(array('willkommen' => true, 'servers' => $list));
+    }
+    if ($aktion === 'federation_name_check') {
+        $check = isset($ein['check_name']) ? strtolower(trim((string)$ein['check_name'])) : '';
+        if (!$check || !name_ok($check)) aoi_fehler('Kein gueltiger Name.');
+        $presence = bereinige(lies(PRESENCE_FILE), PRESENCE_TTL);
+        $dir = lies(DIRECTORY_FILE);
+        $found = isset($presence[$check]) || isset($dir[$check]);
+        aoi_ok(array('exists' => $found, 'server' => FEDERATION_URL));
+    }
+    if ($aktion === 'federation_presence') {
+        $users = isset($ein['users']) ? (array)$ein['users'] : array();
+        $server_url = isset($ein['server_url']) ? trim((string)$ein['server_url']) : '';
+        if (!$server_url || !filter_var($server_url, FILTER_VALIDATE_URL) || $server_url === FEDERATION_URL) aoi_fehler('Ungueltige Server-URL.');
+        $fed_srv = lies(FED_SERVERS_FILE);
+        $srv_key = substr(hash('sha256', $server_url), 0, 16);
+        $fed_srv[$srv_key] = array('url' => $server_url,
+            'joined'    => isset($fed_srv[$srv_key]['joined']) ? $fed_srv[$srv_key]['joined'] : time(),
+            'last_seen' => time());
+        schreibe(FED_SERVERS_FILE, $fed_srv);
+        $fed_pres = bereinige(lies(FED_PRESENCE_FILE), PRESENCE_TTL * 8);
+        foreach ($fed_pres as $fn => $finfo) {
+            if (isset($finfo['server']) && $finfo['server'] === $server_url) unset($fed_pres[$fn]);
+        }
+        foreach ($users as $u) {
+            if (name_ok($u)) $fed_pres[strtolower($u)] = array('server' => $server_url, 'ts' => time());
+        }
+        schreibe(FED_PRESENCE_FILE, $fed_pres);
+        aoi_ok(array('ok' => true));
+    }
+}
+
+if (!token_ok($token)) aoi_fehler('Ungueltiger Token.', 403);
+
+// list_users braucht keinen Screen-Namen
+if ($aktion === 'list_users') {
+    $dir      = lies(DIRECTORY_FILE);
+    $presence = bereinige(lies(PRESENCE_FILE), PRESENCE_TTL);
+    $users    = array();
+    foreach ($dir as $n => $info) {
+        $users[] = array(
+            'name'   => $n,
+            'online' => isset($presence[$n]),
+            'since'  => isset($info['since']) ? $info['since'] : 0,
+        );
+    }
+    usort($users, function($a, $b) {
+        if ($a['online'] !== $b['online']) return $b['online'] ? 1 : -1;
+        return strcasecmp($a['name'], $b['name']);
+    });
+    aoi_ok(array('users' => $users, 'total' => count($users)));
+}
+
+if (!name_ok($name))   aoi_fehler('Ungueltiger Screen-Name.');
+
+// CHECK_NAME – Prüft ob ein Name bereits online ist (liest nur, ändert nichts)
+if ($aktion === 'check_name') {
+    $presence = bereinige(lies(PRESENCE_FILE), PRESENCE_TTL);
+    aoi_ok(array('taken' => isset($presence[$name])));
+}
+
 if ($aktion === 'presence') {
-    $session = (string)($ein['session'] ?? '');
-    if (strlen($session) < 8 || strlen($session) > 64) {
-        fehler('Ungültige Session-ID (8–64 Zeichen).');
+    $session = isset($ein['session']) ? (string)$ein['session'] : '';
+    if (strlen($session) < 8 || strlen($session) > 64) aoi_fehler('Ungueltige Session-ID.');
+    $presence = bereinige(lies(PRESENCE_FILE), PRESENCE_TTL);
+    $presence[$name] = array('ts' => time(), 'session' => $session);
+    schreibe(PRESENCE_FILE, $presence);
+    // Optionaler Verzeichnis-Eintrag (öffentliche Nutzersuche)
+    if (!empty($ein['public'])) {
+        $dir = lies(DIRECTORY_FILE);
+        $dir[$name] = array(
+            'ts'    => time(),
+            'since' => isset($dir[$name]['since']) ? $dir[$name]['since'] : time(),
+        );
+        schreibe(DIRECTORY_FILE, $dir);
     }
 
-    $jetzt    = time();
-    $presence = lies(PRESENCE_FILE);
+    $buddies = array();
+    foreach ($presence as $n => $p) { if ($n !== $name) $buddies[] = $n; }
 
-    // Veraltete Einträge entfernen
-    $presence = array_filter(
-        $presence,
-        fn($p) => is_array($p) && ($p['ts'] ?? 0) + PRESENCE_TTL > $jetzt
-    );
-
-    // Eigenen Eintrag aktualisieren
-    $presence[$name] = ['ts' => $jetzt, 'session' => $session];
-
-    schreibe(PRESENCE_FILE, $presence);
-
-    // Buddy-Liste: alle außer mir selbst
-    $buddies = [];
-    foreach ($presence as $n => $p) {
-        if ($n !== $name) {
-            $buddies[] = $n;
+    // Federation: User anderer Server aus lokalem Cache zurückgeben
+    $fed_buddies = array();
+    if (FEDERATION_ENABLED) {
+        $fed_pres = bereinige(lies(FED_PRESENCE_FILE), PRESENCE_TTL * 8);
+        $local_lower = array_map('strtolower', $buddies);
+        foreach ($fed_pres as $fn => $finfo) {
+            if (strtolower($fn) !== strtolower($name) && !in_array(strtolower($fn), $local_lower)) {
+                $fed_buddies[] = array('name' => $fn, 'server' => $finfo['server']);
+            }
+        }
+        // Eigene User an ALLE bekannten Federation-Server broadcasten
+        $fed_servers = lies(FED_SERVERS_FILE);
+        $names_to_announce = array_keys($presence);
+        foreach ($fed_servers as $srv) {
+            if (empty($srv['url']) || $srv['url'] === FEDERATION_URL) continue;
+            @fed_post($srv['url'], array(
+                'aktion'     => 'federation_presence',
+                'users'      => $names_to_announce,
+                'server_url' => FEDERATION_URL,
+            ), 2);
+        }
+        // Beim ersten Mal: Seed-Server beitreten falls noch keine Peers bekannt
+        if (empty($fed_servers) && FEDERATION_SEED !== '' && FEDERATION_SEED !== FEDERATION_URL) {
+            $res = fed_post(FEDERATION_SEED, array(
+                'aktion'     => 'federation_join',
+                'name'       => $name,
+                'server_url' => FEDERATION_URL,
+            ), 5);
+            if ($res && !empty($res['servers'])) {
+                foreach ($res['servers'] as $surl) {
+                    if ($surl === FEDERATION_URL) continue;
+                    $key = substr(hash('sha256', $surl), 0, 16);
+                    $fed_servers[$key] = array('url' => $surl, 'joined' => time(), 'last_seen' => time());
+                }
+                schreibe(FED_SERVERS_FILE, $fed_servers);
+            }
         }
     }
 
-    ok(['buddies' => $buddies]);
+    aoi_ok(array('buddies' => $buddies, 'fed_buddies' => $fed_buddies));
 }
 
-// SIGNAL – WebRTC-Signal an einen anderen Buddy zustellen
-// typ: 'offer' | 'answer' | 'ice'
 if ($aktion === 'signal') {
-    $an  = (string)($ein['an']  ?? '');
-    $typ = (string)($ein['typ'] ?? '');
-
-    if (!name_ok($an))                                  fehler('Ungültiger Empfänger.');
-    if ($an === $name)                                  fehler('Kann nicht an sich selbst senden.');
-    if (!in_array($typ, ['offer', 'answer', 'ice'], true)) fehler('Unbekannter Signaltyp.');
-
-    $daten = $ein['daten'] ?? null;
-    if ($daten === null)                                fehler('Kein Signal-Inhalt (daten fehlt).');
-
+    $an  = isset($ein['an'])  ? (string)$ein['an']  : '';
+    $typ = isset($ein['typ']) ? (string)$ein['typ'] : '';
+    if (!name_ok($an))  aoi_fehler('Ungueltiger Empfaenger.');
+    if ($an === $name)  aoi_fehler('Kann nicht an sich selbst senden.');
+    if (!in_array($typ, array('offer','answer','ice'), true)) aoi_fehler('Unbekannter Signaltyp.');
+    $daten = isset($ein['daten']) ? $ein['daten'] : null;
+    if ($daten === null) aoi_fehler('Kein Signal-Inhalt.');
     $daten_json = json_encode($daten);
-    if ($daten_json === false)                          fehler('Signal-Daten nicht serialisierbar.');
+    if ($daten_json === false) aoi_fehler('Nicht serialisierbar.');
+    if (strlen($daten_json) > ($typ === 'ice' ? MAX_ICE : MAX_SDP)) aoi_fehler('Signal zu gross.');
 
-    $limit = ($typ === 'ice') ? MAX_ICE : MAX_SDP;
-    if (strlen($daten_json) > $limit)                  fehler('Signal-Daten zu groß.');
+    // Federation: Wenn Empfänger nicht lokal online ist, lokalen Cache befragen
+    if (FEDERATION_ENABLED) {
+        $local_pres = bereinige(lies(PRESENCE_FILE), PRESENCE_TTL);
+        if (!isset($local_pres[$an])) {
+            $fed_pres = bereinige(lies(FED_PRESENCE_FILE), PRESENCE_TTL * 8);
+            if (isset($fed_pres[strtolower($an)])) {
+                $target_server = $fed_pres[strtolower($an)]['server'];
+                $res = fed_post($target_server, array(
+                    'aktion' => 'federation_signal', 'von' => $name, 'an' => $an,
+                    'typ' => $typ, 'daten' => $daten, 'from_server' => FEDERATION_URL,
+                ));
+                if ($res && !empty($res['relayed'])) aoi_ok(array('zugestellt' => true, 'via_federation' => true));
+            }
+        }
+    }
 
-    // Inbox des Empfängers laden
-    $pfad  = inbox($an);
-    $inbox = lies($pfad);
-    $jetzt = time();
-
-    // Veraltete Signale bereinigen
-    $inbox = array_values(array_filter(
-        $inbox,
-        fn($s) => is_array($s) && ($s['ts'] ?? 0) + SIGNAL_TTL > $jetzt
-    ));
-
-    if (count($inbox) >= MAX_SIGNALE) fehler('Posteingang des Empfängers ist voll.');
-
-    $inbox[] = [
-        'von'   => $name,
-        'typ'   => $typ,
-        'daten' => $daten,
-        'ts'    => $jetzt,
-    ];
-
-    if (!schreibe($pfad, $inbox)) fehler('Konnte Signal nicht speichern.', 500);
-
-    ok(['zugestellt' => true]);
+    $pfad  = inbox_pfad($an);
+    $inbox = array_values(bereinige(lies($pfad), SIGNAL_TTL));
+    if (count($inbox) >= MAX_SIGNALE) aoi_fehler('Posteingang voll.');
+    $inbox[] = array('von'=>$name,'typ'=>$typ,'daten'=>$daten,'ts'=>time());
+    if (!schreibe($pfad, $inbox)) aoi_fehler('Speicherfehler.', 500);
+    aoi_ok(array('zugestellt' => true));
 }
 
-// POLL – Eigene eingegangene Signale abholen (Inbox wird danach geleert)
 if ($aktion === 'poll') {
-    $pfad  = inbox($name);
-    $inbox = lies($pfad);
-    $jetzt = time();
-
-    // Nur frische Signale
-    $frisch = array_values(array_filter(
-        $inbox,
-        fn($s) => is_array($s) && ($s['ts'] ?? 0) + SIGNAL_TTL > $jetzt
-    ));
-
-    // Inbox leeren – Signale sind einmalig
-    schreibe($pfad, []);
-
-    ok(['signale' => $frisch]);
+    $pfad   = inbox_pfad($name);
+    $frisch = array_values(bereinige(lies($pfad), SIGNAL_TTL));
+    schreibe($pfad, array());
+    aoi_ok(array('signale' => $frisch));
 }
 
-// BYE – Sauber abmelden (optional – TTL räumt sowieso auf)
 if ($aktion === 'bye') {
     $presence = lies(PRESENCE_FILE);
     unset($presence[$name]);
     schreibe(PRESENCE_FILE, $presence);
-    ok(['tschuess' => true]);
+    aoi_ok(array('tschuess' => true));
 }
 
-fehler('Unbekannte Aktion: ' . htmlspecialchars($aktion, ENT_QUOTES));
+if ($aktion === 'unregister_public') {
+    $dir = lies(DIRECTORY_FILE);
+    unset($dir[$name]);
+    schreibe(DIRECTORY_FILE, $dir);
+    aoi_ok(array('removed' => true));
+}
+
+/* ===== OFFLINE-NACHRICHTEN ===== */
+function offline_pfad($n) {
+    return OFFLINE_PREFIX . substr(hash('sha256', strtolower($n)), 0, 16) . '.php';
+}
+
+if ($aktion === 'offline_send') {
+    $an  = isset($ein['an'])  ? (string)$ein['an']  : '';
+    $msg = isset($ein['msg']) ? (string)$ein['msg'] : '';
+    if (!name_ok($an)) aoi_fehler('Ungueltiger Empfaenger.');
+    if ($an === $name)  aoi_fehler('Kann nicht an sich selbst senden.');
+    if (strlen($msg) === 0 || strlen($msg) > MAX_MSG_LEN) aoi_fehler('Nachricht ungueltig.');
+    $pfad  = offline_pfad($an);
+    $queue = array_values(bereinige(lies($pfad), OFFLINE_TTL));
+    if (count($queue) >= MAX_OFFLINE) aoi_fehler('Offline-Postfach voll.');
+    $queue[] = array('von' => $name, 'msg' => $msg, 'ts' => time());
+    if (!schreibe($pfad, $queue)) aoi_fehler('Speicherfehler.', 500);
+    aoi_ok(array('gespeichert' => true));
+}
+
+if ($aktion === 'offline_poll') {
+    $pfad  = offline_pfad($name);
+    $msgs  = array_values(bereinige(lies($pfad), OFFLINE_TTL));
+    schreibe($pfad, array());
+    aoi_ok(array('nachrichten' => $msgs));
+}
+
+/* ===== PROFILE ===== */
+function profil_pfad($n) {
+    return PROFILE_PREFIX . substr(hash('sha256', strtolower($n)), 0, 16) . '.php';
+}
+
+if ($aktion === 'profile_save') {
+    $erlaubt = array('avatar','motto','interessen','zitat','ort','alter');
+    $profil  = array('name' => $name, 'ts' => time());
+    foreach ($erlaubt as $feld) {
+        if (isset($ein[$feld])) {
+            $val = (string)$ein[$feld];
+            if (strlen($val) > 200) $val = substr($val, 0, 200);
+            $profil[$feld] = $val;
+        }
+    }
+    if (!schreibe(profil_pfad($name), $profil)) aoi_fehler('Speicherfehler.', 500);
+    aoi_ok(array('gespeichert' => true));
+}
+
+if ($aktion === 'profile_get') {
+    $ziel = isset($ein['ziel']) ? (string)$ein['ziel'] : $name;
+    if (!name_ok($ziel)) aoi_fehler('Ungueltiger Name.');
+    $pfad  = profil_pfad($ziel);
+    $profil = is_file($pfad) ? lies($pfad) : array();
+    aoi_ok(array('profil' => $profil));
+}
+
+/* ===== CHATROOMS ===== */
+function room_name_ok($r) {
+    return strlen($r) >= 1 && strlen($r) <= 32 && preg_match('/^[a-zA-Z0-9_\-\. äöüÄÖÜß]+$/u', $r) === 1;
+}
+function room_pfad($r) {
+    return ROOM_PREFIX . substr(hash('sha256', strtolower($r)), 0, 16) . '.php';
+}
+
+if ($aktion === 'room_list') {
+    $rooms = lies(ROOMS_FILE);
+    $presence = bereinige(lies(PRESENCE_FILE), PRESENCE_TTL);
+    $result = array();
+    foreach ($rooms as $rname => $info) {
+        $is_private = !empty($info['private']);
+        $creator    = isset($info['creator']) ? $info['creator'] : '';
+        $raw_members = isset($info['members']) ? (array)$info['members'] : array();
+        if ($is_private && $creator !== $name && !in_array($name, $raw_members)) continue;
+        $members = array_values(array_filter($raw_members, function($m) use ($presence) { return isset($presence[$m]); }));
+        $result[] = array(
+            'name'    => $rname,
+            'topic'   => isset($info['topic']) ? $info['topic'] : '',
+            'members' => $members,
+            'count'   => count($members),
+            'full'    => count($raw_members) >= MAX_ROOM_MEMBERS,
+            'private' => $is_private,
+        );
+    }
+    usort($result, function($a,$b){ return $b['count'] - $a['count']; });
+    aoi_ok(array('rooms' => $result));
+}
+
+if ($aktion === 'room_join') {
+    $room  = isset($ein['room'])  ? trim((string)$ein['room'])  : '';
+    $topic = isset($ein['topic']) ? trim((string)$ein['topic']) : '';
+    if (!room_name_ok($room)) aoi_fehler('Ungueltiger Raumname.');
+    $rooms = lies(ROOMS_FILE);
+    if (!isset($rooms[$room])) {
+        $eigene = count(array_filter($rooms, function($info) use ($name) {
+            return isset($info['creator']) && $info['creator'] === $name;
+        }));
+        if ($eigene >= 4) aoi_fehler('Du hast bereits 4 Chaträume erstellt. Bitte erst einen bestehenden Raum verlassen (leere Räume werden automatisch gelöscht).');
+        $is_private = !empty($ein['private']);
+        $rooms[$room] = array('topic' => substr($topic, 0, 100), 'created' => time(), 'creator' => $name, 'members' => array(), 'private' => $is_private);
+    }
+    $members = (array)$rooms[$room]['members'];
+    if (!in_array($name, $members)) {
+        if (count($members) >= MAX_ROOM_MEMBERS) aoi_fehler('Dieser Raum ist voll (max. ' . MAX_ROOM_MEMBERS . ' Teilnehmer).');
+        $members[] = $name;
+    }
+    $rooms[$room]['members'] = array_values($members);
+    schreibe(ROOMS_FILE, $rooms);
+    $others = array_values(array_filter($members, function($m) use($name){ return $m !== $name; }));
+    aoi_ok(array('beigetreten' => true, 'topic' => $rooms[$room]['topic'], 'members' => $others, 'private' => !empty($rooms[$room]['private'])));
+}
+
+if ($aktion === 'room_leave') {
+    $room = isset($ein['room']) ? trim((string)$ein['room']) : '';
+    if (!room_name_ok($room)) aoi_fehler('Ungueltiger Raumname.');
+    $rooms = lies(ROOMS_FILE);
+    if (isset($rooms[$room])) {
+        $members = array_values(array_filter((array)$rooms[$room]['members'], function($m) use($name){ return $m !== $name; }));
+        if (empty($members)) unset($rooms[$room]);
+        else $rooms[$room]['members'] = $members;
+        schreibe(ROOMS_FILE, $rooms);
+    }
+    aoi_ok(array('verlassen' => true));
+}
+
+if ($aktion === 'room_members') {
+    $room = isset($ein['room']) ? trim((string)$ein['room']) : '';
+    if (!room_name_ok($room)) aoi_fehler('Ungueltiger Raumname.');
+    $rooms    = lies(ROOMS_FILE);
+    $presence = bereinige(lies(PRESENCE_FILE), PRESENCE_TTL);
+    if (!isset($rooms[$room])) aoi_ok(array('members' => array()));
+    $is_private = !empty($rooms[$room]['private']);
+    $creator    = isset($rooms[$room]['creator']) ? $rooms[$room]['creator'] : '';
+    $all        = (array)$rooms[$room]['members'];
+    if ($is_private && $creator !== $name && !in_array($name, $all)) aoi_ok(array('members' => array()));
+    $online = array_values(array_filter($all, function($m) use($presence){ return isset($presence[$m]); }));
+    if (count($online) !== count($all)) {
+        if (empty($online)) unset($rooms[$room]);
+        else $rooms[$room]['members'] = $online;
+        schreibe(ROOMS_FILE, $rooms);
+    }
+    aoi_ok(array('members' => $online));
+}
+
+/* ===== FEDERATION-ENDPUNKTE ===== */
+
+// Bekannte Server im Netz zurückgeben
+if ($aktion === 'federation_servers') {
+    if (!FEDERATION_ENABLED) aoi_fehler('Nicht im AOI-Netz.', 403);
+    $servers = lies(FED_SERVERS_FILE);
+    $list = array_values(array_map(function($s){ return $s['url']; }, $servers));
+    if (!in_array(FEDERATION_URL, $list)) $list[] = FEDERATION_URL;
+    aoi_ok(array('servers' => $list));
+}
+
+// Neuer Server meldet sich am AOI-Netz an
+if ($aktion === 'federation_join') {
+    if (!FEDERATION_ENABLED) aoi_fehler('Nicht im AOI-Netz.', 403);
+    $new_url = isset($ein['server_url']) ? trim((string)$ein['server_url']) : '';
+    if (!$new_url || strlen($new_url) > 256 || !filter_var($new_url, FILTER_VALIDATE_URL)) aoi_fehler('Ungueltige Server-URL.');
+    $servers = lies(FED_SERVERS_FILE);
+    $key = substr(hash('sha256', $new_url), 0, 16);
+    $servers[$key] = array('url' => $new_url, 'joined' => time(), 'last_seen' => time());
+    schreibe(FED_SERVERS_FILE, $servers);
+    $list = array_values(array_map(function($s){ return $s['url']; }, $servers));
+    if (!in_array(FEDERATION_URL, $list)) $list[] = FEDERATION_URL;
+    aoi_ok(array('willkommen' => true, 'servers' => $list));
+}
+
+// Prüfen ob ein Name lokal registriert/online ist
+if ($aktion === 'federation_name_check') {
+    if (!FEDERATION_ENABLED) aoi_fehler('Nicht im AOI-Netz.', 403);
+    $check = isset($ein['check_name']) ? strtolower(trim((string)$ein['check_name'])) : '';
+    if (!$check || !name_ok($check)) aoi_fehler('Kein gueltiger Name.');
+    $presence = bereinige(lies(PRESENCE_FILE), PRESENCE_TTL);
+    $dir = lies(DIRECTORY_FILE);
+    $found = isset($presence[$check]) || isset($dir[$check]);
+    aoi_ok(array('exists' => $found, 'server' => FEDERATION_URL));
+}
+
+// Anderer Server meldet seine aktiven User – jeder Server speichert das lokal
+if ($aktion === 'federation_presence') {
+    if (!FEDERATION_ENABLED) aoi_fehler('Nicht im AOI-Netz.', 403);
+    $users = isset($ein['users']) ? (array)$ein['users'] : array();
+    $server_url = isset($ein['server_url']) ? trim((string)$ein['server_url']) : '';
+    if (!$server_url || !filter_var($server_url, FILTER_VALIDATE_URL) || $server_url === FEDERATION_URL) aoi_fehler('Ungueltige Server-URL.');
+    // Sender als bekannten Peer speichern
+    $fed_srv = lies(FED_SERVERS_FILE);
+    $srv_key = substr(hash('sha256', $server_url), 0, 16);
+    $fed_srv[$srv_key] = array('url' => $server_url,
+        'joined'    => isset($fed_srv[$srv_key]['joined']) ? $fed_srv[$srv_key]['joined'] : time(),
+        'last_seen' => time());
+    schreibe(FED_SERVERS_FILE, $fed_srv);
+    $fed_pres = bereinige(lies(FED_PRESENCE_FILE), PRESENCE_TTL * 8);
+    // Alte Einträge dieses Servers entfernen
+    foreach ($fed_pres as $fn => $finfo) {
+        if (isset($finfo['server']) && $finfo['server'] === $server_url) unset($fed_pres[$fn]);
+    }
+    foreach ($users as $u) {
+        if (name_ok($u)) $fed_pres[strtolower($u)] = array('server' => $server_url, 'ts' => time());
+    }
+    schreibe(FED_PRESENCE_FILE, $fed_pres);
+    aoi_ok(array('ok' => true));
+}
+
+aoi_fehler('Unbekannte Aktion: ' . htmlspecialchars($aktion, ENT_QUOTES));

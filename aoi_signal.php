@@ -54,7 +54,16 @@ define('MAX_SIGNALE',   64);
 define('MAX_NAME',      32);
 define('MAX_SDP',       16384);
 define('MAX_ICE',       2048);
-define('MAX_BODY',      32768);
+define('MAX_BODY',      65536);
+define('OFFLINE_PREFIX', DATEN_DIR . '/offline_');
+define('PROFILE_PREFIX', DATEN_DIR . '/profile_');
+define('ROOMS_FILE',     DATEN_DIR . '/rooms.php');
+define('ROOM_PREFIX',    DATEN_DIR . '/room_');
+define('OFFLINE_TTL',    604800);
+define('MAX_OFFLINE',    50);
+define('MAX_MSG_LEN',      2000);
+define('MAX_ROOM_MEMBERS', 25);
+define('ROOM_TTL',         7200);
 
 function aoi_ok($daten = array()) {
     echo json_encode(array_merge(array('ok' => true), $daten), JSON_UNESCAPED_UNICODE);
@@ -240,6 +249,148 @@ if ($aktion === 'unregister_public') {
     unset($dir[$name]);
     schreibe(DIRECTORY_FILE, $dir);
     aoi_ok(array('removed' => true));
+}
+
+/* ===== OFFLINE-NACHRICHTEN ===== */
+function offline_pfad($n) {
+    return OFFLINE_PREFIX . substr(hash('sha256', strtolower($n)), 0, 16) . '.php';
+}
+
+if ($aktion === 'offline_send') {
+    $an  = isset($ein['an'])  ? (string)$ein['an']  : '';
+    $msg = isset($ein['msg']) ? (string)$ein['msg'] : '';
+    if (!name_ok($an)) aoi_fehler('Ungueltiger Empfaenger.');
+    if ($an === $name)  aoi_fehler('Kann nicht an sich selbst senden.');
+    if (strlen($msg) === 0 || strlen($msg) > MAX_MSG_LEN) aoi_fehler('Nachricht ungueltig.');
+    $pfad  = offline_pfad($an);
+    $queue = array_values(bereinige(lies($pfad), OFFLINE_TTL));
+    if (count($queue) >= MAX_OFFLINE) aoi_fehler('Offline-Postfach voll.');
+    $queue[] = array('von' => $name, 'msg' => $msg, 'ts' => time());
+    if (!schreibe($pfad, $queue)) aoi_fehler('Speicherfehler.', 500);
+    aoi_ok(array('gespeichert' => true));
+}
+
+if ($aktion === 'offline_poll') {
+    $pfad  = offline_pfad($name);
+    $msgs  = array_values(bereinige(lies($pfad), OFFLINE_TTL));
+    schreibe($pfad, array());
+    aoi_ok(array('nachrichten' => $msgs));
+}
+
+/* ===== PROFILE ===== */
+function profil_pfad($n) {
+    return PROFILE_PREFIX . substr(hash('sha256', strtolower($n)), 0, 16) . '.php';
+}
+
+if ($aktion === 'profile_save') {
+    $erlaubt = array('avatar','motto','interessen','zitat','ort','alter');
+    $profil  = array('name' => $name, 'ts' => time());
+    foreach ($erlaubt as $feld) {
+        if (isset($ein[$feld])) {
+            $val = (string)$ein[$feld];
+            if (strlen($val) > 200) $val = substr($val, 0, 200);
+            $profil[$feld] = $val;
+        }
+    }
+    if (!schreibe(profil_pfad($name), $profil)) aoi_fehler('Speicherfehler.', 500);
+    aoi_ok(array('gespeichert' => true));
+}
+
+if ($aktion === 'profile_get') {
+    $ziel = isset($ein['ziel']) ? (string)$ein['ziel'] : $name;
+    if (!name_ok($ziel)) aoi_fehler('Ungueltiger Name.');
+    $pfad  = profil_pfad($ziel);
+    $profil = is_file($pfad) ? lies($pfad) : array();
+    aoi_ok(array('profil' => $profil));
+}
+
+/* ===== CHATROOMS ===== */
+function room_name_ok($r) {
+    return strlen($r) >= 1 && strlen($r) <= 32 && preg_match('/^[a-zA-Z0-9_\-\. äöüÄÖÜß]+$/u', $r) === 1;
+}
+function room_pfad($r) {
+    return ROOM_PREFIX . substr(hash('sha256', strtolower($r)), 0, 16) . '.php';
+}
+
+if ($aktion === 'room_list') {
+    $rooms = lies(ROOMS_FILE);
+    $presence = bereinige(lies(PRESENCE_FILE), PRESENCE_TTL);
+    $result = array();
+    foreach ($rooms as $rname => $info) {
+        $is_private = !empty($info['private']);
+        $creator    = isset($info['creator']) ? $info['creator'] : '';
+        $raw_members = isset($info['members']) ? (array)$info['members'] : array();
+        // Private Räume: nur Ersteller und bereits eingetragene Mitglieder sehen sie
+        if ($is_private && $creator !== $name && !in_array($name, $raw_members)) continue;
+        $members = array_values(array_filter($raw_members, function($m) use ($presence) { return isset($presence[$m]); }));
+        $result[] = array(
+            'name'    => $rname,
+            'topic'   => isset($info['topic']) ? $info['topic'] : '',
+            'members' => $members,
+            'count'   => count($members),
+            'full'    => count($raw_members) >= MAX_ROOM_MEMBERS,
+            'private' => $is_private,
+        );
+    }
+    usort($result, function($a,$b){ return $b['count'] - $a['count']; });
+    aoi_ok(array('rooms' => $result));
+}
+
+if ($aktion === 'room_join') {
+    $room  = isset($ein['room'])  ? trim((string)$ein['room'])  : '';
+    $topic = isset($ein['topic']) ? trim((string)$ein['topic']) : '';
+    if (!room_name_ok($room)) aoi_fehler('Ungueltiger Raumname.');
+    $rooms = lies(ROOMS_FILE);
+    if (!isset($rooms[$room])) {
+        $eigene = count(array_filter($rooms, function($info) use ($name) {
+            return isset($info['creator']) && $info['creator'] === $name;
+        }));
+        if ($eigene >= 4) aoi_fehler('Du hast bereits 4 Chaträume erstellt. Bitte erst einen bestehenden Raum verlassen (leere Räume werden automatisch gelöscht).');
+        $is_private = !empty($ein['private']);
+        $rooms[$room] = array('topic' => substr($topic, 0, 100), 'created' => time(), 'creator' => $name, 'members' => array(), 'private' => $is_private);
+    }
+    $members = (array)$rooms[$room]['members'];
+    if (!in_array($name, $members)) {
+        if (count($members) >= MAX_ROOM_MEMBERS) aoi_fehler('Dieser Raum ist voll (max. ' . MAX_ROOM_MEMBERS . ' Teilnehmer).');
+        $members[] = $name;
+    }
+    $rooms[$room]['members'] = array_values($members);
+    schreibe(ROOMS_FILE, $rooms);
+    $others = array_values(array_filter($members, function($m) use($name){ return $m !== $name; }));
+    aoi_ok(array('beigetreten' => true, 'topic' => $rooms[$room]['topic'], 'members' => $others, 'private' => !empty($rooms[$room]['private'])));
+}
+
+if ($aktion === 'room_leave') {
+    $room = isset($ein['room']) ? trim((string)$ein['room']) : '';
+    if (!room_name_ok($room)) aoi_fehler('Ungueltiger Raumname.');
+    $rooms = lies(ROOMS_FILE);
+    if (isset($rooms[$room])) {
+        $members = array_values(array_filter((array)$rooms[$room]['members'], function($m) use($name){ return $m !== $name; }));
+        if (empty($members)) unset($rooms[$room]);
+        else $rooms[$room]['members'] = $members;
+        schreibe(ROOMS_FILE, $rooms);
+    }
+    aoi_ok(array('verlassen' => true));
+}
+
+if ($aktion === 'room_members') {
+    $room = isset($ein['room']) ? trim((string)$ein['room']) : '';
+    if (!room_name_ok($room)) aoi_fehler('Ungueltiger Raumname.');
+    $rooms    = lies(ROOMS_FILE);
+    $presence = bereinige(lies(PRESENCE_FILE), PRESENCE_TTL);
+    if (!isset($rooms[$room])) aoi_ok(array('members' => array()));
+    $is_private = !empty($rooms[$room]['private']);
+    $creator    = isset($rooms[$room]['creator']) ? $rooms[$room]['creator'] : '';
+    $all        = (array)$rooms[$room]['members'];
+    // Privater Raum: nur Mitglieder dürfen die Liste abrufen
+    if ($is_private && $creator !== $name && !in_array($name, $all)) aoi_ok(array('members' => array()));
+    $online = array_values(array_filter($all, function($m) use($presence){ return isset($presence[$m]); }));
+    if (count($online) !== count($all)) {
+        if (empty($online)) unset($rooms[$room]);
+        else $rooms[$room]['members'] = $online;
+        schreibe(ROOMS_FILE, $rooms);
+    }
+    aoi_ok(array('members' => $online));
 }
 
 aoi_fehler('Unbekannte Aktion: ' . htmlspecialchars($aktion, ENT_QUOTES));

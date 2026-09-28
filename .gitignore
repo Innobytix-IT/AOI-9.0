@@ -1,9 +1,12 @@
-node_modules/
-npm-debug.log*
-.DS_Store
-Thumbs.db
-aoi_data/
-*.tmp
-dist/
-out/
+# Geheimnis – NIEMALS committen
 Webspace/aoi_token.php
+aoi_token.php
+
+# Backup-Kopien (Windows "Kopie von")
+*Kopie*
+*.php.txt
+
+# Node
+node_modules/
+*.log
+dist/
