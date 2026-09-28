@@ -510,7 +510,7 @@ body {
   <div class="menu-bar">
     <span class="menu-item" onclick="menuToggle(event,'menu-datei')">Datei
       <div class="menu-dropdown" id="menu-datei">
-        <div class="menu-dd-item" onclick="restorePortal()">🏠 Willkommen</div>
+        <div class="menu-dd-item" onclick="aoiGoHome()">🏠 Willkommen</div>
         <div class="menu-dd-item" onclick="openWindow('win-main');switchPortalTab('news')">📰 Aktuelles</div>
         <div class="menu-dd-sep"></div>
         <div class="menu-dd-item" onclick="window.print()">🖨️ Drucken…</div>
@@ -563,7 +563,7 @@ body {
     </div>
     <div class="toolbar-right">
       <div class="tool-btn" onclick="openWindow('win-main')"><span class="tool-icon">🌐</span><span class="tool-label">Portal</span></div>
-      <svg style="width:90px;height:46px;cursor:pointer;" viewBox="0 0 260 140" onclick="restorePortal()" title="AOI 9.0 Nostalgia – Startseite">
+      <svg style="width:90px;height:46px;cursor:pointer;" viewBox="0 0 260 140" onclick="aoiGoHome()" title="AOI 9.0 Nostalgia – Startseite">
         <polygon points="65,15 115,105 15,105" fill="url(#tbGrad)" stroke="#003580" stroke-width="4"/>
         <ellipse cx="65" cy="68" rx="22" ry="14" fill="#fff"/><ellipse cx="65" cy="68" rx="11" ry="11" fill="#0058ee"/>
         <circle cx="65" cy="68" r="5" fill="#031b4d"/><circle cx="62" cy="65" r="2.5" fill="#fff"/>
@@ -577,7 +577,7 @@ body {
   </div>
   <div class="address-bar-row">
     <div class="address-left-block">
-      <button class="nav-btn" onclick="restorePortal()">🏠</button>
+      <button class="nav-btn" onclick="aoiGoHome()">🏠</button>
       <button class="nav-btn" title="Zurück" onclick="browserBack()">◀</button><button class="nav-btn" title="Vor" onclick="browserForward()">▶</button>
       <button class="btn-options" style="font-size:10px;padding:2px 5px;">Schnellstart</button>
     </div>
@@ -606,7 +606,7 @@ body {
       <div class="addr-btn-wrap">
         <button class="btn-options" style="font-size:10px;padding:2px 8px;" onclick="toggleFavPanel(event)">Favoriten ▾</button>
         <div class="addr-dropdown" id="fav-panel">
-          <div class="menu-dd-item" onclick="closeAddrPanels();restorePortal()">🏠 AOI Startseite</div>
+          <div class="menu-dd-item" onclick="closeAddrPanels();aoiGoHome()">🏠 AOI Startseite</div>
           <div class="menu-dd-sep"></div>
           <div class="menu-dd-item" onclick="closeAddrPanels();navigateUrl('https://www.wetter.com')">🌤️ Wetter</div>
           <div class="menu-dd-item" onclick="closeAddrPanels();navigateUrl('https://www.kicker.de')">⚽ Sport</div>
@@ -736,7 +736,7 @@ body {
               <div class="mein-aoi-section">
                 <div class="mein-aoi-title">🖥️ Eigenen AOI-Server betreiben</div>
                 <div style="font-size:11px;color:#555;margin-bottom:6px;">Dateien für deinen eigenen AHPT-Signalserver herunterladen und einrichten.</div>
-                <button class="btn-options" style="font-size:10px;" onclick="openWindow('win-server-setup')">🖥️ Server-Einrichtung öffnen</button>
+                <button class="btn-options" style="font-size:10px;" onclick="openWindow('win-server-setup')">⚙️ AOI-Einstellungen öffnen</button>
               </div>
               <div class="mein-aoi-section">
                 <div class="mein-aoi-title">⚙️ Schnelleinstellungen</div>
@@ -1188,7 +1188,7 @@ body {
 <!-- ===== FENSTER: SERVER-EINRICHTUNG ===== -->
 <div class="mdi-window" id="win-server-setup" style="top:60px;left:160px;width:500px;height:540px;z-index:30;display:none;">
   <div class="title-bar" onmousedown="focusAndDrag(event,'win-server-setup')">
-    <div class="title-left"><span>🖥️ Eigenen AOI-Server betreiben</span></div>
+    <div class="title-left"><span>⚙️ AOI-Einstellungen</span></div>
     <div class="title-controls"><div class="btn-win" onclick="minimizeWindow('win-server-setup')">_</div><div class="btn-win" onclick="toggleMaximize('win-server-setup')">□</div><div class="btn-win close" onclick="closeWindow('win-server-setup')">✕</div></div>
   </div>
   <div class="window-inner-content" style="flex:1;min-height:0;display:flex;flex-direction:column;overflow:hidden;">
@@ -1294,6 +1294,18 @@ body {
         <div style="font-family:monospace;font-size:10px;background:#f0f0f0;padding:4px 6px;border-radius:2px;word-break:break-all;margin-bottom:6px;">https://innobytix-it.de/AOI_9/AOI_Treffpunkt/aoi_signal.php</div>
         <button class="btn-options" style="font-size:10px;" onclick="aoiResetServerUrl()">Auf Standard zurücksetzen</button>
       </div>
+    </div>
+    <!-- STARTSEITE -->
+    <div style="border-top:2px solid #7f9db9;padding-top:12px;margin-top:8px;display:flex;flex-direction:column;gap:6px;">
+      <div style="font-weight:bold;font-size:12px;color:#003399;margin-bottom:2px;">🏠 Browser-Startseite</div>
+      <div style="color:#555;font-size:11px;margin-bottom:4px;">Diese URL wird beim Klick auf das Haus-Symbol und beim Anmelden geöffnet.</div>
+      <label style="font-weight:bold;">Startseiten-URL:</label>
+      <input type="text" id="srv-homepage-input" style="font-size:11px;font-family:monospace;border:1px solid #7f9db9;padding:4px 6px;" placeholder="https://www.beispiel.de  (leer = AOI-Portal)">
+      <div style="display:flex;gap:6px;">
+        <button class="btn-signon" style="border-radius:3px;padding:4px 14px;font-size:11px;" onclick="aoiSaveHomepage()">Speichern</button>
+        <button class="btn-options" style="font-size:11px;" onclick="aoiResetHomepage()">Auf Portal zurücksetzen</button>
+      </div>
+      <div id="srv-homepage-msg" style="font-size:10px;margin-top:2px;"></div>
     </div>
   </div>
 </div>
@@ -1698,7 +1710,7 @@ function showWelcomeSplash(name) {
   document.getElementById('my-sn-display').textContent=name;
   document.getElementById('signon-screen').style.display='none';
   document.getElementById('desktop-shell').style.display='flex';
-  restorePortal();
+  aoiGoHome();
   openWindow('win-buddylist');
   openWindow('win-navigation');
   mailInitDemoEmails(name);
@@ -1866,6 +1878,7 @@ function openWindow(id) {
     var tinp=document.getElementById('srv-token-input');
     var defaultTok='AOI-Geheimnis-2026';
     if(tinp) tinp.value=(AOI_TOKEN&&AOI_TOKEN!==defaultTok)?AOI_TOKEN:'';
+    var hinp=document.getElementById('srv-homepage-input'); if(hinp) hinp.value=AOI_HOMEPAGE||'';
   }
 }
 function toggleWindow(id) { var w=document.getElementById(id); if(w.style.display==='none'||w.classList.contains('minimized')) openWindow(id); else closeWindow(id); }
@@ -2780,6 +2793,8 @@ window.addEventListener('DOMContentLoaded',function(){
     }
     var savedTok = localStorage.getItem('aoi_signal_token');
     if(savedTok) AOI_TOKEN = savedTok;
+    var savedHp = localStorage.getItem('aoi_homepage');
+    if(savedHp) AOI_HOMEPAGE = savedHp;
   } catch(e) {}
   aoiInitScreenNames();
   emailLoadSettings();
@@ -2819,6 +2834,7 @@ window.addEventListener('DOMContentLoaded',function(){
 /* ===== AOI NETZWERK (Presence + WebRTC) ===== */
 var AOI_SIGNAL_URL = 'https://innobytix-it.de/AOI_9/AOI_Treffpunkt/aoi_signal.php';
 var AOI_TOKEN = 'AOI-Geheimnis-2026';
+var AOI_HOMEPAGE = '';
 
 var aoi_name = '';
 var aoi_session = '';
@@ -3162,6 +3178,11 @@ function aoiSrvTab(tab) {
   if(tab === 'server') {
     var inp = document.getElementById('srv-url-input');
     if(inp) inp.value = AOI_SIGNAL_URL || '';
+    var tinp = document.getElementById('srv-token-input');
+    var defaultTok = 'AOI-Geheimnis-2026';
+    if(tinp) tinp.value = (AOI_TOKEN && AOI_TOKEN !== defaultTok) ? AOI_TOKEN : '';
+    var hinp = document.getElementById('srv-homepage-input');
+    if(hinp) hinp.value = AOI_HOMEPAGE || '';
   }
 }
 function aoiSrvTabInit() {
@@ -3259,6 +3280,31 @@ function aoiResetServerUrl() {
   if(sigInp) sigInp.value = def;
   var msg = document.getElementById('srv-url-msg');
   if(msg) { msg.style.color='#070'; msg.textContent='Auf Standard zurückgesetzt (Innobytix-Server).'; }
+}
+function aoiSaveHomepage() {
+  var inp = document.getElementById('srv-homepage-input');
+  var msg = document.getElementById('srv-homepage-msg');
+  var val = inp ? inp.value.trim() : '';
+  if(val && !val.startsWith('http://') && !val.startsWith('https://')) val = 'https://' + val;
+  AOI_HOMEPAGE = val;
+  try {
+    if(val) localStorage.setItem('aoi_homepage', val);
+    else localStorage.removeItem('aoi_homepage');
+  } catch(e) {}
+  if(msg) { msg.style.color='#070'; msg.textContent = val ? 'Startseite gespeichert: ' + val : 'Startseite zurückgesetzt (AOI-Portal).'; }
+  if(inp) inp.value = val;
+}
+function aoiResetHomepage() {
+  AOI_HOMEPAGE = '';
+  try { localStorage.removeItem('aoi_homepage'); } catch(e) {}
+  var inp = document.getElementById('srv-homepage-input');
+  if(inp) inp.value = '';
+  var msg = document.getElementById('srv-homepage-msg');
+  if(msg) { msg.style.color='#070'; msg.textContent='Startseite zurückgesetzt (AOI-Portal).'; }
+}
+function aoiGoHome() {
+  if(AOI_HOMEPAGE) { navigateUrl(AOI_HOMEPAGE); }
+  else { restorePortal(); }
 }
 function aoiTestServerUrl() {
   var inp = document.getElementById('srv-url-input');
