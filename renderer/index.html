@@ -739,6 +739,18 @@ body {
                 <button class="btn-options" style="font-size:10px;" onclick="openWindow('win-server-setup')">⚙️ AOI-Einstellungen öffnen</button>
               </div>
               <div class="mein-aoi-section">
+                <div class="mein-aoi-title">🏠 Browser-Startseite</div>
+                <div style="font-size:11px;color:#555;margin-bottom:6px;">Diese URL wird beim Klick auf das Haus-Symbol und beim Anmelden geöffnet.</div>
+                <div style="display:flex;flex-direction:column;gap:5px;">
+                  <input type="text" id="meinaoi-homepage-input" style="font-size:11px;font-family:monospace;border:1px solid #7f9db9;padding:4px 6px;" placeholder="https://www.beispiel.de  (leer = AOI-Portal)">
+                  <div style="display:flex;gap:6px;">
+                    <button class="btn-signon" style="border-radius:3px;padding:3px 12px;font-size:11px;" onclick="aoiSaveHomepage('meinaoi')">Speichern</button>
+                    <button class="btn-options" style="font-size:11px;" onclick="aoiResetHomepage('meinaoi')">Auf Portal zurücksetzen</button>
+                  </div>
+                  <div id="meinaoi-homepage-msg" style="font-size:10px;min-height:14px;"></div>
+                </div>
+              </div>
+              <div class="mein-aoi-section">
                 <div class="mein-aoi-title">⚙️ Schnelleinstellungen</div>
                 <div style="font-size:11px;color:#555;margin-bottom:5px;">🎨 Erscheinungsbild – Farbschema wählen:</div>
                 <div class="theme-row" id="theme-swatch-row">
@@ -1292,18 +1304,6 @@ body {
         <button class="btn-options" style="font-size:10px;" onclick="aoiResetServerUrl()">Auf Standard zurücksetzen</button>
       </div>
     </div>
-    <!-- STARTSEITE -->
-    <div style="border-top:2px solid #7f9db9;padding-top:12px;margin-top:8px;display:flex;flex-direction:column;gap:6px;">
-      <div style="font-weight:bold;font-size:12px;color:#003399;margin-bottom:2px;">🏠 Browser-Startseite</div>
-      <div style="color:#555;font-size:11px;margin-bottom:4px;">Diese URL wird beim Klick auf das Haus-Symbol und beim Anmelden geöffnet.</div>
-      <label style="font-weight:bold;">Startseiten-URL:</label>
-      <input type="text" id="srv-homepage-input" style="font-size:11px;font-family:monospace;border:1px solid #7f9db9;padding:4px 6px;" placeholder="https://www.beispiel.de  (leer = AOI-Portal)">
-      <div style="display:flex;gap:6px;">
-        <button class="btn-signon" style="border-radius:3px;padding:4px 14px;font-size:11px;" onclick="aoiSaveHomepage()">Speichern</button>
-        <button class="btn-options" style="font-size:11px;" onclick="aoiResetHomepage()">Auf Portal zurücksetzen</button>
-      </div>
-      <div id="srv-homepage-msg" style="font-size:10px;margin-top:2px;"></div>
-    </div>
   </div>
 </div>
 <!-- ===== DIALOG: BUDDY SUCHEN ===== -->
@@ -1845,6 +1845,12 @@ function switchPortalTab(id) {
   document.getElementById('ptab-'+id).classList.add('active');
   if(id==='news') fetchNewsTab();
   if(id==='sport') fetchSportNews();
+  if(id==='meinaoi') {
+    var hinp = document.getElementById('meinaoi-homepage-input');
+    if(hinp) hinp.value = AOI_HOMEPAGE || '';
+    var hmsg = document.getElementById('meinaoi-homepage-msg');
+    if(hmsg) hmsg.textContent = '';
+  }
 }
 
 /* ===== FENSTER-STEUERUNG ===== */
@@ -1875,7 +1881,6 @@ function openWindow(id) {
     var tinp=document.getElementById('srv-token-input');
     var defaultTok='AOI-Geheimnis-2026';
     if(tinp) tinp.value=(AOI_TOKEN&&AOI_TOKEN!==defaultTok)?AOI_TOKEN:'';
-    var hinp=document.getElementById('srv-homepage-input'); if(hinp) hinp.value=AOI_HOMEPAGE||'';
   }
 }
 function toggleWindow(id) { var w=document.getElementById(id); if(w.style.display==='none'||w.classList.contains('minimized')) openWindow(id); else closeWindow(id); }
@@ -3233,8 +3238,6 @@ function aoiSrvTab(tab) {
     var tinp = document.getElementById('srv-token-input');
     var defaultTok = 'AOI-Geheimnis-2026';
     if(tinp) tinp.value = (AOI_TOKEN && AOI_TOKEN !== defaultTok) ? AOI_TOKEN : '';
-    var hinp = document.getElementById('srv-homepage-input');
-    if(hinp) hinp.value = AOI_HOMEPAGE || '';
   }
 }
 function aoiSrvTabInit() {
@@ -3333,9 +3336,10 @@ function aoiResetServerUrl() {
   var msg = document.getElementById('srv-url-msg');
   if(msg) { msg.style.color='#070'; msg.textContent='Auf Standard zurückgesetzt (Innobytix-Server).'; }
 }
-function aoiSaveHomepage() {
-  var inp = document.getElementById('srv-homepage-input');
-  var msg = document.getElementById('srv-homepage-msg');
+function aoiSaveHomepage(src) {
+  var prefix = src || 'meinaoi';
+  var inp = document.getElementById(prefix + '-homepage-input');
+  var msg = document.getElementById(prefix + '-homepage-msg');
   var val = inp ? inp.value.trim() : '';
   if(val && !val.startsWith('http://') && !val.startsWith('https://')) val = 'https://' + val;
   AOI_HOMEPAGE = val;
@@ -3343,16 +3347,17 @@ function aoiSaveHomepage() {
     if(val) localStorage.setItem('aoi_homepage', val);
     else localStorage.removeItem('aoi_homepage');
   } catch(e) {}
-  if(msg) { msg.style.color='#070'; msg.textContent = val ? 'Startseite gespeichert: ' + val : 'Startseite zurückgesetzt (AOI-Portal).'; }
+  if(msg) { msg.style.color='#070'; msg.textContent = val ? '✔ Gespeichert: ' + val : '✔ Startseite zurückgesetzt (AOI-Portal).'; }
   if(inp) inp.value = val;
 }
-function aoiResetHomepage() {
+function aoiResetHomepage(src) {
+  var prefix = src || 'meinaoi';
   AOI_HOMEPAGE = '';
   try { localStorage.removeItem('aoi_homepage'); } catch(e) {}
-  var inp = document.getElementById('srv-homepage-input');
+  var inp = document.getElementById(prefix + '-homepage-input');
   if(inp) inp.value = '';
-  var msg = document.getElementById('srv-homepage-msg');
-  if(msg) { msg.style.color='#070'; msg.textContent='Startseite zurückgesetzt (AOI-Portal).'; }
+  var msg = document.getElementById(prefix + '-homepage-msg');
+  if(msg) { msg.style.color='#070'; msg.textContent='✔ Startseite zurückgesetzt (AOI-Portal).'; }
 }
 function aoiGoHome() {
   if(AOI_HOMEPAGE) { navigateUrl(AOI_HOMEPAGE); }
