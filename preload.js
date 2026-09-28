@@ -11,6 +11,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   emailSaveConfig:  (cfg) => ipcRenderer.invoke('email-save-config', cfg),
   emailLoadConfig:  ()    => ipcRenderer.invoke('email-load-config'),
   emailTest:        (cfg) => ipcRenderer.invoke('email-test', cfg),
+  emailListFolders: (cfg) => ipcRenderer.invoke('email-list-folders', cfg),
   emailFetch:       (cfg) => ipcRenderer.invoke('email-fetch', cfg),
   emailSend:        (args) => ipcRenderer.invoke('email-send', args),
   readServerFile:   (name) => ipcRenderer.invoke('read-server-file', name),

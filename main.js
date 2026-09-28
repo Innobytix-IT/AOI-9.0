@@ -222,6 +222,27 @@ ipcMain.handle('email-test', async (_, cfg) => {
   } catch (e) { return { ok: false, error: e.message }; }
 });
 
+ipcMain.handle('email-list-folders', async (_, cfg) => {
+  const client = new ImapFlow({
+    host: cfg.imapHost, port: cfg.imapPort,
+    secure: cfg.imapSsl,
+    auth: { user: cfg.user, pass: cfg.password },
+    logger: false, tls: { rejectUnauthorized: !cfg.tlsIgnoreCert },
+  });
+  try {
+    await client.connect();
+    const list = await client.list('', '*');
+    await client.logout();
+    return { ok: true, folders: list.map(f => ({
+      path: f.path,
+      name: f.name,
+      delimiter: f.delimiter,
+      specialUse: f.specialUse || null,
+      flags: f.flags ? Array.from(f.flags) : [],
+    })) };
+  } catch (e) { return { ok: false, error: e.message }; }
+});
+
 ipcMain.handle('email-fetch', async (_, payload) => {
   const cfg     = (payload && payload.cfg) ? payload.cfg : payload;
   const folders = (payload && payload.folders) ? payload.folders : ['INBOX'];

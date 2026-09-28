@@ -965,10 +965,7 @@ body {
           <!-- Ordnerstruktur -->
           <div class="mail-tree">
             <div class="mail-tree-header">Ordner</div>
-            <div class="mail-tree-item selected" id="mf-inbox" onclick="emailSwitchFolder('inbox')"><span>📬 Posteingang</span><span id="mf-inbox-badge" class="mail-folder-badge" style="display:none;"></span></div>
-            <div class="mail-tree-item" id="mf-sent"  onclick="emailSwitchFolder('sent')"><span>📤 Gesendet</span></div>
-            <div class="mail-tree-item" id="mf-junk"  onclick="emailSwitchFolder('junk')"><span>⚠️ Junk / Spam</span></div>
-            <div class="mail-tree-item" id="mf-trash" onclick="emailSwitchFolder('trash')"><span>🗑 Papierkorb</span></div>
+            <div id="mail-folder-tree"><div class="mail-tree-item selected" id="mf-inbox" onclick="emailSwitchFolder('INBOX')"><span>📬 Posteingang</span><span id="mf-inbox-badge" class="mail-folder-badge" style="display:none;"></span></div></div>
           </div>
           <div class="mail-grid-container">
             <div class="mail-table-box">
@@ -1870,7 +1867,7 @@ function openWindow(id) {
   var w=document.getElementById(id); if(!w) return;
   if(w.classList.contains('minimized')) restoreWindow(id);
   else { if((id==='win-mailbox'||id==='win-im') && w.style.display==='none') applyDefaultPosition(id); w.style.display='flex'; bringToFront(id); }
-  if(id==='win-mailbox'){ if(document.querySelectorAll('#mail-tbody tr.unread').length>0) playSound('snd-mail'); if(_emailCfg) emailFetchInbox(); }
+  if(id==='win-mailbox'){ if(document.querySelectorAll('#mail-tbody tr.unread').length>0) playSound('snd-mail'); if(_emailCfg) emailLoadFolders(); }
   if(id==='win-userdir') aoiLoadUserDir();
   if(id==='win-server-setup') {
     aoiSrvTabInit();
@@ -2582,19 +2579,76 @@ function mailDelete() {
   mailUpdateCounter();
 }
 /* ===== E-MAIL ORDNER-NAVIGATION ===== */
-var _currentFolder = 'inbox';
-var FOLDER_CANDIDATES = {
-  inbox: ['INBOX'],
-  sent:  ['Sent', 'Sent Items', 'Sent Messages', '[Gmail]/Sent Mail', 'INBOX.Sent'],
-  junk:  ['Junk', 'Spam', 'Junk Email', '[Gmail]/Spam', 'INBOX.Junk', 'Junk E-Mail'],
-  trash: ['Trash', 'Deleted Items', 'Deleted Messages', '[Gmail]/Trash', 'INBOX.Trash'],
-};
+var _currentFolderPath = 'INBOX';
+var _currentFolderLabel = 'Posteingang';
 
-function emailSwitchFolder(folderKey) {
-  _currentFolder = folderKey;
+function mailFolderIcon(folder) {
+  var su = (folder.specialUse || '').toLowerCase();
+  var p  = (folder.path || '').toLowerCase();
+  if (p === 'inbox') return '📬';
+  if (su === '\\sent'    || /sent|gesendet/i.test(p))               return '📤';
+  if (su === '\\trash'   || /trash|deleted|papierkorb|gel.scht/i.test(p)) return '🗑';
+  if (su === '\\junk'    || /junk|spam/i.test(p))                   return '⚠️';
+  if (su === '\\drafts'  || /draft|entw.rf/i.test(p))               return '📝';
+  if (su === '\\archive' || /archiv/i.test(p))                      return '🗂';
+  if (su === '\\all'     || /all.?mail/i.test(p))                   return '📦';
+  return '📁';
+}
+
+function mailFolderSortKey(folder) {
+  var su = (folder.specialUse || '').toLowerCase();
+  var p  = (folder.path || '').toLowerCase();
+  if (p === 'inbox') return '0';
+  if (su === '\\sent'    || /sent|gesendet/i.test(p))   return '1';
+  if (su === '\\drafts'  || /draft|entw.rf/i.test(p))   return '2';
+  if (su === '\\junk'    || /junk|spam/i.test(p))        return '3';
+  if (su === '\\trash'   || /trash|deleted/i.test(p))    return '4';
+  if (su === '\\archive' || /archiv/i.test(p))           return '5';
+  return '6' + folder.path.toLowerCase();
+}
+
+function emailLoadFolders() {
+  if (!window.electronAPI || !window.electronAPI.emailListFolders || !_emailCfg) return;
+  var tree = document.getElementById('mail-folder-tree');
+  if (tree) tree.innerHTML = '<div style="padding:6px;color:#888;font-size:10px;">⏳ Lade Ordner…</div>';
+  window.electronAPI.emailListFolders(_emailCfg).then(function(r) {
+    if (!r.ok || !r.folders) {
+      if (tree) tree.innerHTML = '<div class="mail-tree-item selected" id="mf-inbox" onclick="emailSwitchFolder(\'INBOX\',\'Posteingang\')"><span>📬 Posteingang</span></div>';
+      return;
+    }
+    var folders = r.folders.filter(function(f) {
+      return !f.flags.includes('\\NoSelect') && !f.flags.includes('\\NonExistent');
+    });
+    folders.sort(function(a, b) {
+      var ka = mailFolderSortKey(a), kb = mailFolderSortKey(b);
+      return ka < kb ? -1 : ka > kb ? 1 : 0;
+    });
+    if (!tree) return;
+    tree.innerHTML = '';
+    folders.forEach(function(f) {
+      var icon  = mailFolderIcon(f);
+      var label = f.name === 'INBOX' ? 'Posteingang' : f.name;
+      var div = document.createElement('div');
+      div.className = 'mail-tree-item' + (f.path === _currentFolderPath ? ' selected' : '');
+      div.setAttribute('data-path', f.path);
+      div.innerHTML = '<span>' + icon + ' ' + escHtml(label) + '</span>';
+      (function(path, lbl){ div.onclick = function(){ emailSwitchFolder(path, lbl); }; })(f.path, label);
+      tree.appendChild(div);
+    });
+  }).catch(function() {
+    if (tree) tree.innerHTML = '<div class="mail-tree-item selected" onclick="emailSwitchFolder(\'INBOX\',\'Posteingang\')"><span>📬 Posteingang</span></div>';
+  });
+}
+
+function emailSwitchFolder(folderPath, label) {
+  _currentFolderPath = folderPath;
+  _currentFolderLabel = label || folderPath;
   document.querySelectorAll('.mail-tree-item').forEach(function(el){ el.classList.remove('selected'); });
-  var el = document.getElementById('mf-'+folderKey);
-  if (el) el.classList.add('selected');
+  document.querySelectorAll('[data-path]').forEach(function(el){
+    if (el.getAttribute('data-path') === folderPath) el.classList.add('selected');
+  });
+  var inbox = document.getElementById('mf-inbox');
+  if (inbox && folderPath === 'INBOX') inbox.classList.add('selected');
   document.getElementById('mail-preview').innerHTML = '<i>Klicke auf eine E-Mail für die Vorschau...</i>';
   _selMail = null;
   emailFetchCurrentFolder();
@@ -2602,12 +2656,10 @@ function emailSwitchFolder(folderKey) {
 
 function emailFetchCurrentFolder() {
   if (!window.electronAPI || !_emailCfg) return;
-  var folders = FOLDER_CANDIDATES[_currentFolder] || ['INBOX'];
   var tbody = document.getElementById('mail-tbody');
-  var labels = {inbox:'Posteingang', sent:'Gesendet', junk:'Junk / Spam', trash:'Papierkorb'};
-  var label = labels[_currentFolder] || 'Ordner';
+  var label = _currentFolderLabel;
   if (tbody) tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;color:#888;padding:12px;">⏳ Lade '+escHtml(label)+'…</td></tr>';
-  window.electronAPI.emailFetch({cfg: _emailCfg, folders: folders}).then(function(r) {
+  window.electronAPI.emailFetch({cfg: _emailCfg, folders: [_currentFolderPath]}).then(function(r) {
     if (!r.ok) { if(tbody) tbody.innerHTML='<tr><td colspan="4" style="color:#c00;padding:8px;">Fehler: '+escHtml(r.error)+'</td></tr>'; return; }
     if (!tbody) return;
     tbody.innerHTML = '';
@@ -2706,7 +2758,7 @@ function emailSaveSettings() {
   var cfg = emailGetFormCfg();
   if(!cfg.user || !cfg.password || !cfg.imapHost) { emailSetResult('Bitte alle Felder ausfüllen.', false); return; }
   window.electronAPI.emailSaveConfig(cfg).then(function(r){
-    if(r.ok){ _emailCfg = cfg; emailSetResult('✔ Gespeichert.', true); mailUpdateTitle(); }
+    if(r.ok){ _emailCfg = cfg; emailSetResult('✔ Gespeichert.', true); mailUpdateTitle(); emailLoadFolders(); }
     else emailSetResult('✘ Speichern fehlgeschlagen: ' + r.error, false);
   });
 }
@@ -2727,12 +2779,12 @@ function emailLoadSettings() {
     document.getElementById('email-pass').value  = c.password || '';
     document.getElementById('email-tls-ignore').checked = !!c.tlsIgnoreCert;
     mailUpdateTitle();
+    emailLoadFolders();
   });
 }
 
 function emailFetchInbox() {
-  _currentFolder = 'inbox';
-  emailSwitchFolder('inbox');
+  emailSwitchFolder('INBOX', 'Posteingang');
 }
 
 /* ===== E-MAIL VERFASSEN ===== */
