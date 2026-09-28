@@ -728,9 +728,10 @@ body {
                 <div class="mein-aoi-title">🔑 Kennwort</div>
                 <div id="pw-status" style="font-size:11px;margin-bottom:6px;color:#555;">Kein Kennwortschutz aktiv.</div>
                 <div style="font-size:11px;display:flex;flex-direction:column;gap:4px;">
-                  <div style="display:flex;align-items:center;gap:4px;"><label style="width:85px;flex-shrink:0;">Aktuell:</label><input type="password" id="pw-current" placeholder="Leer wenn nicht gesetzt" style="flex:1;font-size:11px;font-family:Tahoma;border:1px solid #7f9db9;padding:2px 4px;"></div>
-                  <div style="display:flex;align-items:center;gap:4px;"><label style="width:85px;flex-shrink:0;">Neues PW:</label><input type="password" id="pw-new" placeholder="Leer = Schutz entfernen" style="flex:1;font-size:11px;font-family:Tahoma;border:1px solid #7f9db9;padding:2px 4px;"></div>
+                  <div style="display:flex;align-items:center;gap:4px;"><label style="width:85px;flex-shrink:0;">Aktuell:</label><input type="password" id="pw-current" placeholder="Aktuelles Kennwort" style="flex:1;font-size:11px;font-family:Tahoma;border:1px solid #7f9db9;padding:2px 4px;"></div>
+                  <div style="display:flex;align-items:center;gap:4px;"><label style="width:85px;flex-shrink:0;">Neues PW:</label><input type="password" id="pw-new" placeholder="Mind. 8 Zeichen" style="flex:1;font-size:11px;font-family:Tahoma;border:1px solid #7f9db9;padding:2px 4px;" oninput="aoiUpdatePwStrength('pw-new','pw-strength',aoi_name)"></div>
                   <div style="display:flex;align-items:center;gap:4px;"><label style="width:85px;flex-shrink:0;">Bestätigen:</label><input type="password" id="pw-new2" placeholder="Wiederholen" style="flex:1;font-size:11px;font-family:Tahoma;border:1px solid #7f9db9;padding:2px 4px;"></div>
+                  <div style="font-size:10px;min-height:14px;text-align:right;" id="pw-strength"></div>
                   <div id="pw-msg" style="min-height:14px;font-size:10px;color:#c00;"></div>
                   <div style="display:flex;gap:5px;justify-content:flex-end;"><button class="btn-options" onclick="aoiChangePassword()">Kennwort speichern</button></div>
                 </div>
@@ -1239,12 +1240,13 @@ body {
       </div>
       <div class="aoi-modal-row">
         <label>Kennwort:</label>
-        <input type="password" id="inp-new-password" maxlength="64" placeholder="Kennwort (Pflichtfeld)">
+        <input type="password" id="inp-new-password" maxlength="64" placeholder="Mind. 8 Zeichen" oninput="aoiUpdatePwStrength('inp-new-password','inp-new-pw-strength',document.getElementById('inp-new-name').value.trim())">
       </div>
       <div class="aoi-modal-row">
         <label>Bestätigen:</label>
         <input type="password" id="inp-new-password2" maxlength="64" placeholder="Kennwort wiederholen">
       </div>
+      <div style="font-size:10px;min-height:14px;text-align:right;padding-right:2px;" id="inp-new-pw-strength"></div>
       <div class="aoi-modal-row" style="align-items:center;gap:8px;">
         <input type="checkbox" id="chk-public-name" style="cursor:pointer;">
         <label for="chk-public-name" style="cursor:pointer;font-size:11px;">In der Nutzersuche sichtbar (öffentliches Verzeichnis)</label>
@@ -3809,6 +3811,7 @@ function aoiUpdatePwStatus(name) {
   var pn = document.getElementById('pw-new'); if(pn) pn.value = '';
   var pn2 = document.getElementById('pw-new2'); if(pn2) pn2.value = '';
   var pm = document.getElementById('pw-msg'); if(pm) pm.textContent = '';
+  var ps = document.getElementById('pw-strength'); if(ps) ps.textContent = '';
 }
 
 function aoiUpdatePubStatus(name) {
@@ -3830,26 +3833,51 @@ function aoiTogglePublic(enabled) {
   aoiUpdatePubStatus(aoi_name);
 }
 
+function aoiPasswordStrength(pw) {
+  if(!pw || pw.length < 8) return {label:'Zu kurz', color:'#c00'};
+  var s = 0;
+  if(pw.length >= 10) s++;
+  if(pw.length >= 14) s++;
+  if(/[A-Z]/.test(pw)) s++;
+  if(/[a-z]/.test(pw)) s++;
+  if(/[0-9]/.test(pw)) s++;
+  if(/[^A-Za-z0-9]/.test(pw)) s++;
+  if(s <= 2) return {label:'Schwach', color:'#c00'};
+  if(s <= 4) return {label:'Mittel',  color:'#c47a00'};
+  return {label:'Stark', color:'#070'};
+}
+function aoiValidatePassword(pw, username) {
+  if(!pw || pw.length < 8) return 'Kennwort muss mindestens 8 Zeichen lang sein.';
+  if(username && pw.toLowerCase() === username.toLowerCase()) return 'Kennwort darf nicht dem Benutzernamen entsprechen.';
+  return null;
+}
+function aoiUpdatePwStrength(inputId, indicatorId, username) {
+  var pw = (document.getElementById(inputId)||{}).value || '';
+  var el = document.getElementById(indicatorId); if(!el) return;
+  if(!pw){ el.textContent=''; return; }
+  var err = aoiValidatePassword(pw, username);
+  if(err){ el.style.color='#c00'; el.textContent=err; return; }
+  var st = aoiPasswordStrength(pw);
+  el.style.color = st.color; el.textContent = 'Stärke: ' + st.label;
+}
+
 function aoiChangePassword() {
   if(!aoi_name){ alert('Bitte erst anmelden.'); return; }
   var cur = document.getElementById('pw-current').value;
-  var nw = document.getElementById('pw-new').value;
+  var nw  = document.getElementById('pw-new').value;
   var nw2 = document.getElementById('pw-new2').value;
   var msg = document.getElementById('pw-msg');
   msg.textContent = ''; msg.style.color = '#c00';
+  var err = aoiValidatePassword(nw, aoi_name);
+  if(err){ msg.textContent = err; return; }
   if(nw !== nw2){ msg.textContent = 'Kennwörter stimmen nicht überein.'; return; }
   var stored = null; try{ stored = localStorage.getItem('aoi_pw_hash_'+aoi_name); }catch(e){}
   function doSave(ok) {
     if(!ok){ msg.textContent = 'Aktuelles Kennwort ist falsch.'; return; }
-    if(!nw) {
-      try{ localStorage.removeItem('aoi_pw_hash_'+aoi_name); }catch(e){}
-      msg.style.color = '#070'; msg.textContent = 'Kennwortschutz entfernt.'; aoiUpdatePwStatus(aoi_name);
-    } else {
-      aoiHashPassword(nw).then(function(h){
-        try{ localStorage.setItem('aoi_pw_hash_'+aoi_name, h); }catch(e){}
-        msg.style.color = '#070'; msg.textContent = 'Kennwort gespeichert.'; aoiUpdatePwStatus(aoi_name);
-      });
-    }
+    aoiHashPassword(nw).then(function(h){
+      try{ localStorage.setItem('aoi_pw_hash_'+aoi_name, h); }catch(e){}
+      msg.style.color = '#070'; msg.textContent = 'Kennwort gespeichert.'; aoiUpdatePwStatus(aoi_name);
+    });
   }
   if(!stored){ doSave(true); }
   else { aoiHashPassword(cur).then(function(h){ doSave(h === stored); }); }
@@ -4068,7 +4096,8 @@ function aoiConfirmCreateName() {
   // Kennwort vorab prüfen
   var pw = document.getElementById('inp-new-password') ? document.getElementById('inp-new-password').value : '';
   var pw2 = document.getElementById('inp-new-password2') ? document.getElementById('inp-new-password2').value : '';
-  if(!pw){ errEl.textContent='Bitte ein Kennwort vergeben.'; return; }
+  var pwErr = aoiValidatePassword(pw, name);
+  if(pwErr){ errEl.textContent=pwErr; return; }
   if(pw !== pw2){ errEl.textContent='Kennwörter stimmen nicht überein.'; return; }
   errEl.textContent='Prüfe Verfügbarkeit online...';
   aoiPost({aktion:'check_name',name:name},function(err,data){
