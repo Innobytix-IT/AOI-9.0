@@ -22,7 +22,13 @@
  * ----------
  * 1. aoi_signal.php  hochladen
  * 2. .htaccess       hochladen (schützt aoi_data/)
- * 3. aoi_token.php   selbst anlegen – nur eine Zeile, kein PHP-Tag:
+ * 3. aoi_token.php   selbst anlegen (PHP-Format empfohlen – schützt vor Direktzugriff):
+ *
+ *                    <?php
+ *                    defined('AOI_SIGNAL_ACTIVE') or die('403 Forbidden');
+ *                    return 'mein-geheimes-passwort-hier';
+ *
+ *                    Alternativ (Plaintext, nur wenn .htaccess zuverlässig greift):
  *                    mein-geheimes-passwort-hier
  * 4. Das aoi_data/-Verzeichnis legt das Script beim ersten Aufruf selbst an.
  *
@@ -43,6 +49,7 @@ if (isset($_SERVER['REQUEST_METHOD']) && $_SERVER['REQUEST_METHOD'] === 'OPTIONS
     exit;
 }
 
+define('AOI_SIGNAL_ACTIVE', true);
 define('DATEN_DIR',     __DIR__ . '/aoi_data');
 define('PRESENCE_FILE',  DATEN_DIR . '/presence.php');
 define('DIRECTORY_FILE', DATEN_DIR . '/directory.php');
@@ -164,7 +171,14 @@ function name_ok($name) {
 
 function token_ok($eingabe) {
     if (!is_file(TOKEN_DATEI)) return true;
-    $soll = trim((string)(@file_get_contents(TOKEN_DATEI) ?: ''));
+    $raw = @file_get_contents(TOKEN_DATEI);
+    if ($raw === false) return false;
+    // PHP-Format (<?php … return 'secret';): require ausführen, Guard schützt Direktzugriff
+    if (strncmp(ltrim((string)$raw), '<?php', 5) === 0) {
+        $soll = trim((string)(require TOKEN_DATEI));
+    } else {
+        $soll = trim((string)$raw);
+    }
     return $soll === '' || hash_equals($soll, $eingabe);
 }
 

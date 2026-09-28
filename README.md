@@ -100,7 +100,13 @@ Er sieht **nur**, wer online ist und wer mit wem verbinden will – niemals den 
 
 1. **`aoi_signal.php`** in ein Verzeichnis auf deinem Webspace hochladen
 2. **`.htaccess_aoi`** als **`.htaccess`** in dasselbe Verzeichnis hochladen
-3. Eine Datei **`aoi_token.php`** selbst anlegen (nur eine Zeile, kein PHP-Tag):
+3. Eine Datei **`aoi_token.php`** selbst anlegen – **PHP-Format empfohlen** (schützt vor Direktzugriff falls `.htaccess` nicht greift, z. B. auf Nginx):
+   ```php
+   <?php
+   defined('AOI_SIGNAL_ACTIVE') or die('403 Forbidden');
+   return 'mein-geheimes-passwort-hier';
+   ```
+   Alternativ (Plaintext, nur wenn `.htaccess` zuverlässig aktiv ist):
    ```
    mein-geheimes-passwort-hier
    ```
