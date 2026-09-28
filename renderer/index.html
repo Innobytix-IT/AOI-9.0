@@ -1280,6 +1280,9 @@ body {
       <div style="display:flex;flex-direction:column;gap:6px;margin-bottom:10px;">
         <label style="font-weight:bold;">Aktuelle Server-URL:</label>
         <input type="text" id="srv-url-input" style="font-size:11px;font-family:monospace;border:1px solid #7f9db9;padding:4px 6px;" placeholder="https://example.com/AOI/aoi_signal.php">
+        <label style="font-weight:bold;margin-top:4px;">Server-Token (Passwort):</label>
+        <input type="password" id="srv-token-input" style="font-size:11px;font-family:monospace;border:1px solid #7f9db9;padding:4px 6px;" placeholder="Leer = Standard-Token (Innobytix-Server)">
+        <div style="color:#777;font-size:10px;margin-top:-2px;">Nur ausfüllen, wenn du einen eigenen AHPT-Server betreibst.</div>
         <div style="display:flex;gap:6px;">
           <button class="btn-signon" style="border-radius:3px;padding:4px 14px;font-size:11px;" onclick="aoiSaveServerUrl()">Speichern</button>
           <button class="btn-options" style="font-size:11px;" onclick="aoiTestServerUrl()">Verbindung testen</button>
@@ -1857,7 +1860,13 @@ function openWindow(id) {
   else { if((id==='win-mailbox'||id==='win-im') && w.style.display==='none') applyDefaultPosition(id); w.style.display='flex'; bringToFront(id); }
   if(id==='win-mailbox'){ if(document.querySelectorAll('#mail-tbody tr.unread').length>0) playSound('snd-mail'); if(_emailCfg) emailFetchInbox(); }
   if(id==='win-userdir') aoiLoadUserDir();
-  if(id==='win-server-setup') { aoiSrvTabInit(); var inp=document.getElementById('srv-url-input'); if(inp) inp.value=AOI_SIGNAL_URL||''; }
+  if(id==='win-server-setup') {
+    aoiSrvTabInit();
+    var inp=document.getElementById('srv-url-input'); if(inp) inp.value=AOI_SIGNAL_URL||'';
+    var tinp=document.getElementById('srv-token-input');
+    var defaultTok='AOI-Geheimnis-2026';
+    if(tinp) tinp.value=(AOI_TOKEN&&AOI_TOKEN!==defaultTok)?AOI_TOKEN:'';
+  }
 }
 function toggleWindow(id) { var w=document.getElementById(id); if(w.style.display==='none'||w.classList.contains('minimized')) openWindow(id); else closeWindow(id); }
 function closeWindow(id) { var w=document.getElementById(id); if(w) w.style.display='none'; removeMinTab(id); }
@@ -2761,6 +2770,17 @@ function composeAttach() {
 window.addEventListener('DOMContentLoaded',function(){
   initResizers();
   if(window.electronAPI) document.getElementById('electron-winctrls').style.display='flex';
+  // Gespeicherte Server-URL und Token laden
+  try {
+    var savedUrl = localStorage.getItem('aoi_signal_url');
+    if(savedUrl) {
+      AOI_SIGNAL_URL = savedUrl;
+      var sigInp = document.getElementById('inp-signal-url');
+      if(sigInp) sigInp.value = savedUrl;
+    }
+    var savedTok = localStorage.getItem('aoi_signal_token');
+    if(savedTok) AOI_TOKEN = savedTok;
+  } catch(e) {}
   aoiInitScreenNames();
   emailLoadSettings();
   aoiRenderBuddyListUI();
@@ -3211,18 +3231,34 @@ function aoiSaveServerUrl() {
   try { localStorage.setItem('aoi_signal_url', val); } catch(e) {}
   var sigInp = document.getElementById('inp-signal-url');
   if(sigInp) sigInp.value = val;
-  msg.style.color = '#070'; msg.textContent = 'Gespeichert. Gilt beim nächsten Anmelden.';
+  // Token speichern
+  var tinp = document.getElementById('srv-token-input');
+  var tokVal = tinp ? tinp.value.trim() : '';
+  var defaultTok = 'AOI-Geheimnis-2026';
+  if(tokVal) {
+    AOI_TOKEN = tokVal;
+    try { localStorage.setItem('aoi_signal_token', tokVal); } catch(e) {}
+  } else {
+    AOI_TOKEN = defaultTok;
+    try { localStorage.removeItem('aoi_signal_token'); } catch(e) {}
+  }
+  msg.style.color = '#070'; msg.textContent = 'URL und Token gespeichert.';
 }
 function aoiResetServerUrl() {
   var def = 'https://innobytix-it.de/AOI_9/AOI_Treffpunkt/aoi_signal.php';
+  var defTok = 'AOI-Geheimnis-2026';
   AOI_SIGNAL_URL = def;
+  AOI_TOKEN = defTok;
   try { localStorage.removeItem('aoi_signal_url'); } catch(e) {}
+  try { localStorage.removeItem('aoi_signal_token'); } catch(e) {}
   var inp = document.getElementById('srv-url-input');
   if(inp) inp.value = def;
+  var tinp = document.getElementById('srv-token-input');
+  if(tinp) tinp.value = '';
   var sigInp = document.getElementById('inp-signal-url');
   if(sigInp) sigInp.value = def;
   var msg = document.getElementById('srv-url-msg');
-  if(msg) { msg.style.color='#070'; msg.textContent='Auf Standard zurückgesetzt.'; }
+  if(msg) { msg.style.color='#070'; msg.textContent='Auf Standard zurückgesetzt (Innobytix-Server).'; }
 }
 function aoiTestServerUrl() {
   var inp = document.getElementById('srv-url-input');
