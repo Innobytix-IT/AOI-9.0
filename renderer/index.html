@@ -5195,6 +5195,8 @@ if ($aktion === 'offline_send') {
     $msg = isset($ein['msg']) ? (string)$ein['msg'] : '';
     if (!name_ok($an)) aoi_fehler('Ungueltiger Empfaenger.');
     if ($an === $name)  aoi_fehler('Kann nicht an sich selbst senden.');
+    $dir_chk = lies(DIRECTORY_FILE);
+    if (!isset($dir_chk[strtolower($an)])) aoi_fehler('Empfaenger nicht bekannt.');
     if (strlen($msg) === 0 || strlen($msg) > MAX_MSG_LEN) aoi_fehler('Nachricht ungueltig.');
     $pfad  = offline_pfad($an);
     $queue = array_values(bereinige(lies($pfad), OFFLINE_TTL));

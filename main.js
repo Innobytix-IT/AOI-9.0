@@ -275,6 +275,15 @@ ipcMain.handle('email-send', async (_, { cfg, to, cc, subject, body }) => {
   } catch (e) { return { ok: false, error: e.message }; }
 });
 
+app.on('web-contents-created', (_event, contents) => {
+  contents.on('will-attach-webview', (_waEvent, webPreferences) => {
+    delete webPreferences.preload;
+    delete webPreferences.preloadURL;
+    webPreferences.nodeIntegration = false;
+    webPreferences.contextIsolation = true;
+  });
+});
+
 app.whenReady().then(() => {
   createWindow();
   app.on('activate', () => {
