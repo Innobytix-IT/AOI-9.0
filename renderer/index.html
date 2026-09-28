@@ -5729,12 +5729,13 @@ async function aoiDeliverPendingMsgs(name) {
   if(aoi_im_wins[name]) logEl=aoi_im_wins[name].querySelector('.im-extra-log');
   else if(currentIMBuddy===name) logEl=document.getElementById('im-chat-log');
   if(logEl) { logEl.querySelectorAll('.im-offline-hint').forEach(function(el){ el.remove(); }); }
-  var sent=0;
-  msgs.forEach(function(m){
-    try { peer.dc.send(m.text); sent++; } catch(e) {}
-  });
   _pendingMsgs[name]=[];
   try { localStorage.removeItem('aoi_pending_'+name); } catch(e) {}
+  var sent=0;
+  for(var i=0;i<msgs.length;i++){
+    try { peer.dc.send(msgs[i].text); sent++; } catch(e) {}
+    if(i<msgs.length-1) await new Promise(function(r){ setTimeout(r,150); });
+  }
   if(!logEl||!sent) return;
   var note=document.createElement('div');
   note.style.cssText='margin:6px 0;padding:5px 8px;background:#eaf5ea;border:1px solid #6aaa6a;border-radius:3px;font-size:10px;color:#256025;';
