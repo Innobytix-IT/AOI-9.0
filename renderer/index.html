@@ -894,7 +894,7 @@ body {
             </div>
           </div>
         </div>
-        <webview id="browser-frame" style="display:none;flex:1;min-height:0;width:100%;border:none;background:#fff;" allowpopups></webview>
+        <webview id="browser-frame" style="display:none;flex:1;min-height:0;width:100%;border:none;background:#fff;"></webview>
       </div>
     </div>
 
@@ -1055,7 +1055,7 @@ body {
           <button class="btn-options" style="font-size:10px;padding:1px 7px;" onclick="radioSelectStation()">▶</button>
         </div>
         <webview id="radio-frame" src="https://tunein.com/radio/Top-40-Hits-g39/"
-          style="flex:1;width:100%;border:none;background:#fff;" allowpopups></webview>
+          style="flex:1;width:100%;border:none;background:#fff;"></webview>
       </div>
     </div>
 
@@ -1362,8 +1362,8 @@ body {
         </tr>
         <tr style="background:#f5f8ff;">
           <td style="padding:4px 6px;border:1px solid #c0cce8;"><b>Offline-Nachrichten</b></td>
-          <td style="padding:4px 6px;border:1px solid #c0cce8;">Temporär auf Signaling-Server</td>
-          <td style="padding:4px 6px;border:1px solid #c0cce8;">Bis zur Zustellung, max. 48 Stunden</td>
+          <td style="padding:4px 6px;border:1px solid #c0cce8;">Ausschließlich beim Absender (localStorage) – nie auf dem Server</td>
+          <td style="padding:4px 6px;border:1px solid #c0cce8;">Bis zur Zustellung per WebRTC, dann gelöscht</td>
         </tr>
         <tr>
           <td style="padding:4px 6px;border:1px solid #c0cce8;"><b>Dateiübertragungen</b></td>
@@ -1436,7 +1436,7 @@ body {
 
       <b style="color:#003dd0;font-size:12px;">4. Ihre Rechte (DSGVO Art. 15–21)</b>
       <div style="margin:6px 0 12px 0;font-size:11px;">
-        <div style="padding:3px 0;"><b>Auskunft &amp; Löschung:</b> Abmelden löscht Ihren Präsenz-Eintrag sofort. Offline-Nachrichten werden nach Zustellung bzw. spätestens nach 48 Stunden automatisch gelöscht. Wenden Sie sich für weitergehende Anfragen an den Betreiber Ihres Servers.</div>
+        <div style="padding:3px 0;"><b>Auskunft &amp; Löschung:</b> Abmelden löscht Ihren Präsenz-Eintrag sofort. Offline-Nachrichten liegen ausschließlich auf Ihrem Gerät und werden nach WebRTC-Zustellung automatisch gelöscht. Wenden Sie sich für weitergehende Anfragen an den Betreiber Ihres Servers.</div>
         <div style="padding:3px 0;margin-top:4px;"><b>Datenminimierung:</b> AOI 9.0 überträgt nur das technisch Notwendige. Nachrichten und Dateien verlassen Ihr Gerät ausschließlich verschlüsselt und direkt zum Empfänger.</div>
         <div style="padding:3px 0;margin-top:4px;"><b>Portabilität:</b> Alle lokalen Daten liegen im localStorage dieses Geräts und können jederzeit über die Browser-Entwicklertools eingesehen werden.</div>
       </div>
@@ -1708,11 +1708,10 @@ function showWelcomeSplash(name) {
   else if(hasUnread) { setTimeout(function(){ playSound('snd-mail'); }, 1200); }
   splashTimer=setTimeout(function(){ splashTimer=null; closeSplashNow(); }, 6000);
   aoiStartOnline(name);
+  aoiInitPendingKey(localStorage.getItem('aoi_pw_hash_'+name) || null);
   aoiUpdatePwStatus(name);
   aoiUpdatePubStatus(name);
   aoiInitTheme();
-  // Offline-Nachrichten vom Server abholen (mit Verzögerung nach Verbindungsaufbau)
-  setTimeout(aoiPollOfflineMessages, 4000);
   // Eigenes Profil laden
   setTimeout(aoiLoadOwnProfil, 2000);
 }
@@ -4421,22 +4420,57 @@ function aoiStatusLabel(v) {
   return {avail:'',away:' (Away)',busy:' (Beschäftigt)',brb:' (BRB)'}[v]||'';
 }
 
+/* ===== OFFLINE-NACHRICHTEN: AES-256-GCM VERSCHLÜSSELUNG ===== */
+var _aoiPendingKey = null;
+async function aoiInitPendingKey(hexHash) {
+  _aoiPendingKey = null;
+  if (!hexHash || !window.crypto || !crypto.subtle) return;
+  try {
+    var bytes = new Uint8Array(hexHash.match(/.{2}/g).map(function(h){ return parseInt(h,16); }));
+    _aoiPendingKey = await crypto.subtle.importKey('raw', bytes, {name:'AES-GCM'}, false, ['encrypt','decrypt']);
+  } catch(e) {}
+}
+async function _aoiPendingEncrypt(plaintext) {
+  if (!_aoiPendingKey) return plaintext;
+  try {
+    var iv = crypto.getRandomValues(new Uint8Array(12));
+    var buf = await crypto.subtle.encrypt({name:'AES-GCM',iv:iv}, _aoiPendingKey, new TextEncoder().encode(plaintext));
+    var combined = new Uint8Array(12 + buf.byteLength);
+    combined.set(iv, 0); combined.set(new Uint8Array(buf), 12);
+    return '\x00enc:' + btoa(String.fromCharCode.apply(null, combined));
+  } catch(e) { return plaintext; }
+}
+async function _aoiPendingDecrypt(raw) {
+  if (!raw) return '[]';
+  if (!_aoiPendingKey || !raw.startsWith('\x00enc:')) return raw;
+  try {
+    var combined = new Uint8Array(atob(raw.slice(5)).split('').map(function(c){ return c.charCodeAt(0); }));
+    var buf = await crypto.subtle.decrypt({name:'AES-GCM',iv:combined.slice(0,12)}, _aoiPendingKey, combined.slice(12));
+    return new TextDecoder().decode(buf);
+  } catch(e) { return '[]'; }
+}
+
 /* ===== OFFLINE-NACHRICHTEN ZWISCHENSPEICHERN ===== */
 var _pendingMsgs = {}; // name → [{text, html, ts}]
 function aoiQueueOfflineMsg(name, text, html) {
   if(!_pendingMsgs[name]) _pendingMsgs[name]=[];
   _pendingMsgs[name].push({text:text, html:html, ts:Date.now()});
-  try { localStorage.setItem('aoi_pending_'+name, JSON.stringify(_pendingMsgs[name])); } catch(e) {}
-  // Kein Server-Speicher – Nachricht bleibt lokal bis Empfänger online kommt
+  var serialized = JSON.stringify(_pendingMsgs[name]);
+  _aoiPendingEncrypt(serialized).then(function(enc){
+    try { localStorage.setItem('aoi_pending_'+name, enc); } catch(e) {}
+  });
 }
-function aoiLoadPendingMsgs(name) {
+async function aoiLoadPendingMsgs(name) {
   try {
-    var arr=JSON.parse(localStorage.getItem('aoi_pending_'+name)||'[]');
+    var raw = localStorage.getItem('aoi_pending_'+name);
+    if (!raw) return;
+    var plain = await _aoiPendingDecrypt(raw);
+    var arr = JSON.parse(plain || '[]');
     if(arr.length) _pendingMsgs[name]=arr;
   } catch(e) {}
 }
-function aoiDeliverPendingMsgs(name) {
-  aoiLoadPendingMsgs(name);
+async function aoiDeliverPendingMsgs(name) {
+  await aoiLoadPendingMsgs(name);
   var msgs=_pendingMsgs[name];
   if(!msgs||!msgs.length) return;
   var peer=aoi_peers[name];
@@ -4444,7 +4478,6 @@ function aoiDeliverPendingMsgs(name) {
   var logEl;
   if(aoi_im_wins[name]) logEl=aoi_im_wins[name].querySelector('.im-extra-log');
   else if(currentIMBuddy===name) logEl=document.getElementById('im-chat-log');
-  // "Wird zugestellt"-Zeilen entfernen
   if(logEl) { logEl.querySelectorAll('.im-offline-hint').forEach(function(el){ el.remove(); }); }
   var sent=0;
   msgs.forEach(function(m){
@@ -4453,7 +4486,6 @@ function aoiDeliverPendingMsgs(name) {
   _pendingMsgs[name]=[];
   try { localStorage.removeItem('aoi_pending_'+name); } catch(e) {}
   if(!logEl||!sent) return;
-  // "Zugestellt"-Bestätigung + Nachrichten nochmal anzeigen (aus History geladen, bleiben erhalten)
   var note=document.createElement('div');
   note.style.cssText='margin:6px 0;padding:5px 8px;background:#eaf5ea;border:1px solid #6aaa6a;border-radius:3px;font-size:10px;color:#256025;';
   note.innerHTML='✓ <b>'+escHtml(name)+'</b> ist online – '+sent+(sent===1?' Nachricht wurde':' Nachrichten wurden')+' automatisch zugestellt.';
@@ -4600,32 +4632,9 @@ function aoiProfilOpenIM() {
   if(_dlgProfilName) aoiTryOpenIM(_dlgProfilName);
 }
 
-/* ===== b5: OFFLINE-NACHRICHTEN (Server) ===== */
-function aoiSendOfflineToServer(name, text) {
-  aoiPost({aktion:'offline_send',name:aoi_name,token:aoi_token,an:name,msg:text}, function(){});
-}
-function aoiPollOfflineMessages() {
-  if(!aoi_name) return;
-  aoiPost({aktion:'offline_poll',name:aoi_name,token:aoi_token}, function(err,r){
-    if(err||!r||!r.nachrichten||!r.nachrichten.length) return;
-    r.nachrichten.forEach(function(m){
-      var von=m.von, msg=m.msg, ts=m.ts;
-      // JSON-Kontrollnachrichten (z.B. Raum-Einladungen) durch normalen Dispatcher leiten
-      if(typeof msg==='string' && msg.charAt(0)==='{') {
-        try { var p=JSON.parse(msg); if(p.aoi) { aoiReceiveIM(von, msg); return; } } catch(e){}
-      }
-      // Im IM-Fenster anzeigen falls offen
-      var logEl=null;
-      if(aoi_im_wins[von]) logEl=aoi_im_wins[von].querySelector('.im-extra-log');
-      else if(currentIMBuddy===von) logEl=document.getElementById('im-chat-log');
-      var html='<b style="color:#cc4400;">'+escHtml(von)+'</b> <span style="color:#888;font-size:9px;">(offline gesendet '+new Date(ts*1000).toLocaleTimeString('de-DE',{hour:'2-digit',minute:'2-digit'})+')</span>: '+escHtml(msg);
-      if(logEl){ var d=document.createElement('div'); d.innerHTML=html; logEl.appendChild(d); logEl.scrollTop=logEl.scrollHeight; }
-      else { aoiShowToast('📨 Offline-Nachricht von '+von); }
-      aoiSaveChatMsg(von,'in',html);
-    });
-    if(aoiSoundAllowed('msg')) playSound('snd-msg-recv');
-  });
-}
+/* b5 – aoiSendViaDataChannel (ergänzt bestehende Queue-Funktionen oben) */
+function aoiSendViaDataChannel(name,text){var peer=aoi_peers[name];if(peer&&peer.dc&&peer.dc.readyState==='open'){try{peer.dc.send(text);return true;}catch(e){}}return false;}
+function aoiPendingCount(){var t=0;Object.keys(_pendingMsgs).forEach(function(k){t+=_pendingMsgs[k].length;});return t;}
 
 /* ===== c1: CHATROOMS ===== */
 var _currentRoom = '';
@@ -4846,10 +4855,7 @@ function aoiSendRoomInvite(buddyName) {
     try { peer.dc.send(payload); sent = true; } catch(e) {}
   }
   if(!sent) {
-    // Lokal in Warteschlange speichern – kein Server, wird zugestellt wenn Empfänger online kommt
-    if(!_pendingMsgs[buddyName]) _pendingMsgs[buddyName]=[];
-    _pendingMsgs[buddyName].push({text:payload, html:null, ts:Date.now()});
-    try { localStorage.setItem('aoi_pending_'+buddyName, JSON.stringify(_pendingMsgs[buddyName])); } catch(e) {}
+    aoiQueueOfflineMsg(buddyName, payload, null);
   }
   aoiRoomAppendSys('Einladung an <b>'+escHtml(buddyName)+'</b> gesendet'+(sent?' (direkt ✓)':' (wird zugestellt wenn '+escHtml(buddyName)+' online kommt ⏳)')+' ');
 }
@@ -5340,28 +5346,7 @@ function offline_pfad($n) {
     return OFFLINE_PREFIX . substr(hash('sha256', strtolower($n)), 0, 16) . '.php';
 }
 
-if ($aktion === 'offline_send') {
-    $an  = isset($ein['an'])  ? (string)$ein['an']  : '';
-    $msg = isset($ein['msg']) ? (string)$ein['msg'] : '';
-    if (!name_ok($an)) aoi_fehler('Ungueltiger Empfaenger.');
-    if ($an === $name)  aoi_fehler('Kann nicht an sich selbst senden.');
-    $dir_chk = lies(DIRECTORY_FILE);
-    if (!isset($dir_chk[strtolower($an)])) aoi_fehler('Empfaenger nicht bekannt.');
-    if (strlen($msg) === 0 || strlen($msg) > MAX_MSG_LEN) aoi_fehler('Nachricht ungueltig.');
-    $pfad  = offline_pfad($an);
-    $queue = array_values(bereinige(lies($pfad), OFFLINE_TTL));
-    if (count($queue) >= MAX_OFFLINE) aoi_fehler('Offline-Postfach voll.');
-    $queue[] = array('von' => $name, 'msg' => $msg, 'ts' => time());
-    if (!schreibe($pfad, $queue)) aoi_fehler('Speicherfehler.', 500);
-    aoi_ok(array('gespeichert' => true));
-}
-
-if ($aktion === 'offline_poll') {
-    $pfad  = offline_pfad($name);
-    $msgs  = array_values(bereinige(lies($pfad), OFFLINE_TTL));
-    schreibe($pfad, array());
-    aoi_ok(array('nachrichten' => $msgs));
-}
+/* offline_send / offline_poll entfernt (v9.1.0) – Offline-Nachrichten liegen beim Absender-Client */
 
 /* ===== PROFILE ===== */
 function profil_pfad($n) {

@@ -1,6 +1,6 @@
 {
   "name": "aoi-9",
-  "version": "9.0.4",
+  "version": "9.1.0",
   "description": "AOI 9.0 Nostalgia – Retro Online-Software",
   "main": "main.js",
   "scripts": {
@@ -63,7 +63,7 @@
     }
   },
   "devDependencies": {
-    "electron": "^32.0.0",
+    "electron": "^44.0.0",
     "electron-builder": "^25.0.0"
   },
   "dependencies": {

@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, safeStorage } = require('electron');
+const { app, BrowserWindow, ipcMain, safeStorage, session } = require('electron');
 const path = require('path');
 const { exec } = require('child_process');
 const fs = require('fs');
@@ -185,8 +185,11 @@ function emailConfigPath() {
 
 ipcMain.handle('email-save-config', async (_, cfg) => {
   try {
+    if (!safeStorage.isEncryptionAvailable()) {
+      return { ok: false, error: 'Systemverschlüsselung nicht verfügbar – E-Mail-Passwort kann nicht sicher gespeichert werden.' };
+    }
     const toSave = { ...cfg };
-    if (safeStorage.isEncryptionAvailable() && cfg.password) {
+    if (cfg.password) {
       toSave.password = safeStorage.encryptString(cfg.password).toString('base64');
       toSave.encrypted = true;
     }
@@ -282,9 +285,13 @@ app.on('web-contents-created', (_event, contents) => {
     webPreferences.nodeIntegration = false;
     webPreferences.contextIsolation = true;
   });
+  contents.on('will-navigate', (navEvent, url) => {
+    if (!/^file:/.test(url)) navEvent.preventDefault();
+  });
 });
 
 app.whenReady().then(() => {
+  session.defaultSession.setPermissionRequestHandler((_wc, _perm, cb) => cb(false));
   createWindow();
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();

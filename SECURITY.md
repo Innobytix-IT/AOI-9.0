@@ -6,7 +6,7 @@
 |---|---|
 | Passwörter | Nur als SHA-256-Hash im lokalen `localStorage`, nie übertragen |
 | E-Mail-Passwörter | Electron `safeStorage` (Windows DPAPI / macOS Keychain) |
-| Chat-Inhalte | End-to-End-verschlüsselt via WebRTC DTLS/SRTP – kein Server sieht den Inhalt |
+| Chat-Inhalte | P2P-Chat: End-to-End-verschlüsselt via WebRTC DTLS/SRTP – kein Server sieht den Inhalt |
 | Server-Datendateien | `<?php exit; ?>` Header + `.htaccess 604` – kein Direktzugriff per Browser |
 | Schreiboperationen | Atomares Schreiben (`.tmp` + rename) – keine Race Conditions |
 
@@ -69,8 +69,21 @@ bekannten Personen konzipiert; ein anonymes Netz ist kein Designziel.
 
 ---
 
+## Offline-Nachrichten
+
+Nachrichten an offline Buddies werden **ausschließlich lokal** auf dem Absender-Gerät
+in `localStorage` (`aoi_pending_offline`) gespeichert – niemals auf dem Server.
+Sobald der Empfänger online kommt und ein WebRTC-DataChannel geöffnet wird,
+liefert `aoiDeliverPendingMsgs()` die ausstehenden Nachrichten direkt P2P aus.
+
+Einschränkung: Wenn der Absender offline geht bevor der Empfänger zurückkehrt,
+warten die Nachrichten auf dem Absender-Gerät bis beide gleichzeitig online sind
+(AIM-konformes Verhalten).
+
+---
+
 ## Was absichtlich *nicht* zentral gespeichert wird
 
 - Chat-Nachrichten (nur lokal im `localStorage`)
-- Offline-Nachrichten nach Zustellung (werden nach Poll gelöscht)
+- Offline-Nachrichten (liegen beim Absender, nie auf dem Server)
 - WebRTC-Signale (TTL-basierend, werden automatisch bereinigt)

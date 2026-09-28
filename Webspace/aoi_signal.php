@@ -459,28 +459,7 @@ function offline_pfad($n) {
     return OFFLINE_PREFIX . substr(hash('sha256', strtolower($n)), 0, 16) . '.php';
 }
 
-if ($aktion === 'offline_send') {
-    $an  = isset($ein['an'])  ? (string)$ein['an']  : '';
-    $msg = isset($ein['msg']) ? (string)$ein['msg'] : '';
-    if (!name_ok($an)) aoi_fehler('Ungueltiger Empfaenger.');
-    if ($an === $name)  aoi_fehler('Kann nicht an sich selbst senden.');
-    $dir_chk = lies(DIRECTORY_FILE);
-    if (!isset($dir_chk[strtolower($an)])) aoi_fehler('Empfaenger nicht bekannt.');
-    if (strlen($msg) === 0 || strlen($msg) > MAX_MSG_LEN) aoi_fehler('Nachricht ungueltig.');
-    $pfad  = offline_pfad($an);
-    $queue = array_values(bereinige(lies($pfad), OFFLINE_TTL));
-    if (count($queue) >= MAX_OFFLINE) aoi_fehler('Offline-Postfach voll.');
-    $queue[] = array('von' => $name, 'msg' => $msg, 'ts' => time());
-    if (!schreibe($pfad, $queue)) aoi_fehler('Speicherfehler.', 500);
-    aoi_ok(array('gespeichert' => true));
-}
-
-if ($aktion === 'offline_poll') {
-    $pfad  = offline_pfad($name);
-    $msgs  = array_values(bereinige(lies($pfad), OFFLINE_TTL));
-    schreibe($pfad, array());
-    aoi_ok(array('nachrichten' => $msgs));
-}
+/* offline_send / offline_poll entfernt (v9.1.0) – Offline-Nachrichten liegen beim Absender-Client */
 
 /* ===== PROFILE ===== */
 function profil_pfad($n) {
