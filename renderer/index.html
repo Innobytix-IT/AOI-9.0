@@ -5633,12 +5633,15 @@ async function aoiNoiseInit(name) {
   }
   if (!_aoiServerNoisePub) { aoiNoiseLock(); return; }
 
-  // Öffentlichen Schlüssel beim Server registrieren (einmal pro Login, mit altem Token)
+  // SPK beim Server registrieren – Token reist verschlüsselt im Noise-Payload
   try {
-    await fetch(AOI_SIGNAL_URL, {
-      method:'POST', headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({aktion:'noise_register', name:name, token:AOI_TOKEN, spk:_noiseB64enc(_aoiNoiseSpkPub)})
-    });
+    var regWrapped = await aoiNoiseWrap({aktion:'noise_register', name:name, token:AOI_TOKEN});
+    if (regWrapped) {
+      await fetch(AOI_SIGNAL_URL, {
+        method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify(regWrapped.envelope)
+      });
+    }
   } catch(e) {}
 }
 

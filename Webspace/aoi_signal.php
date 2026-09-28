@@ -341,19 +341,6 @@ if (FEDERATION_ENABLED && in_array($aktion, array('federation_servers','federati
     }
 }
 
-/* ===== NOISE IK: Client-Schlüssel registrieren ===== */
-if ($aktion === 'noise_register') {
-    if (!token_ok($token)) aoi_fehler('Ungueltiger Token.', 403);
-    if (!name_ok($name))   aoi_fehler('Ungueltiger Name.');
-    $spk = isset($ein['spk']) ? trim((string)$ein['spk']) : '';
-    $spk_bytes = base64_decode($spk, true);
-    if ($spk_bytes === false || strlen($spk_bytes) !== 32) aoi_fehler('Ungueltiger Public Key.');
-    $clients = lies(NOISE_CLIENTS_FILE);
-    $clients[$name] = array('spk' => $spk, 'ts' => time());
-    schreibe(NOISE_CLIENTS_FILE, $clients);
-    $nkp = noise_server_keypair();
-    aoi_ok(array('registered' => true, 'noise_pub' => $nkp ? $nkp['pub'] : null));
-}
 
 /* ===== NOISE IK: Anfrage entschlüsseln ===== */
 $noise_authenticated = false;
@@ -367,16 +354,7 @@ if (isset($ein['v']) && (int)$ein['v'] === 1) {
     $spk_pub  = base64_decode($ein['spk'] ?? '', true);
     if (!$epk_pub || !$spk_pub || strlen($epk_pub) !== 32 || strlen($spk_pub) !== 32)
         aoi_fehler('Ungueltige Noise-Schluessel.', 400);
-    // SPK muss registriert sein
-    $clients = lies(NOISE_CLIENTS_FILE);
-    $noise_client_name = null;
-    foreach ($clients as $cn => $ci) {
-        if (isset($ci['spk']) && base64_decode($ci['spk'], true) === $spk_pub) {
-            $noise_client_name = $cn; break;
-        }
-    }
-    if ($noise_client_name === null) aoi_fehler('Unbekannter Client-Schluessel.', 403);
-    // DH + HKDF
+    // DH + HKDF (immer möglich, da Server seinen privaten Schlüssel kennt)
     $dh1     = sodium_crypto_scalarmult($srv_priv, $epk_pub);
     $dh2     = sodium_crypto_scalarmult($srv_priv, $spk_pub);
     $ikm     = $dh1 . $dh2;
@@ -392,10 +370,34 @@ if (isset($ein['v']) && (int)$ein['v'] === 1) {
     $aad        = $epk_pub . $spk_pub;
     $plain = openssl_decrypt($ciphertext, 'aes-256-gcm', $req_key, OPENSSL_RAW_DATA, $iv, $tag, $aad);
     if ($plain === false) aoi_fehler('Entschluesselung fehlgeschlagen.', 403);
-    $ein = @json_decode($plain, true);
-    if (!is_array($ein)) aoi_fehler('Ungueltige verschluesselte Nutzlast.', 400);
-    $aktion = isset($ein['aktion']) ? (string)$ein['aktion'] : '';
-    $name   = isset($ein['name'])   ? (string)$ein['name']   : $noise_client_name;
+    $ein_dec = @json_decode($plain, true);
+    if (!is_array($ein_dec)) aoi_fehler('Ungueltige verschluesselte Nutzlast.', 400);
+    $aktion_dec = isset($ein_dec['aktion']) ? (string)$ein_dec['aktion'] : '';
+    // Bootstrap: noise_register darf mit unbekanntem SPK kommen – Token im Payload prüfen
+    if ($aktion_dec === 'noise_register') {
+        $noise_res_key = $res_key;
+        $reg_name  = isset($ein_dec['name'])  ? strtolower(trim((string)$ein_dec['name']))  : '';
+        $reg_token = isset($ein_dec['token']) ? (string)$ein_dec['token'] : '';
+        if (!name_ok($reg_name))      aoi_fehler('Ungueltiger Name.');
+        if (!token_ok($reg_token))    aoi_fehler('Ungueltiger Token.', 403);
+        $spk_b64 = base64_encode($spk_pub);
+        $clients = lies(NOISE_CLIENTS_FILE);
+        $clients[$reg_name] = array('spk' => $spk_b64, 'ts' => time());
+        schreibe(NOISE_CLIENTS_FILE, $clients);
+        aoi_ok(array('registered' => true, 'noise_pub' => $nkp['pub']));
+    }
+    // Alle anderen Aktionen: SPK muss registriert sein
+    $clients = lies(NOISE_CLIENTS_FILE);
+    $noise_client_name = null;
+    foreach ($clients as $cn => $ci) {
+        if (isset($ci['spk']) && base64_decode($ci['spk'], true) === $spk_pub) {
+            $noise_client_name = $cn; break;
+        }
+    }
+    if ($noise_client_name === null) aoi_fehler('Unbekannter Client-Schluessel.', 403);
+    $ein    = $ein_dec;
+    $aktion = $aktion_dec;
+    $name   = isset($ein['name']) ? (string)$ein['name'] : $noise_client_name;
     $noise_res_key       = $res_key;
     $noise_authenticated = true;
 }
