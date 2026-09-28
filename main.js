@@ -285,9 +285,12 @@ app.on('web-contents-created', (_event, contents) => {
     webPreferences.nodeIntegration = false;
     webPreferences.contextIsolation = true;
   });
-  contents.on('will-navigate', (navEvent, url) => {
-    if (!/^file:/.test(url)) navEvent.preventDefault();
-  });
+  // Nur das Hauptfenster vor Navigation weg von file:// schützen – nicht die Webviews
+  if (contents.getType() === 'window') {
+    contents.on('will-navigate', (navEvent, url) => {
+      if (!/^file:/.test(url)) navEvent.preventDefault();
+    });
+  }
 });
 
 app.whenReady().then(() => {
