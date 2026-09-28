@@ -222,7 +222,9 @@ ipcMain.handle('email-test', async (_, cfg) => {
   } catch (e) { return { ok: false, error: e.message }; }
 });
 
-ipcMain.handle('email-fetch', async (_, cfg) => {
+ipcMain.handle('email-fetch', async (_, payload) => {
+  const cfg     = (payload && payload.cfg) ? payload.cfg : payload;
+  const folders = (payload && payload.folders) ? payload.folders : ['INBOX'];
   const client = new ImapFlow({
     host: cfg.imapHost, port: cfg.imapPort,
     secure: cfg.imapSsl,
@@ -231,36 +233,43 @@ ipcMain.handle('email-fetch', async (_, cfg) => {
   });
   try {
     await client.connect();
-    const lock = await client.getMailboxLock('INBOX');
-    const msgs = [];
-    try {
-      // Neueste 30 Nachrichten, neueste zuerst
-      const status = await client.status('INBOX', { messages: true });
-      const total = status.messages || 0;
-      const from = Math.max(1, total - 29);
-      for await (const msg of client.fetch(`${from}:${total}`, {
-        uid: true, flags: true, envelope: true, bodyStructure: true,
-        bodyParts: ['text'],
-      })) {
-        const isRead = msg.flags && msg.flags.has('\\Seen');
-        const env = msg.envelope || {};
-        const fromAddr = env.from && env.from[0]
-          ? (env.from[0].name || env.from[0].address || '')
-          : '?';
-        const bodyPart = msg.bodyParts && (msg.bodyParts.get('text') || msg.bodyParts.get('TEXT'));
-        const bodyText = bodyPart ? bodyPart.toString().slice(0, 2000) : '';
-        msgs.unshift({
-          uid: msg.uid,
-          seq: msg.seq,
-          read: isRead,
-          from: fromAddr,
-          subject: env.subject || '(kein Betreff)',
-          date: env.date ? new Date(env.date).toLocaleDateString('de-DE') : '?',
-          body: bodyText,
-        });
-      }
-    } finally { lock.release(); }
+    let msgs = [];
+    let lastErr = null;
+    for (const folder of folders) {
+      try {
+        const lock = await client.getMailboxLock(folder);
+        try {
+          const status = await client.status(folder, { messages: true });
+          const total = status.messages || 0;
+          const from = Math.max(1, total - 29);
+          if (total > 0) {
+            for await (const msg of client.fetch(`${from}:${total}`, {
+              uid: true, flags: true, envelope: true, bodyStructure: true,
+              bodyParts: ['text'],
+            })) {
+              const isRead = msg.flags && msg.flags.has('\\Seen');
+              const env = msg.envelope || {};
+              const fromAddr = env.from && env.from[0]
+                ? (env.from[0].name || env.from[0].address || '')
+                : '?';
+              const bodyPart = msg.bodyParts && (msg.bodyParts.get('text') || msg.bodyParts.get('TEXT'));
+              const bodyText = bodyPart ? bodyPart.toString().slice(0, 2000) : '';
+              msgs.unshift({
+                uid: msg.uid, seq: msg.seq, read: isRead,
+                from: fromAddr,
+                subject: env.subject || '(kein Betreff)',
+                date: env.date ? new Date(env.date).toLocaleDateString('de-DE') : '?',
+                body: bodyText,
+              });
+            }
+          }
+        } finally { lock.release(); }
+        lastErr = null;
+        break;
+      } catch (e) { lastErr = e; }
+    }
     await client.logout();
+    if (lastErr) return { ok: false, error: 'Ordner nicht gefunden: ' + lastErr.message };
     return { ok: true, messages: msgs };
   } catch (e) { return { ok: false, error: e.message }; }
 });

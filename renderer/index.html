@@ -291,13 +291,17 @@ body {
 .away-idle { color:#888;font-size:9px;margin-top:2px; }
 
 /* ===== POSTFACH ===== */
-.mail-tabs { display:flex;gap:4px;padding:6px 8px 0 8px;background:#d8e6f3;border-bottom:1px solid #7faad0; }
-.mail-tab { background:linear-gradient(to bottom,#f0f7fe 0%,#bad4ed 100%);border:1px solid #6d96be;border-bottom:none;border-radius:4px 4px 0 0;padding:4px 14px;font-weight:bold;color:#07315c;cursor:pointer; }
-.mail-tab.active { background:#fff;border-bottom:1px solid #fff;margin-bottom:-1px; }
+.mail-toolbar { display:flex;align-items:center;gap:1px;padding:3px 5px;background:#e8f0fb;border-bottom:1px solid #7faad0;flex-wrap:wrap; }
+.mail-tb-btn { background:linear-gradient(to bottom,#fff 0%,#dce9f8 100%);border:1px solid #7faad0;border-radius:3px;padding:3px 9px;font-size:11px;font-family:Tahoma,sans-serif;cursor:pointer;color:#07315c;white-space:nowrap; }
+.mail-tb-btn:hover { background:linear-gradient(to bottom,#e5f1fb 0%,#c5dff7 100%);border-color:#3c7fb1; }
+.mail-tb-sep { width:1px;height:18px;background:#aaa;margin:0 4px;flex-shrink:0; }
 .mail-body-layout { flex:1;display:flex;padding:6px;gap:6px;background:#fff;overflow:hidden; }
-.mail-tree { width:130px;border:1px solid #7f9db9;padding:4px;font-size:11px;background:#fdfdfd; }
-.mail-tree-item { padding:2px 4px;cursor:pointer; }
-.mail-tree-item.selected { background:#ff9900;color:white;font-weight:bold; }
+.mail-tree { width:145px;border:1px solid #7f9db9;font-size:11px;background:#fdfdfd;flex-shrink:0; }
+.mail-tree-header { font-weight:bold;font-size:10px;color:#fff;background:#3a6ea5;padding:3px 6px; }
+.mail-tree-item { padding:3px 6px;cursor:pointer;display:flex;justify-content:space-between;align-items:center; }
+.mail-tree-item:hover { background:#e5f1fb; }
+.mail-tree-item.selected { background:#316ac5;color:white;font-weight:bold; }
+.mail-folder-badge { font-size:10px;font-weight:bold;background:#c00;color:#fff;border-radius:8px;padding:0 5px;margin-left:3px; }
 .mail-grid-container { flex:1;display:flex;flex-direction:column;gap:6px; }
 .mail-table-box { flex:1;border:1px solid #7f9db9;overflow-y:auto; }
 .mail-table { width:100%;border-collapse:collapse;font-size:11px; }
@@ -938,47 +942,47 @@ body {
     <!-- POSTFACH -->
     <div class="mdi-window" id="win-mailbox" style="top:90px;left:320px;width:960px;height:540px;z-index:25;display:none;">
       <div class="title-bar" onmousedown="focusAndDrag(event,'win-mailbox')">
-        <div class="title-left"><span>📬 Postfach von RetroSurfer</span></div>
+        <div class="title-left"><span id="mail-window-title">📬 Postfach</span></div>
         <div class="title-controls"><div class="btn-win" onclick="minimizeWindow('win-mailbox')">_</div><div class="btn-win" onclick="toggleMaximize('win-mailbox')">□</div><div class="btn-win close" onclick="closeWindow('win-mailbox')">✕</div></div>
       </div>
       <div class="window-inner-content" style="flex:1;min-height:0;display:flex;flex-direction:column;overflow:hidden;">
-        <div class="mail-tabs">
-          <div class="mail-tab active" id="tab-new" onclick="selectMailTab('new')">Neu (3)</div>
-          <div class="mail-tab" id="tab-old" onclick="selectMailTab('old')">Alt</div>
-          <div class="mail-tab" id="tab-sent" onclick="selectMailTab('sent')">Gesendet</div>
+        <!-- Outlook-Toolbar -->
+        <div class="mail-toolbar">
+          <button class="mail-tb-btn" onclick="openComposeMail()">✉ Neue E-Mail</button>
+          <span class="mail-tb-sep"></span>
+          <button class="mail-tb-btn" onclick="mailReplyOpen()">↩ Antworten</button>
+          <button class="mail-tb-btn" onclick="mailForwardOpen()">➡ Weiterleiten</button>
+          <span class="mail-tb-sep"></span>
+          <button class="mail-tb-btn" onclick="mailMarkAsRead()">✔ Als gelesen</button>
+          <button class="mail-tb-btn" onclick="mailRead()" style="font-weight:bold;">📖 Öffnen</button>
+          <button class="mail-tb-btn" onclick="mailSaveAs()">💾 Speichern</button>
+          <span class="mail-tb-sep"></span>
+          <button class="mail-tb-btn" onclick="mailDelete()">🗑 Löschen</button>
+          <span class="mail-tb-sep"></span>
+          <button class="mail-tb-btn" onclick="emailFetchCurrentFolder()">🔄 Aktualisieren</button>
         </div>
         <div class="mail-body-layout">
+          <!-- Ordnerstruktur -->
           <div class="mail-tree">
-            <div class="mail-tree-item selected">📁 Posteingang</div>
-            <div class="mail-tree-item" style="margin-left:8px;">↳ Neu (3)</div>
-            <div class="mail-tree-item" style="margin-left:8px;">↳ Gelesen</div>
-            <div class="mail-tree-item">📁 Gesendet</div>
-            <div class="mail-tree-item">📁 Papierkorb</div>
-            <div class="mail-tree-item">💾 Auf meinem PC</div>
+            <div class="mail-tree-header">Ordner</div>
+            <div class="mail-tree-item selected" id="mf-inbox" onclick="emailSwitchFolder('inbox')"><span>📬 Posteingang</span><span id="mf-inbox-badge" class="mail-folder-badge" style="display:none;"></span></div>
+            <div class="mail-tree-item" id="mf-sent"  onclick="emailSwitchFolder('sent')"><span>📤 Gesendet</span></div>
+            <div class="mail-tree-item" id="mf-junk"  onclick="emailSwitchFolder('junk')"><span>⚠️ Junk / Spam</span></div>
+            <div class="mail-tree-item" id="mf-trash" onclick="emailSwitchFolder('trash')"><span>🗑 Papierkorb</span></div>
           </div>
           <div class="mail-grid-container">
             <div class="mail-table-box">
               <table class="mail-table">
-                <thead><tr><th>Typ</th><th>Datum</th><th>Absender</th><th>Betreff</th></tr></thead>
-                <tbody id="mail-tbody">
-                </tbody>
+                <thead><tr><th style="width:22px;">Typ</th><th style="width:88px;">Datum</th><th style="width:180px;">Absender</th><th>Betreff</th></tr></thead>
+                <tbody id="mail-tbody"></tbody>
               </table>
             </div>
             <div class="mail-preview-box" id="mail-preview"><i>Klicke auf eine E-Mail für die Vorschau...</i></div>
           </div>
         </div>
         <div class="mail-actions-bar">
-          <div style="display:flex;gap:4px;position:relative;">
-            <button class="btn-options" id="mail-btn-lesen"    onclick="mailRead()"   style="font-weight:bold;">Lesen</button>
-            <button class="btn-options" id="mail-btn-speichern" onclick="mailSaveToggle(event)">Speichern ▾</button>
-            <div id="mail-save-menu" style="display:none;position:absolute;bottom:28px;left:0;background:#ece9d8;border:1px solid #7f9db9;box-shadow:3px 3px 8px rgba(0,0,0,.25);z-index:9999;min-width:160px;">
-              <div class="mail-save-item" onclick="mailSaveAs()">💾 Als Textdatei speichern</div>
-              <div class="mail-save-item" onclick="mailReplyOpen()">↩️ Antworten</div>
-              <div class="mail-save-item" onclick="mailForwardOpen()">➡️ Weiterleiten</div>
-            </div>
-            <button class="btn-options" id="mail-btn-loeschen" onclick="mailDelete()">Löschen</button>
-          </div>
-          <button class="btn-options" onclick="playSound('snd-mail')">🔔 Sound wiederholen</button>
+          <span id="mail-status-bar" style="font-size:10px;color:#555;"></span>
+          <button class="btn-options" onclick="playSound('snd-mail')">🔔 Sound</button>
         </div>
       </div>
     </div>
@@ -2519,16 +2523,9 @@ function mailRead() {
   inner.appendChild(overlay);
 }
 
-function mailSaveToggle(e) {
-  var menu=document.getElementById('mail-save-menu');
-  menu.style.display = menu.style.display==='none' ? 'block' : 'none';
-  e.stopPropagation();
-  // Schließen bei Klick außerhalb
-  setTimeout(function(){ document.addEventListener('click', function close(){ menu.style.display='none'; document.removeEventListener('click',close); }); },0);
-}
+function mailSaveToggle(e) { /* Toolbar-Variante – kein Dropdown mehr */ }
 
 function mailSaveAs() {
-  document.getElementById('mail-save-menu').style.display='none';
   if(!_selMail){ alert('Bitte zuerst eine E-Mail auswählen.'); return; }
   var m=_selMail;
   var text='Von: '+m.from+'\nDatum: '+m.date+'\nBetreff: '+m.subject+'\n\n'+m.body;
@@ -2541,14 +2538,12 @@ function mailSaveAs() {
 }
 
 function mailReplyOpen() {
-  document.getElementById('mail-save-menu').style.display='none';
   if(!_selMail){ alert('Bitte zuerst eine E-Mail auswählen.'); return; }
   openComposeMail(_selMail.from, 'Re: '+_selMail.subject,
     '\n\n--- Original ---\nVon: '+_selMail.from+'\n'+_selMail.body);
 }
 
 function mailForwardOpen() {
-  document.getElementById('mail-save-menu').style.display='none';
   if(!_selMail){ alert('Bitte zuerst eine E-Mail auswählen.'); return; }
   openComposeMail('', 'Fwd: '+_selMail.subject,
     '\n\n--- Weitergeleitet ---\nVon: '+_selMail.from+'\n'+_selMail.body);
@@ -2564,7 +2559,71 @@ function mailDelete() {
   document.getElementById('mail-preview').innerHTML='<i>Klicke auf eine E-Mail für die Vorschau...</i>';
   mailUpdateCounter();
 }
-function selectMailTab(t) { document.querySelectorAll('.mail-tab').forEach(function(x){x.classList.remove('active');}); document.getElementById('tab-'+t).classList.add('active'); }
+/* ===== E-MAIL ORDNER-NAVIGATION ===== */
+var _currentFolder = 'inbox';
+var FOLDER_CANDIDATES = {
+  inbox: ['INBOX'],
+  sent:  ['Sent', 'Sent Items', 'Sent Messages', '[Gmail]/Sent Mail', 'INBOX.Sent'],
+  junk:  ['Junk', 'Spam', 'Junk Email', '[Gmail]/Spam', 'INBOX.Junk', 'Junk E-Mail'],
+  trash: ['Trash', 'Deleted Items', 'Deleted Messages', '[Gmail]/Trash', 'INBOX.Trash'],
+};
+
+function emailSwitchFolder(folderKey) {
+  _currentFolder = folderKey;
+  document.querySelectorAll('.mail-tree-item').forEach(function(el){ el.classList.remove('selected'); });
+  var el = document.getElementById('mf-'+folderKey);
+  if (el) el.classList.add('selected');
+  document.getElementById('mail-preview').innerHTML = '<i>Klicke auf eine E-Mail für die Vorschau...</i>';
+  _selMail = null;
+  emailFetchCurrentFolder();
+}
+
+function emailFetchCurrentFolder() {
+  if (!window.electronAPI || !_emailCfg) return;
+  var folders = FOLDER_CANDIDATES[_currentFolder] || ['INBOX'];
+  var tbody = document.getElementById('mail-tbody');
+  var labels = {inbox:'Posteingang', sent:'Gesendet', junk:'Junk / Spam', trash:'Papierkorb'};
+  var label = labels[_currentFolder] || 'Ordner';
+  if (tbody) tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;color:#888;padding:12px;">⏳ Lade '+escHtml(label)+'…</td></tr>';
+  window.electronAPI.emailFetch({cfg: _emailCfg, folders: folders}).then(function(r) {
+    if (!r.ok) { if(tbody) tbody.innerHTML='<tr><td colspan="4" style="color:#c00;padding:8px;">Fehler: '+escHtml(r.error)+'</td></tr>'; return; }
+    if (!tbody) return;
+    tbody.innerHTML = '';
+    if (r.messages.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;color:#888;padding:12px;">Keine E-Mails in '+escHtml(label)+'.</td></tr>';
+    } else {
+      r.messages.forEach(function(m, i) {
+        var tr = document.createElement('tr');
+        if (!m.read) tr.className = 'unread';
+        tr.id = 'mail-row-' + i;
+        tr.innerHTML = '<td>'+(m.read?'📨':'✉️')+'</td><td>'+escHtml(m.date)+'</td><td>'+escHtml(m.from)+'</td><td>'+escHtml(m.subject)+'</td>';
+        (function(msg){ tr.onclick=function(){ previewMail(tr,msg.from,msg.date,msg.subject,msg.body); }; tr.ondblclick=mailRead; })(m);
+        tbody.appendChild(tr);
+      });
+    }
+    mailUpdateCounter();
+    mailUpdateTitle();
+    var sb = document.getElementById('mail-status-bar');
+    if (sb) sb.textContent = r.messages.length + ' E-Mail(s) in ' + label;
+  }).catch(function(e) {
+    if (tbody) tbody.innerHTML = '<tr><td colspan="4" style="color:#c00;padding:8px;">'+escHtml(e.message)+'</td></tr>';
+  });
+}
+
+function mailUpdateTitle() {
+  var titleEl = document.getElementById('mail-window-title');
+  if (!titleEl) return;
+  var addr = (_emailCfg && _emailCfg.user) ? _emailCfg.user : (aoi_name || '');
+  titleEl.textContent = '📬 ' + (addr ? addr : 'Postfach');
+}
+
+function mailMarkAsRead() {
+  if (!_selMail) { alert('Bitte zuerst eine E-Mail auswählen.'); return; }
+  _selMail.row.classList.remove('unread');
+  if (_selMail.row.cells[0]) _selMail.row.cells[0].textContent = '📨';
+  if (_selMail.row.dataset.demoId) { try{ localStorage.setItem('aoi_mail_read_'+_selMail.row.dataset.demoId,'1'); }catch(e){} }
+  mailUpdateCounter();
+}
 
 /* ===== E-MAIL EINSTELLUNGEN ===== */
 var _emailCfg = null;
@@ -2625,7 +2684,7 @@ function emailSaveSettings() {
   var cfg = emailGetFormCfg();
   if(!cfg.user || !cfg.password || !cfg.imapHost) { emailSetResult('Bitte alle Felder ausfüllen.', false); return; }
   window.electronAPI.emailSaveConfig(cfg).then(function(r){
-    if(r.ok){ _emailCfg = cfg; emailSetResult('✔ Gespeichert.', true); }
+    if(r.ok){ _emailCfg = cfg; emailSetResult('✔ Gespeichert.', true); mailUpdateTitle(); }
     else emailSetResult('✘ Speichern fehlgeschlagen: ' + r.error, false);
   });
 }
@@ -2645,34 +2704,13 @@ function emailLoadSettings() {
     document.getElementById('email-user').value  = c.user || '';
     document.getElementById('email-pass').value  = c.password || '';
     document.getElementById('email-tls-ignore').checked = !!c.tlsIgnoreCert;
+    mailUpdateTitle();
   });
 }
 
 function emailFetchInbox() {
-  if(!window.electronAPI || !_emailCfg) return;
-  var tbody = document.getElementById('mail-tbody');
-  if(tbody) tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;color:#888;padding:12px;">⏳ Lade E-Mails…</td></tr>';
-  window.electronAPI.emailFetch(_emailCfg).then(function(r){
-    if(!r.ok){ if(tbody) tbody.innerHTML='<tr><td colspan="4" style="color:#c00;padding:8px;">Fehler: '+escHtml(r.error)+'</td></tr>'; return; }
-    if(!tbody) return;
-    tbody.innerHTML='';
-    if(r.messages.length === 0){
-      tbody.innerHTML='<tr><td colspan="4" style="text-align:center;color:#888;padding:12px;">Keine E-Mails gefunden.</td></tr>';
-      return;
-    }
-    r.messages.forEach(function(m, i){
-      var tr = document.createElement('tr');
-      if(!m.read) tr.className='unread';
-      tr.id='mail-row-'+i;
-      tr.innerHTML='<td>'+(m.read?'📨':'✉️')+'</td><td>'+escHtml(m.date)+'</td><td>'+escHtml(m.from)+'</td><td>'+escHtml(m.subject)+'</td>';
-      (function(msg){ tr.onclick=function(){ previewMail(tr,msg.from,msg.date,msg.subject,msg.body); }; tr.ondblclick=mailRead; })(m);
-      tbody.appendChild(tr);
-    });
-    mailUpdateCounter();
-    // Titelzeile aktualisieren
-    var titleEl = document.querySelector('#win-mailbox .title-left span');
-    if(titleEl) titleEl.textContent='📬 Postfach von '+(_emailCfg.user||'');
-  }).catch(function(e){ if(tbody) tbody.innerHTML='<tr><td colspan="4" style="color:#c00;padding:8px;">'+escHtml(e.message)+'</td></tr>'; });
+  _currentFolder = 'inbox';
+  emailSwitchFolder('inbox');
 }
 
 /* ===== E-MAIL VERFASSEN ===== */
