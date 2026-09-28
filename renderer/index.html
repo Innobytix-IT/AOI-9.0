@@ -441,7 +441,7 @@ body {
           <div class="form-container">
             <div class="form-row"><label>Hauptname:</label><div style="flex:1;display:flex;gap:4px;"><select id="user-screenname" class="screen-name-select" style="flex:1;"></select><button class="btn-options" style="white-space:nowrap;padding:3px 8px;" onclick="aoiShowCreateNameDialog()">+ Neu</button></div></div>
             <div class="signon-error-msg" id="signon-error"></div>
-            <div class="form-row"><label>Kennwort:</label><input type="password" id="inp-password" placeholder="Leer = kein Schutz"></div>
+            <div class="form-row"><label>Kennwort:</label><input type="password" id="inp-password" placeholder="Kennwort eingeben"></div>
             <div class="form-row"><label>AHPT-Server:</label><input type="text" id="inp-signal-url" value="https://innobytix-it.de/AOI_9/AOI_Treffpunkt/aoi_signal.php"></div>
             
             <div class="actions-row">
@@ -1239,7 +1239,7 @@ body {
       </div>
       <div class="aoi-modal-row">
         <label>Kennwort:</label>
-        <input type="password" id="inp-new-password" maxlength="64" placeholder="Optional – nur lokal gespeichert">
+        <input type="password" id="inp-new-password" maxlength="64" placeholder="Kennwort (Pflichtfeld)">
       </div>
       <div class="aoi-modal-row">
         <label>Bestätigen:</label>
@@ -2097,15 +2097,19 @@ async function startSignOn() {
   errEl.textContent='';
   var serverUrl=(document.getElementById('inp-signal-url').value||'').trim();
   if(serverUrl) AOI_SIGNAL_URL=serverUrl;
+  var enteredPw = document.getElementById('inp-password') ? document.getElementById('inp-password').value : '';
+  if(!enteredPw){ errEl.textContent='Bitte ein Kennwort eingeben.'; return; }
   var storedHash=null;
   try{ storedHash=localStorage.getItem('aoi_pw_hash_'+name); }catch(e){}
+  var enteredHash = await aoiHashPassword(enteredPw);
   if(storedHash){
-    var enteredPw=document.getElementById('inp-password')?document.getElementById('inp-password').value:'';
-    var enteredHash=await aoiHashPassword(enteredPw);
     if(enteredHash!==storedHash){
       errEl.textContent='Falsches Kennwort.';
       return;
     }
+  } else {
+    // Kein Hash gespeichert (Legacy-Account) – eingegebenes Passwort jetzt sichern
+    try{ localStorage.setItem('aoi_pw_hash_'+name, enteredHash); }catch(e){}
   }
   btn.disabled=true; btn.textContent='Prüfe...';
   aoiPost({aktion:'check_name',name:name},function(err,data){
@@ -4064,13 +4068,14 @@ function aoiConfirmCreateName() {
   // Kennwort vorab prüfen
   var pw = document.getElementById('inp-new-password') ? document.getElementById('inp-new-password').value : '';
   var pw2 = document.getElementById('inp-new-password2') ? document.getElementById('inp-new-password2').value : '';
-  if(pw && pw !== pw2){ errEl.textContent='Kennwörter stimmen nicht überein.'; return; }
+  if(!pw){ errEl.textContent='Bitte ein Kennwort vergeben.'; return; }
+  if(pw !== pw2){ errEl.textContent='Kennwörter stimmen nicht überein.'; return; }
   errEl.textContent='Prüfe Verfügbarkeit online...';
   aoiPost({aktion:'check_name',name:name},function(err,data){
     if(err||!data||!data.ok){ errEl.textContent=''; }
     else if(data.taken){ errEl.textContent='Dieser Name ist bereits online vergeben. Bitte einen anderen wählen.'; return; }
     names.push(name); aoiSaveNames(names);
-    if(pw) aoiHashPassword(pw).then(function(h){ try{localStorage.setItem('aoi_pw_hash_'+name,h);}catch(e){} });
+    aoiHashPassword(pw).then(function(h){ try{localStorage.setItem('aoi_pw_hash_'+name,h);}catch(e){} });
     var pub = document.getElementById('chk-public-name') && document.getElementById('chk-public-name').checked;
     try{ if(pub) localStorage.setItem('aoi_pub_'+name,'1'); else localStorage.removeItem('aoi_pub_'+name); }catch(e){}
     aoiInitScreenNames();
