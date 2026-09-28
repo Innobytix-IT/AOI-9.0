@@ -210,7 +210,7 @@ ipcMain.handle('email-test', async (_, cfg) => {
     host: cfg.imapHost, port: cfg.imapPort,
     secure: cfg.imapSsl,
     auth: { user: cfg.user, pass: cfg.password },
-    logger: false, tls: { rejectUnauthorized: false },
+    logger: false, tls: { rejectUnauthorized: !cfg.tlsIgnoreCert },
   });
   try {
     await client.connect();
@@ -224,7 +224,7 @@ ipcMain.handle('email-fetch', async (_, cfg) => {
     host: cfg.imapHost, port: cfg.imapPort,
     secure: cfg.imapSsl,
     auth: { user: cfg.user, pass: cfg.password },
-    logger: false, tls: { rejectUnauthorized: false },
+    logger: false, tls: { rejectUnauthorized: !cfg.tlsIgnoreCert },
   });
   try {
     await client.connect();
@@ -267,7 +267,7 @@ ipcMain.handle('email-send', async (_, { cfg, to, cc, subject, body }) => {
     host: cfg.smtpHost, port: cfg.smtpPort,
     secure: cfg.smtpSsl,
     auth: { user: cfg.user, pass: cfg.password },
-    tls: { rejectUnauthorized: false },
+    tls: { rejectUnauthorized: !cfg.tlsIgnoreCert },
   });
   try {
     await transport.sendMail({ from: cfg.user, to, cc: cc || undefined, subject, text: body });

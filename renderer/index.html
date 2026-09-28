@@ -850,6 +850,12 @@ body {
                     <label style="width:72px;color:#1a3c63;font-weight:bold;flex-shrink:0;">Kennwort:</label>
                     <input id="email-pass" type="password" style="flex:1;font-size:11px;font-family:Tahoma;border:1px solid #7f9db9;padding:2px 4px;" placeholder="••••••••">
                   </div>
+                  <div style="font-size:10px;color:#666;padding:2px 0;">
+                    <label style="cursor:pointer;display:flex;align-items:center;gap:4px;">
+                      <input type="checkbox" id="email-tls-ignore">
+                      <span>Selbst-signierte Zertifikate erlauben <span style="color:#cc4400;">(unsicher – nur für private Server)</span></span>
+                    </label>
+                  </div>
                   <div id="email-test-result" style="min-height:16px;font-size:10px;padding:2px 0;"></div>
                   <div style="display:flex;gap:5px;justify-content:flex-end;">
                     <button class="btn-options" onclick="emailTestConnection()">🔌 Verbindung testen</button>
@@ -2440,14 +2446,15 @@ function emailPreset() {
 
 function emailGetFormCfg() {
   return {
-    imapHost: document.getElementById('email-imap-host').value.trim(),
-    imapPort: parseInt(document.getElementById('email-imap-port').value) || 993,
-    imapSsl:  document.getElementById('email-imap-ssl').checked,
-    smtpHost: document.getElementById('email-smtp-host').value.trim(),
-    smtpPort: parseInt(document.getElementById('email-smtp-port').value) || 465,
-    smtpSsl:  document.getElementById('email-smtp-ssl').checked,
-    user:     document.getElementById('email-user').value.trim(),
-    password: document.getElementById('email-pass').value,
+    imapHost:     document.getElementById('email-imap-host').value.trim(),
+    imapPort:     parseInt(document.getElementById('email-imap-port').value) || 993,
+    imapSsl:      document.getElementById('email-imap-ssl').checked,
+    smtpHost:     document.getElementById('email-smtp-host').value.trim(),
+    smtpPort:     parseInt(document.getElementById('email-smtp-port').value) || 465,
+    smtpSsl:      document.getElementById('email-smtp-ssl').checked,
+    user:         document.getElementById('email-user').value.trim(),
+    password:     document.getElementById('email-pass').value,
+    tlsIgnoreCert: document.getElementById('email-tls-ignore').checked,
   };
 }
 
@@ -2492,6 +2499,7 @@ function emailLoadSettings() {
     document.getElementById('email-smtp-ssl').checked = !!c.smtpSsl;
     document.getElementById('email-user').value  = c.user || '';
     document.getElementById('email-pass').value  = c.password || '';
+    document.getElementById('email-tls-ignore').checked = !!c.tlsIgnoreCert;
   });
 }
 
@@ -2802,7 +2810,7 @@ function aoiReceiveIM(fromName, text) {
   else logEl=document.getElementById('im-chat-log');
   if(!logEl) return;
   var d=document.createElement('div');
-  d.innerHTML='<b style="color:#aa0000;">'+fromName+':</b> '+text.replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  d.innerHTML='<b style="color:#aa0000;">'+escHtml(fromName)+':</b> '+escHtml(text);
   logEl.appendChild(d); logEl.scrollTop=logEl.scrollHeight;
   aoiSaveChatMsg(fromName,'in',d.innerHTML);
   playSound('snd-msg-recv');
@@ -4873,6 +4881,28 @@ function token_ok($eingabe) {
     return $soll === '' || hash_equals($soll, $eingabe);
 }
 
+// SSRF-Schutz: nur HTTPS, keine privaten IPs
+function fed_url_safe($url) {
+    if (!preg_match('#^https://#i', $url)) return false;
+    $host = parse_url($url, PHP_URL_HOST);
+    if (!$host) return false;
+    $ip = @gethostbyname($host);
+    if (!$ip || $ip === $host) return false;
+    $long = ip2long($ip);
+    if ($long === false) return false;
+    foreach (array(
+        array('127.0.0.0','127.255.255.255'),
+        array('10.0.0.0','10.255.255.255'),
+        array('172.16.0.0','172.31.255.255'),
+        array('192.168.0.0','192.168.255.255'),
+        array('169.254.0.0','169.254.255.255'),
+        array('0.0.0.0','0.255.255.255'),
+    ) as $r) {
+        if ($long >= ip2long($r[0]) && $long <= ip2long($r[1])) return false;
+    }
+    return true;
+}
+
 // HTTP-POST zu einem anderen Federation-Server (kein Token – Server-zu-Server)
 function fed_post($url, $payload, $timeout = 5) {
     $body = json_encode($payload, JSON_UNESCAPED_UNICODE);
@@ -4936,6 +4966,15 @@ if ($aktion === 'info') {
 // federation_signal: kein eigener Token nötig – kommt von einem anderen AOI-Server
 if ($aktion === 'federation_signal') {
     if (!FEDERATION_ENABLED) aoi_fehler('Nicht im AOI-Netz.', 403);
+    // IP-Rate-Limiting: max 30 Anfragen / 60 Sek pro IP
+    $rl_hash = substr(hash('sha256', $_SERVER['REMOTE_ADDR'] ?? ''), 0, 12);
+    $rl_pfad = DATEN_DIR . '/rl_' . $rl_hash . '.php';
+    $rl = lies($rl_pfad); $rl_now = time();
+    if (!isset($rl['start']) || ($rl_now - $rl['start']) > 60) {
+        $rl = array('start' => $rl_now, 'count' => 1);
+    } else { $rl['count']++; }
+    schreibe($rl_pfad, $rl);
+    if ($rl['count'] > 30) aoi_fehler('Rate limit.', 429);
     $an          = isset($ein['an'])          ? (string)$ein['an']          : '';
     $von         = isset($ein['von'])         ? (string)$ein['von']         : '';
     $typ         = isset($ein['typ'])         ? (string)$ein['typ']         : '';
@@ -4965,7 +5004,7 @@ if (FEDERATION_ENABLED && in_array($aktion, array('federation_servers','federati
     }
     if ($aktion === 'federation_join') {
         $new_url = isset($ein['server_url']) ? trim((string)$ein['server_url']) : '';
-        if (!$new_url || strlen($new_url) > 256 || !filter_var($new_url, FILTER_VALIDATE_URL)) aoi_fehler('Ungueltige Server-URL.');
+        if (!$new_url || strlen($new_url) > 256 || !fed_url_safe($new_url)) aoi_fehler('Ungueltige Server-URL.');
         $servers = lies(FED_SERVERS_FILE);
         $key = substr(hash('sha256', $new_url), 0, 16);
         $servers[$key] = array('url' => $new_url, 'joined' => time(), 'last_seen' => time());
@@ -4985,7 +5024,7 @@ if (FEDERATION_ENABLED && in_array($aktion, array('federation_servers','federati
     if ($aktion === 'federation_presence') {
         $users = isset($ein['users']) ? (array)$ein['users'] : array();
         $server_url = isset($ein['server_url']) ? trim((string)$ein['server_url']) : '';
-        if (!$server_url || !filter_var($server_url, FILTER_VALIDATE_URL) || $server_url === FEDERATION_URL) aoi_fehler('Ungueltige Server-URL.');
+        if (!$server_url || !fed_url_safe($server_url) || $server_url === FEDERATION_URL) aoi_fehler('Ungueltige Server-URL.');
         $fed_srv = lies(FED_SERVERS_FILE);
         $srv_key = substr(hash('sha256', $server_url), 0, 16);
         $fed_srv[$srv_key] = array('url' => $server_url,

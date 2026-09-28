@@ -139,6 +139,28 @@ function token_ok($eingabe) {
 }
 
 // HTTP-POST zu einem anderen Federation-Server (kein Token – Server-zu-Server)
+// SSRF-Schutz: nur HTTPS, keine privaten IPs
+function fed_url_safe($url) {
+    if (!preg_match('#^https://#i', $url)) return false;
+    $host = parse_url($url, PHP_URL_HOST);
+    if (!$host) return false;
+    $ip = @gethostbyname($host);
+    if (!$ip || $ip === $host) return false;
+    $long = ip2long($ip);
+    if ($long === false) return false;
+    foreach (array(
+        array('127.0.0.0','127.255.255.255'),
+        array('10.0.0.0','10.255.255.255'),
+        array('172.16.0.0','172.31.255.255'),
+        array('192.168.0.0','192.168.255.255'),
+        array('169.254.0.0','169.254.255.255'),
+        array('0.0.0.0','0.255.255.255'),
+    ) as $r) {
+        if ($long >= ip2long($r[0]) && $long <= ip2long($r[1])) return false;
+    }
+    return true;
+}
+
 function fed_post($url, $payload, $timeout = 5) {
     $body = json_encode($payload, JSON_UNESCAPED_UNICODE);
     if (function_exists('curl_init')) {
@@ -202,6 +224,15 @@ if ($aktion === 'info') {
 // Wird vor dem Token-Check behandelt, da fremde Server unser Passwort nicht kennen.
 if ($aktion === 'federation_signal') {
     if (!FEDERATION_ENABLED) aoi_fehler('Nicht im AOI-Netz.', 403);
+    // IP-Rate-Limiting: max 30 Anfragen / 60 Sek pro IP
+    $rl_hash = substr(hash('sha256', $_SERVER['REMOTE_ADDR'] ?? ''), 0, 12);
+    $rl_pfad = DATEN_DIR . '/rl_' . $rl_hash . '.php';
+    $rl = lies($rl_pfad); $rl_now = time();
+    if (!isset($rl['start']) || ($rl_now - $rl['start']) > 60) {
+        $rl = array('start' => $rl_now, 'count' => 1);
+    } else { $rl['count']++; }
+    schreibe($rl_pfad, $rl);
+    if ($rl['count'] > 30) aoi_fehler('Rate limit.', 429);
     $an          = isset($ein['an'])          ? (string)$ein['an']          : '';
     $von         = isset($ein['von'])         ? (string)$ein['von']         : '';
     $typ         = isset($ein['typ'])         ? (string)$ein['typ']         : '';
@@ -231,7 +262,7 @@ if (FEDERATION_ENABLED && in_array($aktion, array('federation_servers','federati
     }
     if ($aktion === 'federation_join') {
         $new_url = isset($ein['server_url']) ? trim((string)$ein['server_url']) : '';
-        if (!$new_url || strlen($new_url) > 256 || !filter_var($new_url, FILTER_VALIDATE_URL)) aoi_fehler('Ungueltige Server-URL.');
+        if (!$new_url || strlen($new_url) > 256 || !fed_url_safe($new_url)) aoi_fehler('Ungueltige Server-URL.');
         $servers = lies(FED_SERVERS_FILE);
         $key = substr(hash('sha256', $new_url), 0, 16);
         $servers[$key] = array('url' => $new_url, 'joined' => time(), 'last_seen' => time());
@@ -251,7 +282,7 @@ if (FEDERATION_ENABLED && in_array($aktion, array('federation_servers','federati
     if ($aktion === 'federation_presence') {
         $users = isset($ein['users']) ? (array)$ein['users'] : array();
         $server_url = isset($ein['server_url']) ? trim((string)$ein['server_url']) : '';
-        if (!$server_url || !filter_var($server_url, FILTER_VALIDATE_URL) || $server_url === FEDERATION_URL) aoi_fehler('Ungueltige Server-URL.');
+        if (!$server_url || !fed_url_safe($server_url) || $server_url === FEDERATION_URL) aoi_fehler('Ungueltige Server-URL.');
         $fed_srv = lies(FED_SERVERS_FILE);
         $srv_key = substr(hash('sha256', $server_url), 0, 16);
         $fed_srv[$srv_key] = array('url' => $server_url,
