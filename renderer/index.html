@@ -2478,6 +2478,12 @@ function openIM(name) {
   // win-im is visible with a DIFFERENT buddy → create extra window
   var mainWin=document.getElementById('win-im');
   var mainVisible=mainWin&&mainWin.style.display!=='none'&&!mainWin.classList.contains('minimized');
+  // win-im already showing this buddy → just bring to front, do NOT reload history
+  if(mainVisible && currentIMBuddy===name) {
+    bringToFront('win-im');
+    var inp=document.getElementById('im-message-input'); if(inp) inp.focus();
+    return;
+  }
   if(mainVisible && currentIMBuddy && currentIMBuddy!==name) {
     aoiCreateExtraIMWin(name); return;
   }
