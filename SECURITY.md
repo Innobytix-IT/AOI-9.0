@@ -1,14 +1,58 @@
-# Sicherheitsarchitektur – AOI 9.0
+# Sicherheitsarchitektur – AOI 9.1
 
 ## Allgemeine Prinzipien
 
 | Bereich | Ansatz |
 |---|---|
-| Passwörter | Nur als SHA-256-Hash im lokalen `localStorage`, nie übertragen |
-| E-Mail-Passwörter | Electron `safeStorage` (Windows DPAPI / macOS Keychain) |
-| Chat-Inhalte | P2P-Chat: End-to-End-verschlüsselt via WebRTC DTLS/SRTP – kein Server sieht den Inhalt |
+| Login-Passwörter | Nur als SHA-256-Hash im lokalen `localStorage`, nie übertragen |
+| E-Mail-Passwörter | Electron `safeStorage` (Windows DPAPI / macOS Keychain); kein Klartext-Fallback – Speichern schlägt fehl wenn Systemverschlüsselung nicht verfügbar |
+| Noise-Privat-Key | AOI Tresor (Linux/Mac) oder `localStorage` (Windows DPAPI-Pfad) |
+| Server-Token | AOI Tresor; verlässt das Gerät nur im Noise-verschlüsselten Payload |
+| Chat-Inhalte | P2P via WebRTC DTLS/SRTP – kein Server sieht den Inhalt |
 | Server-Datendateien | `<?php exit; ?>` Header + `.htaccess 604` – kein Direktzugriff per Browser |
 | Schreiboperationen | Atomares Schreiben (`.tmp` + rename) – keine Race Conditions |
+
+---
+
+## AOI Tresor
+
+Der AOI Tresor ist ein lokaler Schlüsselspeicher, der sensible Werte verschlüsselt in `localStorage` ablegt.
+
+| Parameter | Wert |
+|---|---|
+| Algorithmus | AES-256-GCM |
+| Schlüsselableitung | PBKDF2 – SHA-256, 100 000 Iterationen, 32-Byte-Ausgabe |
+| Salt | 16 Byte zufällig pro Nutzer, in `localStorage` gespeichert |
+| IV | 12 Byte zufällig pro Schreibvorgang |
+| Plattform | Linux / macOS (aktiv) – Windows nutzt transparenten DPAPI-Fallback via `safeStorage` |
+
+Gespeicherte Felder: `noise_priv` (X25519-Langzeitschlüssel), `signal_token`, `email_cfg`.
+
+---
+
+## Noise IK – Signaling-Verschlüsselung
+
+Jeder AOI-Client generiert beim ersten Login ein X25519-Langzeitschlüsselpaar (SPK).  
+Der öffentliche Teil wird beim Signaling-Server registriert; der private Teil verlässt das Gerät nie.
+
+**Handshake (`noise_register`):**
+
+1. Client generiert ein ephemeres X25519-Paar (`ek`)
+2. DH: `ek_priv × server_pub` → HKDF-SHA256 → Sitzungsschlüssel
+3. Payload (inkl. Server-Token und eigenem `spk_pub`) wird mit AES-256-GCM + AAD verschlüsselt
+4. Server dekryptiert, verifiziert den Token, speichert `spk_pub`
+
+Das Ergebnis: Der Server-Token verlässt das Gerät ausschließlich im verschlüsselten Noise-Payload – niemals im Klartext über das Netz.
+
+---
+
+## TOFU – Server-Key-Pinning
+
+Beim ersten Verbinden wird der öffentliche Noise-Schlüssel des Signaling-Servers (`noise_pub`) in `localStorage` gepinnt (Trust On First Use).
+
+- Bei allen folgenden Verbindungen wird der aktuelle Server-Key gegen den gepinnten verglichen
+- Abweichung → Verbindung wird abgebrochen, Warnung in der Statusleiste
+- Legitimer Server-Schlüsselwechsel (z. B. nach Neuinstallation): Nutzer kann den Pin unter **Server-Setup → Pin zurücksetzen** löschen
 
 ---
 
@@ -23,6 +67,15 @@ Diese Option wird zusammen mit der Konfiguration gespeichert.
 ---
 
 ## Föderations-Sicherheit (aoi_signal.php)
+
+### Server-zu-Server-Verschlüsselung (`fed_post_noise`)
+
+Server-zu-Server-Requests im Föderationsnetz werden seit v9.1 verschlüsselt übertragen:
+
+1. Empfänger-Server-Pub-Key wird einmalig abgerufen und lokal gecacht (TOFU analog zum Client)
+2. Pro Request: ephemeres X25519-Paar generiert, DH → HKDF-SHA256 (`aoi-fed-req-v1`) → AES-256-GCM
+3. Envelope: `{"v":"fed1","epk":"…","iv":"…","body":"…"}` (Ciphertext + 16-Byte GCM-Tag)
+4. Fallback auf unverschlüsselt nur wenn der Empfänger-Server keinen Noise-Pub-Key bereitstellt
 
 ### SSRF-Schutz (`fed_url_safe()`)
 

@@ -3,7 +3,7 @@
 [![Release](https://img.shields.io/github/v/release/Innobytix-IT/AOI-9.0?label=Release&color=brightgreen)](https://github.com/Innobytix-IT/AOI-9.0/releases/latest)
 [![Build](https://img.shields.io/github/actions/workflow/status/Innobytix-IT/AOI-9.0/build.yml?label=Build)](https://github.com/Innobytix-IT/AOI-9.0/actions/workflows/build.yml)
 [![License: AGPL v3](https://img.shields.io/badge/License-AGPL%20v3-blue.svg)](https://www.gnu.org/licenses/agpl-3.0)
-[![Electron](https://img.shields.io/badge/Electron-32-47848F?logo=electron&logoColor=white)](https://www.electronjs.org/)
+[![Electron](https://img.shields.io/badge/Electron-44-47848F?logo=electron&logoColor=white)](https://www.electronjs.org/)
 [![Platform](https://img.shields.io/badge/Platform-Windows%20%7C%20Linux-lightgrey)](https://github.com/Innobytix-IT/AOI-9.0/releases/latest)
 
 **Retro AOL-style Electron desktop app with WebRTC P2P messaging**
@@ -41,9 +41,19 @@ Ein klassischer Instant-Messenger-Look, echter P2P-Chat via WebRTC und ein integ
 - **Buddy-Verwaltung** – Gruppen, Online/Offline-Status, Sortierung, Kontextmenü, Buddy-Suche
 - **Screen Names** – Mehrere Namen pro Installation, Eindeutigkeitsprüfung via Server
 - **Integrierter Browser** – Webviewer mit Navigationsliste (Wetter, Sport, Musik, Suche …)
-- **Sounds** – Modem-Einwahl, Türklingeln bei Buddy-Login (optional)
+- **Integriertes E-Mail-Postfach** – IMAP/SMTP mit Ordnernavigation, Hintergrundpolling, Benachrichtigung
+- **Sounds** – Modem-Einwahl, Türklingeln bei Buddy-Login, E-Mail-Benachrichtigung (optional)
 - **Eigener Signaling-Server** – PHP 7.2-kompatibel, läuft auf jedem Standard-Webspace
+- **Föderations-Netzwerk** – Dezentrales Gossip-Netz; AOI-Instanzen finden sich ohne Root-Server
 - **AGPL-3.0** – Quelloffene Software; wer das Netzwerk nutzt, muss den Quellcode teilen
+
+### Neu in v9.1
+
+- **AOI Tresor** – Lokaler AES-256-GCM-Schlüsselspeicher (PBKDF2, 100 000 Iterationen) für private Schlüssel und Token; auf Windows transparenter DPAPI-Fallback
+- **Noise IK Handshake** – Jeder Client hat ein X25519-Langzeitschlüsselpaar; `noise_register` läuft vollständig verschlüsselt über diesen Kanal, Token verlassen das Gerät nie im Klartext
+- **TOFU-Pinning** – Der öffentliche Schlüssel des Signaling-Servers wird beim ersten Verbinden gepinnt; Schlüsselwechsel ohne expliziten Reset löst eine Warnung aus
+- **Federation-Verschlüsselung** – Server-zu-Server-Requests werden mit ephemeralen X25519-Schlüsseln + AES-256-GCM verschlüsselt (`v:'fed1'`)
+- **safeStorage-Fallback blockiert** – E-Mail-Passwörter werden nur gespeichert wenn Systemverschlüsselung verfügbar ist; kein Klartext-Fallback
 
 ---
 
@@ -51,10 +61,15 @@ Ein klassischer Instant-Messenger-Look, echter P2P-Chat via WebRTC und ein integ
 
 | Schicht | Technologie |
 |---------|-------------|
-| Desktop-App | [Electron](https://www.electronjs.org/) |
-| P2P-Übertragung | WebRTC DataChannel |
-| Signaling-Server | PHP (TTL-basierte Präsenz, kein Cronjob nötig) |
-| Persistenz (lokal) | `localStorage` (Screen Names, Buddy-Liste) |
+| Desktop-App | [Electron 44](https://www.electronjs.org/) |
+| P2P-Übertragung | WebRTC DataChannel (DTLS/SRTP E2E) |
+| Signaling-Verschlüsselung | Noise IK – X25519 + HKDF-SHA256 + AES-256-GCM |
+| Server-Vertrauen | TOFU-Pinning des Server-Noise-Pub-Keys |
+| Schlüsselspeicher | AOI Tresor (AES-256-GCM + PBKDF2) / Windows DPAPI |
+| Federation | Dezentrales Gossip-Netz, ephemerales X25519+AES-256-GCM |
+| Signaling-Server | PHP 7.2+ (TTL-basierte Präsenz, kein Cronjob nötig) |
+| E-Mail | IMAP/SMTP via ImapFlow + nodemailer |
+| Persistenz (lokal) | `localStorage` + AOI Tresor |
 | STUN | `stun:stun.l.google.com:19302` |
 
 ---
