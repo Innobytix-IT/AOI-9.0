@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, safeStorage, session } = require('electron');
+const { app, BrowserWindow, ipcMain, safeStorage, session, shell } = require('electron');
 const path = require('path');
 const { exec } = require('child_process');
 const fs = require('fs');
@@ -40,6 +40,11 @@ function run(cmd, timeout) {
     });
   });
 }
+
+ipcMain.handle('open-external', (_, url) => {
+  const allowed = /^https:\/\/(github\.com|innobytix-it\.de)\//;
+  if (allowed.test(url)) shell.openExternal(url);
+});
 
 ipcMain.handle('security-check', async () => {
   const plat = process.platform;
@@ -179,8 +184,9 @@ ipcMain.handle('security-check', async () => {
 });
 
 /* ===== E-MAIL IPC ===== */
-function emailConfigPath() {
-  return path.join(app.getPath('userData'), 'email_config.json');
+function emailConfigPath(username) {
+  const safe = (username || 'default').replace(/[^a-zA-Z0-9_\-\.]/g, '_');
+  return path.join(app.getPath('userData'), 'email_config_' + safe + '.json');
 }
 
 ipcMain.handle('email-save-config', async (_, cfg) => {
@@ -193,14 +199,16 @@ ipcMain.handle('email-save-config', async (_, cfg) => {
       toSave.password = safeStorage.encryptString(cfg.password).toString('base64');
       toSave.encrypted = true;
     }
-    fs.writeFileSync(emailConfigPath(), JSON.stringify(toSave, null, 2), 'utf8');
+    fs.writeFileSync(emailConfigPath(cfg.username), JSON.stringify(toSave, null, 2), 'utf8');
     return { ok: true };
   } catch (e) { return { ok: false, error: e.message }; }
 });
 
-ipcMain.handle('email-load-config', async () => {
+ipcMain.handle('email-load-config', async (_, username) => {
   try {
-    const raw = JSON.parse(fs.readFileSync(emailConfigPath(), 'utf8'));
+    const filePath = emailConfigPath(username);
+    if (!fs.existsSync(filePath)) return { ok: false, config: null };
+    const raw = JSON.parse(fs.readFileSync(filePath, 'utf8'));
     if (raw.encrypted && raw.password && safeStorage.isEncryptionAvailable()) {
       raw.password = safeStorage.decryptString(Buffer.from(raw.password, 'base64'));
     }
@@ -243,6 +251,67 @@ ipcMain.handle('email-list-folders', async (_, cfg) => {
   } catch (e) { return { ok: false, error: e.message }; }
 });
 
+function decodeMailBytes(raw, charset, encoding) {
+  const enc = (charset || 'utf-8').toLowerCase().replace(/[^a-z0-9]/g, '');
+  const nodeEnc = (enc === 'utf8' || enc === 'utf8') ? 'utf8'
+    : (enc === 'iso88591' || enc === 'latin1' || enc === 'windows1252') ? 'latin1'
+    : 'utf8';
+
+  if (/quoted-printable/i.test(encoding)) {
+    const stripped = raw.replace(/=\r?\n/g, '');
+    const bytes = [];
+    for (let i = 0; i < stripped.length; ) {
+      if (stripped[i] === '=' && i + 2 < stripped.length && /[0-9A-Fa-f]{2}/.test(stripped.slice(i+1, i+3))) {
+        bytes.push(parseInt(stripped.slice(i+1, i+3), 16));
+        i += 3;
+      } else {
+        bytes.push(stripped.charCodeAt(i));
+        i++;
+      }
+    }
+    try { return Buffer.from(bytes).toString(nodeEnc); } catch(_) { return raw; }
+  }
+
+  if (/base64/i.test(encoding)) {
+    try { return Buffer.from(raw.replace(/\s/g, ''), 'base64').toString(nodeEnc); } catch(_) { return raw; }
+  }
+
+  return raw;
+}
+
+function extractPlainText(raw) {
+  if (!raw) return '';
+  const str = raw.toString();
+  if (!str.includes('Content-Type:')) return str.slice(0, 2000);
+  const sections = str.split(/^--[^\r\n]+/m);
+
+  for (const sec of sections) {
+    if (/Content-Type:\s*text\/plain/i.test(sec)) {
+      const charsetM  = sec.match(/charset=["']?([^"'\r\n;]+)["']?/i);
+      const encodingM = sec.match(/Content-Transfer-Encoding:\s*([^\r\n]+)/i);
+      const bodyM     = sec.match(/\r?\n\r?\n([\s\S]*)/);
+      if (bodyM) {
+        const decoded = decodeMailBytes(bodyM[1].trim(), charsetM && charsetM[1], encodingM && encodingM[1]);
+        return decoded.slice(0, 2000);
+      }
+    }
+  }
+
+  for (const sec of sections) {
+    if (/Content-Type:\s*text\/html/i.test(sec)) {
+      const charsetM  = sec.match(/charset=["']?([^"'\r\n;]+)["']?/i);
+      const encodingM = sec.match(/Content-Transfer-Encoding:\s*([^\r\n]+)/i);
+      const bodyM     = sec.match(/\r?\n\r?\n([\s\S]*)/);
+      if (bodyM) {
+        const decoded = decodeMailBytes(bodyM[1].trim(), charsetM && charsetM[1], encodingM && encodingM[1]);
+        return decoded.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 2000);
+      }
+    }
+  }
+
+  return str.slice(0, 2000);
+}
+
 ipcMain.handle('email-fetch', async (_, payload) => {
   const cfg     = (payload && payload.cfg) ? payload.cfg : payload;
   const folders = (payload && payload.folders) ? payload.folders : ['INBOX'];
@@ -274,7 +343,7 @@ ipcMain.handle('email-fetch', async (_, payload) => {
                 ? (env.from[0].name || env.from[0].address || '')
                 : '?';
               const bodyPart = msg.bodyParts && (msg.bodyParts.get('text') || msg.bodyParts.get('TEXT'));
-              const bodyText = bodyPart ? bodyPart.toString().slice(0, 2000) : '';
+              const bodyText = extractPlainText(bodyPart);
               msgs.unshift({
                 uid: msg.uid, seq: msg.seq, read: isRead,
                 from: fromAddr,
@@ -308,6 +377,83 @@ ipcMain.handle('email-send', async (_, { cfg, to, cc, subject, body }) => {
   } catch (e) { return { ok: false, error: e.message }; }
 });
 
+ipcMain.handle('email-mark-read', async (_, {cfg, folder, uid}) => {
+  const client = new ImapFlow({
+    host: cfg.imapHost, port: cfg.imapPort, secure: cfg.imapSsl,
+    auth: { user: cfg.user, pass: cfg.password },
+    logger: false, tls: { rejectUnauthorized: !cfg.tlsIgnoreCert },
+  });
+  try {
+    await client.connect();
+    const lock = await client.getMailboxLock(folder);
+    try { await client.messageFlagsAdd({uid}, ['\\Seen'], {uid: true}); }
+    finally { lock.release(); }
+    await client.logout();
+    return { ok: true };
+  } catch(e) { return { ok: false, error: e.message }; }
+});
+
+ipcMain.handle('email-trash', async (_, {cfg, folder, uid, trashFolder}) => {
+  const client = new ImapFlow({
+    host: cfg.imapHost, port: cfg.imapPort, secure: cfg.imapSsl,
+    auth: { user: cfg.user, pass: cfg.password },
+    logger: false, tls: { rejectUnauthorized: !cfg.tlsIgnoreCert },
+  });
+  try {
+    await client.connect();
+    const lock = await client.getMailboxLock(folder);
+    try {
+      if (trashFolder && trashFolder !== folder) {
+        await client.messageMove({uid}, trashFolder, {uid: true});
+      } else {
+        await client.messageFlagsAdd({uid}, ['\\Deleted'], {uid: true});
+        await client.mailboxClose();
+        const lock2 = await client.getMailboxLock(folder);
+        try { await client.mailboxOpen(folder, {readOnly: false}); } finally { lock2.release(); }
+      }
+    } finally { lock.release(); }
+    await client.logout();
+    return { ok: true };
+  } catch(e) { return { ok: false, error: e.message }; }
+});
+
+ipcMain.handle('email-trash-many', async (_, {cfg, folder, uids, trashFolder}) => {
+  const client = new ImapFlow({
+    host: cfg.imapHost, port: cfg.imapPort, secure: cfg.imapSsl,
+    auth: { user: cfg.user, pass: cfg.password },
+    logger: false, tls: { rejectUnauthorized: !cfg.tlsIgnoreCert },
+  });
+  try {
+    await client.connect();
+    const lock = await client.getMailboxLock(folder);
+    try {
+      if (trashFolder && trashFolder !== folder) {
+        await client.messageMove(uids, trashFolder, {uid: true});
+      } else {
+        await client.messageFlagsAdd(uids, ['\\Deleted'], {uid: true});
+      }
+    } finally { lock.release(); }
+    await client.logout();
+    return { ok: true };
+  } catch(e) { return { ok: false, error: e.message }; }
+});
+
+ipcMain.handle('email-move-many', async (_, {cfg, folder, uids, targetFolder}) => {
+  const client = new ImapFlow({
+    host: cfg.imapHost, port: cfg.imapPort, secure: cfg.imapSsl,
+    auth: { user: cfg.user, pass: cfg.password },
+    logger: false, tls: { rejectUnauthorized: !cfg.tlsIgnoreCert },
+  });
+  try {
+    await client.connect();
+    const lock = await client.getMailboxLock(folder);
+    try { await client.messageMove(uids, targetFolder, {uid: true}); }
+    finally { lock.release(); }
+    await client.logout();
+    return { ok: true };
+  } catch(e) { return { ok: false, error: e.message }; }
+});
+
 ipcMain.handle('read-server-file', async (_, filename) => {
   const allowed = ['aoi_signal.php'];
   if (!allowed.includes(filename)) return null;
@@ -317,13 +463,26 @@ ipcMain.handle('read-server-file', async (_, filename) => {
 });
 
 app.on('web-contents-created', (_event, contents) => {
-  contents.on('will-attach-webview', (_waEvent, webPreferences) => {
+  contents.on('will-attach-webview', (_waEvent, webPreferences, params) => {
+    // Kein eigenes Preload-Script erlaubt
     delete webPreferences.preload;
     delete webPreferences.preloadURL;
+    // Node.js-Zugriff grundsätzlich verweigert
     webPreferences.nodeIntegration = false;
     webPreferences.contextIsolation = true;
+    // Isolierte Storage-Partition je nach Webview-ID
+    const src = params.src || '';
+    if (!src.startsWith('file://')) {
+      webPreferences.partition = params.partition || 'persist:aoi-browser';
+    }
   });
-  // Nur das Hauptfenster vor Navigation weg von file:// schützen – nicht die Webviews
+
+  // Popups aus Webviews blockieren (window.open, target="_blank" usw.)
+  if (contents.getType() === 'webview') {
+    contents.setWindowOpenHandler(() => ({ action: 'deny' }));
+  }
+
+  // Hauptfenster darf nicht von file:// wegnavigieren
   if (contents.getType() === 'window') {
     contents.on('will-navigate', (navEvent, url) => {
       if (!/^file:/.test(url)) navEvent.preventDefault();
@@ -332,7 +491,11 @@ app.on('web-contents-created', (_event, contents) => {
 });
 
 app.whenReady().then(() => {
-  session.defaultSession.setPermissionRequestHandler((_wc, _perm, cb) => cb(false));
+  // Vollbild erlauben, alle anderen Berechtigungen (Kamera, Mikrofon, Standort …) verweigern
+  const permHandler = (_wc, perm, cb) => cb(perm === 'fullscreen');
+  session.defaultSession.setPermissionRequestHandler(permHandler);
+  session.fromPartition('persist:aoi-browser').setPermissionRequestHandler(permHandler);
+  session.fromPartition('persist:aoi-radio').setPermissionRequestHandler(permHandler);
   createWindow();
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();

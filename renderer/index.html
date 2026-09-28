@@ -309,14 +309,18 @@ body {
 .mail-table td { padding:3px 5px;border-bottom:1px solid #eee;cursor:pointer; }
 .mail-table tr:hover { background:#e5f1fb; }
 .mail-table tr.unread { font-weight:bold;color:#000; }
-.mail-preview-box { height:85px;border:1px solid #7f9db9;background:#fffff8;padding:6px;overflow-y:auto;font-size:11px; }
+.mail-preview-box { height:85px;border:1px solid #7f9db9;background:#fffff8;padding:6px;overflow-y:auto;font-size:11px;user-select:text; }
 .mail-actions-bar { display:flex;justify-content:space-between;padding:4px 6px;background:#eaf2fb;border-top:1px solid #c2d8ed; }
 .mail-save-item { padding:5px 12px;font-size:11px;font-family:Tahoma,sans-serif;cursor:pointer;white-space:nowrap; }
 .mail-save-item:hover { background:#d0e4f7; }
 .mail-table tr.mail-selected { background:#c5dff7 !important; }
+.mail-table tr.mail-multi-selected { background:#b0d4f7 !important; outline:1px solid #3c7fb1 inset; }
+.mail-chk { cursor:pointer;margin:0; }
+.mail-bulk-bar { display:none;align-items:center;gap:6px;padding:3px 8px;background:#fff3cd;border-bottom:1px solid #f0c040;font-size:11px;flex-wrap:wrap; }
+.mail-move-popup { position:absolute;z-index:999;background:#ece9d8;border:1px solid #7faad0;box-shadow:3px 4px 8px rgba(0,0,0,.3);min-width:160px;padding:2px 0;font-size:11px; }
 .mail-read-view { position:absolute;inset:0;background:#fffff8;z-index:50;display:flex;flex-direction:column;overflow:hidden; }
 .mail-read-header { padding:8px 12px;background:#d8e6f3;border-bottom:1px solid #7faad0;font-size:11px;font-family:Tahoma; }
-.mail-read-body { flex:1;overflow-y:auto;padding:10px 14px;font-size:12px;font-family:Tahoma;line-height:1.6; }
+.mail-read-body { flex:1;overflow-y:auto;padding:10px 14px;font-size:12px;font-family:Tahoma;line-height:1.6;user-select:text; }
 .mail-read-bar { padding:4px 8px;background:#eaf2fb;border-top:1px solid #c2d8ed;display:flex;gap:4px; }
 
 /* ===== IM-FENSTER ===== */
@@ -418,7 +422,7 @@ body {
     <div class="window-body">
       <div style="display:flex;justify-content:flex-end;gap:6px;margin-bottom:8px;">
         <button class="btn-options" onclick="openDatenschutz()">🔒 Datenschutz</button>
-        <button class="btn-options" onclick="window.open('https://github.com/Innobytix-IT/AOI-9.0','_blank')">Hilfe</button>
+        <button class="btn-options" onclick="window.electronAPI&&window.electronAPI.openExternal('https://github.com/Innobytix-IT/AOI-9.0')">Hilfe</button>
       </div>
       <div class="main-card">
         <div class="card-top">
@@ -538,7 +542,7 @@ body {
     <span class="menu-item" style="color:#b31e00;font-weight:bold;" onclick="doSignOff()">Abmelden</span>
     <span class="menu-item" onclick="menuToggle(event,'menu-hilfe')">Hilfe
       <div class="menu-dropdown" id="menu-hilfe">
-        <div class="menu-dd-item" onclick="window.open('https://github.com/Innobytix-IT/AOI-9.0','_blank')">📖 GitHub / Dokumentation</div>
+        <div class="menu-dd-item" onclick="window.electronAPI&&window.electronAPI.openExternal('https://github.com/Innobytix-IT/AOI-9.0')">📖 GitHub / Dokumentation</div>
         <div class="menu-dd-sep"></div>
         <div class="menu-dd-item" onclick="menuClose();openDatenschutz()">🔒 Datenschutz &amp; Datenverarbeitung</div>
       </div>
@@ -582,7 +586,22 @@ body {
       <button class="btn-options" style="font-size:10px;padding:2px 5px;">Schnellstart</button>
     </div>
     <div class="address-center-block">
-      <div class="url-input-container"><input type="text" id="url-bar" class="url-input" value="aoi://willkommen" onkeydown="if(event.key==='Enter')navigateUrl()"></div>
+      <div class="url-input-container" style="position:relative;display:flex;align-items:center;">
+        <input type="text" id="url-bar" class="url-input" value="aoi://willkommen" onkeydown="if(event.key==='Enter')navigateUrl()" style="padding-right:22px;">
+        <span id="fav-star-btn" title="Als Favorit speichern" onclick="aoiToggleStar(event)" style="position:absolute;right:4px;cursor:pointer;font-size:14px;line-height:1;user-select:none;">☆</span>
+        <!-- Stern-Popup -->
+        <div id="fav-star-popup" style="display:none;position:absolute;top:calc(100% + 4px);left:0;z-index:9999;background:#ece9d8;border:1px solid #7faad0;box-shadow:3px 4px 8px rgba(0,0,0,.35);padding:10px;min-width:260px;border-radius:2px;">
+          <div style="font-weight:bold;font-size:11px;color:#0b3464;margin-bottom:6px;">⭐ Favorit hinzufügen</div>
+          <div style="display:flex;gap:4px;margin-bottom:5px;">
+            <input id="fav-pop-icon" type="text" maxlength="4" style="width:36px;font-size:14px;text-align:center;border:1px solid #aaa;border-radius:2px;" value="🔗">
+            <input id="fav-pop-name" type="text" placeholder="Name" style="flex:1;font-size:11px;border:1px solid #aaa;border-radius:2px;padding:2px 4px;">
+          </div>
+          <div style="display:flex;gap:4px;justify-content:flex-end;">
+            <button onclick="aoiStarPopupCancel()" style="font-size:10px;padding:2px 8px;cursor:pointer;">Abbrechen</button>
+            <button onclick="aoiStarPopupSave()" style="font-size:10px;padding:2px 8px;cursor:pointer;background:#316ac5;color:#fff;border:none;border-radius:2px;">Hinzufügen</button>
+          </div>
+        </div>
+      </div>
       <button class="btn-go" onclick="navigateUrl()">Los</button>
     </div>
     <div class="address-right-block">
@@ -606,16 +625,7 @@ body {
       <div class="addr-btn-wrap">
         <button class="btn-options" style="font-size:10px;padding:2px 8px;" onclick="toggleFavPanel(event)">Favoriten ▾</button>
         <div class="addr-dropdown" id="fav-panel">
-          <div class="menu-dd-item" onclick="closeAddrPanels();aoiGoHome()">🏠 AOI Startseite</div>
-          <div class="menu-dd-sep"></div>
-          <div class="menu-dd-item" onclick="closeAddrPanels();navigateUrl('https://www.wetter.com')">🌤️ Wetter</div>
-          <div class="menu-dd-item" onclick="closeAddrPanels();navigateUrl('https://www.kicker.de')">⚽ Sport</div>
-          <div class="menu-dd-item" onclick="closeAddrPanels();navigateUrl('https://www.tagesschau.de')">📰 Nachrichten</div>
-          <div class="menu-dd-item" onclick="closeAddrPanels();navigateUrl('https://www.last.fm')">🎵 Musik</div>
-          <div class="menu-dd-item" onclick="closeAddrPanels();navigateUrl('https://www.amazon.de')">🛒 Shopping</div>
-          <div class="menu-dd-item" onclick="closeAddrPanels();navigateUrl('https://www.google.de')">🔍 Google</div>
-          <div class="menu-dd-sep"></div>
-          <div class="menu-dd-item" onclick="closeAddrPanels();aoiShowAddBuddyDialog()">👥 Buddy suchen…</div>
+          <!-- wird dynamisch per aoiRenderFavPanel() befüllt -->
         </div>
       </div>
     </div>
@@ -632,7 +642,7 @@ body {
       <div class="window-inner-content" style="flex:1;display:flex;flex-direction:column;overflow-y:auto;background:#fff;">
         <div class="nav-icon-grid">
           <div class="nav-grid-item" onclick="navigateKeyword('suche')"><span>🔍</span>Suchen</div>
-          <div class="nav-grid-item" onclick="navigateKeyword('stichwort')"><span>🔤</span>Stichwort</div>
+          <div class="nav-grid-item" onclick="aoiToggleAtomUhr()"><span>⚛️</span>Atomuhr</div>
           <div class="nav-grid-item" onclick="navigateKeyword('einkaufen')"><span>🛍️</span>Einkaufen</div>
           <div class="nav-grid-item" onclick="navigateKeyword('karten')"><span>🗺️</span>Karten</div>
         </div>
@@ -761,6 +771,42 @@ body {
                   </div>
                   <div id="meinaoi-homepage-msg" style="font-size:10px;min-height:14px;"></div>
                 </div>
+              </div>
+              <div class="mein-aoi-section">
+                <div class="mein-aoi-title">📬 E-Mail-Abrufintervall</div>
+                <div style="font-size:11px;color:#555;margin-bottom:6px;">Alle wie viele Minuten soll AOI auf neue E-Mails prüfen? (1–60)</div>
+                <div style="display:flex;flex-direction:column;gap:5px;">
+                  <div style="display:flex;align-items:center;gap:8px;">
+                    <input type="number" id="meinaoi-email-interval" min="1" max="60" style="width:70px;font-size:11px;border:1px solid #7f9db9;padding:4px 6px;" value="3">
+                    <span style="font-size:11px;color:#555;">Minuten</span>
+                  </div>
+                  <div style="display:flex;gap:6px;">
+                    <button class="btn-signon" style="border-radius:3px;padding:3px 12px;font-size:11px;" onclick="aoiSaveEmailInterval()">Speichern</button>
+                  </div>
+                  <div id="meinaoi-email-interval-msg" style="font-size:10px;min-height:14px;"></div>
+                </div>
+              </div>
+              <div class="mein-aoi-section">
+                <div class="mein-aoi-title">👥 Buddy-Gruppen</div>
+                <div style="font-size:11px;color:#555;margin-bottom:6px;">Gruppen anlegen oder leere Gruppen entfernen.</div>
+                <div id="meinaoi-groups-list" style="display:flex;flex-direction:column;gap:3px;margin-bottom:8px;"></div>
+                <div style="display:flex;gap:5px;align-items:center;">
+                  <input type="text" id="meinaoi-new-group-inp" maxlength="40" placeholder="Neuer Gruppenname…" style="flex:1;font-size:11px;border:1px solid #7f9db9;padding:3px 6px;" onkeydown="if(event.key==='Enter')aoiMeinAoiCreateGroup()">
+                  <button class="btn-signon" style="border-radius:3px;padding:3px 10px;font-size:11px;white-space:nowrap;" onclick="aoiMeinAoiCreateGroup()">➕ Anlegen</button>
+                </div>
+                <div id="meinaoi-groups-msg" style="font-size:10px;min-height:14px;margin-top:4px;"></div>
+              </div>
+              <div class="mein-aoi-section">
+                <div class="mein-aoi-title">⭐ Favoriten verwalten</div>
+                <div style="font-size:11px;color:#555;margin-bottom:6px;">Reihenfolge ändern, Einträge löschen oder umbenennen.</div>
+                <div id="meinaoi-fav-list" style="display:flex;flex-direction:column;gap:3px;margin-bottom:6px;"></div>
+                <div id="meinaoi-fav-msg" style="font-size:10px;min-height:14px;color:green;"></div>
+              </div>
+              <div class="mein-aoi-section">
+                <div class="mein-aoi-title">🧑‍💻 Gespeicherte Konten</div>
+                <div style="font-size:11px;color:#555;margin-bottom:6px;">Nicht mehr benötigte Accounts aus dem Anmeldedialog entfernen.</div>
+                <div id="meinaoi-accounts-list" style="display:flex;flex-direction:column;gap:3px;margin-bottom:4px;"></div>
+                <div id="meinaoi-accounts-msg" style="font-size:10px;min-height:14px;"></div>
               </div>
               <div class="mein-aoi-section">
                 <div class="mein-aoi-title">⚙️ Schnelleinstellungen</div>
@@ -906,7 +952,7 @@ body {
                 <div style="font-size:11px;color:#555;line-height:1.6;">
                   AOI 9.0 Nostalgia ist ein <b>inoffizielles Fan-Projekt</b> und steht in keiner Verbindung zu AOL, Verizon Media, Yahoo oder deren Tochtergesellschaften.<br><br>
                   „AOL", „AIM" und „AOL Instant Messenger" sind eingetragene Marken ihrer jeweiligen Eigentümer. AOI 9.0 übernimmt lediglich den Retro-Stil als Hommage an eine vergangene Ära – ähnlich wie Fan-Remakes klassischer Videospiele.<br><br>
-                  Der AIM-Dienst wurde am <b>15. Dezember 2017</b> von AOL offiziell eingestellt. AOI 9.0 ist eine eigenständige, quelloffene Neuimplementierung (<a href="#" onclick="window.open('https://github.com/Innobytix-IT/AOI-9.0','_blank');return false;" style="color:#003dd0;">AGPL-3.0</a>) ohne Zugriff auf AOL-Infrastruktur oder -Daten.
+                  Der AIM-Dienst wurde am <b>15. Dezember 2017</b> von AOL offiziell eingestellt. AOI 9.0 ist eine eigenständige, quelloffene Neuimplementierung (<a href="#" onclick="window.electronAPI&&window.electronAPI.openExternal('https://github.com/Innobytix-IT/AOI-9.0');return false;" style="color:#003dd0;">AGPL-3.0</a>) ohne Zugriff auf AOL-Infrastruktur oder -Daten.
                 </div>
               </div>
 
@@ -922,7 +968,7 @@ body {
             </div>
           </div>
         </div>
-        <webview id="browser-frame" style="display:none;flex:1;min-height:0;width:100%;border:none;background:#fff;"></webview>
+        <webview id="browser-frame" partition="persist:aoi-browser" style="display:none;flex:1;min-height:0;width:100%;border:none;background:#fff;"></webview>
       </div>
     </div>
 
@@ -958,7 +1004,6 @@ body {
             <button class="buddy-act-btn" onclick="aoiCreateGroup()" style="grid-column:span 2;">➕ Neue Gruppe</button>
             <button class="buddy-act-btn" onclick="openWindow('win-userdir');aoiLoadUserDir()" style="grid-column:span 2;">🔍 Nutzersuche</button>
           </div>
-          <div style="font-size:9px;text-align:center;color:#555;">AOI-Stichwort: <b>Buddy</b></div>
         </div>
       </div>
     </div>
@@ -983,7 +1028,13 @@ body {
           <span class="mail-tb-sep"></span>
           <button class="mail-tb-btn" onclick="mailDelete()">🗑 Löschen</button>
           <span class="mail-tb-sep"></span>
-          <button class="mail-tb-btn" onclick="emailFetchCurrentFolder()">🔄 Aktualisieren</button>
+          <button class="mail-tb-btn" onclick="emailManualFetch()">📥 Abrufen</button>
+        </div>
+        <div class="mail-bulk-bar" id="mail-bulk-bar">
+          <span id="mail-bulk-count" style="font-weight:bold;"></span>
+          <button class="mail-tb-btn" onclick="mailDeleteSelected()">🗑 Auswahl löschen</button>
+          <button class="mail-tb-btn" id="mail-move-btn" onclick="mailShowMoveMenu(this)">📁 Verschieben ▾</button>
+          <button class="btn-options" style="margin-left:4px;" onclick="mailClearSelection()">✕ Abwählen</button>
         </div>
         <div class="mail-body-layout">
           <!-- Ordnerstruktur -->
@@ -994,7 +1045,7 @@ body {
           <div class="mail-grid-container">
             <div class="mail-table-box">
               <table class="mail-table">
-                <thead><tr><th style="width:22px;">Typ</th><th style="width:88px;">Datum</th><th style="width:180px;">Absender</th><th>Betreff</th></tr></thead>
+                <thead><tr><th style="width:20px;"><input type="checkbox" id="mail-chk-all" class="mail-chk" onclick="mailSelectAll(this)" title="Alle auswählen"></th><th style="width:22px;">Typ</th><th style="width:88px;">Datum</th><th style="width:180px;">Absender</th><th>Betreff</th></tr></thead>
                 <tbody id="mail-tbody"></tbody>
               </table>
             </div>
@@ -1003,7 +1054,10 @@ body {
         </div>
         <div class="mail-actions-bar">
           <span id="mail-status-bar" style="font-size:10px;color:#555;"></span>
-          <button class="btn-options" onclick="playSound('snd-mail')">🔔 Sound</button>
+          <div style="display:flex;gap:4px;">
+            <button class="btn-options" onclick="mailPrint()">🖨 Drucken</button>
+            <button class="btn-options" onclick="playSound('snd-mail')">🔔 Sound</button>
+          </div>
         </div>
       </div>
     </div>
@@ -1054,6 +1108,15 @@ body {
     </div>
 
     <!-- RADIO-FENSTER -->
+    <!-- ATOMUHR WIDGET (rahmenlos, immer im Vordergrund) -->
+    <div id="atomuhr-widget" style="display:none;position:fixed;z-index:99999;cursor:move;user-select:none;background:transparent;border:none;padding:4px 8px;">
+      <div id="atomuhr-time" style="font-family:'Courier New',monospace;font-size:34px;font-weight:bold;color:#ff2200;letter-spacing:5px;text-shadow:0 0 8px #ff2200,0 0 18px #cc1100,1px 1px 2px #000;line-height:1;"></div>
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-top:2px;">
+        <div id="atomuhr-date" style="font-family:'Courier New',monospace;font-size:10px;color:#ff3311;letter-spacing:1px;text-shadow:0 0 6px #cc1100,1px 1px 2px #000;"></div>
+        <div id="atomuhr-tz"   style="font-family:'Courier New',monospace;font-size:8px;color:#cc2200;letter-spacing:.5px;text-shadow:1px 1px 2px #000;margin-left:10px;"></div>
+      </div>
+    </div>
+
     <div class="mdi-window" id="win-radio" style="bottom:30px;left:20px;width:360px;height:280px;z-index:27;display:none;">
       <div class="title-bar" onmousedown="focusAndDrag(event,'win-radio')">
         <div class="title-left">
@@ -1079,7 +1142,7 @@ body {
           </select>
           <button class="btn-options" style="font-size:10px;padding:1px 7px;" onclick="radioSelectStation()">▶</button>
         </div>
-        <webview id="radio-frame" src="https://tunein.com/radio/Top-40-Hits-g39/"
+        <webview id="radio-frame" partition="persist:aoi-radio" src="https://tunein.com/radio/Top-40-Hits-g39/"
           style="flex:1;width:100%;border:none;background:#fff;"></webview>
       </div>
     </div>
@@ -1154,6 +1217,9 @@ body {
 
 <!-- ===== KONTEXT-MENÜ GRUPPEN ===== -->
 <div id="group-ctx-menu" style="display:none;position:fixed;z-index:9999;background:#fff;border:1px solid #6b98c3;border-radius:3px;box-shadow:2px 2px 6px rgba(0,0,0,.25);min-width:150px;padding:2px 0;">
+  <div class="ctx-item" id="ctx-group-up-btn" onclick="aoiCtxGroupMove(-1)">▲ Nach oben</div>
+  <div class="ctx-item" id="ctx-group-down-btn" onclick="aoiCtxGroupMove(1)">▼ Nach unten</div>
+  <div style="border-top:1px solid #c0cfe0;margin:2px 0;"></div>
   <div class="ctx-item" onclick="aoiCtxGroupRename()">✏️ Umbenennen</div>
   <div class="ctx-item" id="ctx-group-delete-btn" onclick="aoiCtxGroupDelete()">🗑️ Löschen</div>
 </div>
@@ -1349,6 +1415,46 @@ body {
   </div>
 </div>
 
+<!-- ===== DIALOG: NEUE GRUPPE ===== -->
+<div class="aoi-modal" id="dlg-create-group">
+  <div class="aoi-modal-box" style="width:300px;">
+    <div class="aoi-modal-title">
+      <span>➕ Neue Gruppe</span>
+      <span style="cursor:pointer;" onclick="document.getElementById('dlg-create-group').style.display='none'">✕</span>
+    </div>
+    <div class="aoi-modal-body">
+      <div class="aoi-modal-row">
+        <label>Gruppenname:</label>
+        <input type="text" id="inp-group-name" maxlength="40" placeholder="z.B. Kollegen" style="width:100%;" onkeydown="if(event.key==='Enter')aoiCreateGroupConfirm()">
+      </div>
+      <div class="aoi-modal-error" id="dlg-group-error"></div>
+      <div class="aoi-modal-btns">
+        <button class="btn-options" onclick="document.getElementById('dlg-create-group').style.display='none'">Abbrechen</button>
+        <button class="btn-signon" style="border-radius:4px;padding:4px 16px;" onclick="aoiCreateGroupConfirm()">Erstellen</button>
+      </div>
+    </div>
+  </div>
+</div>
+<!-- ===== DIALOG: GRUPPE UMBENENNEN ===== -->
+<div class="aoi-modal" id="dlg-rename-group">
+  <div class="aoi-modal-box" style="width:300px;">
+    <div class="aoi-modal-title">
+      <span>✏ Gruppe umbenennen</span>
+      <span style="cursor:pointer;" onclick="document.getElementById('dlg-rename-group').style.display='none'">✕</span>
+    </div>
+    <div class="aoi-modal-body">
+      <div class="aoi-modal-row">
+        <label>Neuer Name:</label>
+        <input type="text" id="inp-rename-group" maxlength="40" style="width:100%;" onkeydown="if(event.key==='Enter')aoiRenameGroupConfirm()">
+      </div>
+      <div class="aoi-modal-error" id="dlg-rename-group-error"></div>
+      <div class="aoi-modal-btns">
+        <button class="btn-options" onclick="document.getElementById('dlg-rename-group').style.display='none'">Abbrechen</button>
+        <button class="btn-signon" style="border-radius:4px;padding:4px 16px;" onclick="aoiRenameGroupConfirm()">Umbenennen</button>
+      </div>
+    </div>
+  </div>
+</div>
 <!-- ===== DIALOG: SICHERHEITSCHECK ===== -->
 <div class="aoi-modal" id="dlg-datenschutz">
   <div class="aoi-modal-box" style="width:560px;max-height:85vh;display:flex;flex-direction:column;">
@@ -1468,7 +1574,7 @@ body {
 
       <div style="background:#f0f0f0;border:1px solid #ccc;border-radius:4px;padding:8px 10px;font-size:10px;color:#555;">
         AOI 9.0 ist quelloffene Software (AGPL-3.0) –
-        <a href="#" onclick="window.open('https://github.com/Innobytix-IT/AOI-9.0','_blank');return false;" style="color:#003dd0;">Quellcode auf GitHub</a>.
+        <a href="#" onclick="window.electronAPI&&window.electronAPI.openExternal('https://github.com/Innobytix-IT/AOI-9.0');return false;" style="color:#003dd0;">Quellcode auf GitHub</a>.
         Jeder Nutzer kann den Signaling-Server selbst betreiben und ist dann selbst datenschutzrechtlich Verantwortlicher im Sinne der DSGVO Art. 4 Nr. 7.
       </div>
     </div>
@@ -1864,6 +1970,13 @@ function switchPortalTab(id) {
     if(tinp) tinp.value = (AOI_TOKEN && AOI_TOKEN !== defTok) ? AOI_TOKEN : '';
     var tmsg = document.getElementById('meinaoi-token-msg');
     if(tmsg) tmsg.textContent = '';
+    var iinp = document.getElementById('meinaoi-email-interval');
+    if(iinp) iinp.value = _emailPollInterval || 3;
+    var imsg = document.getElementById('meinaoi-email-interval-msg');
+    if(imsg) imsg.textContent = '';
+    aoiMeinAoiRenderGroups();
+    aoiMeinAoiRenderFavorites();
+    aoiMeinAoiRenderAccounts();
   }
 }
 
@@ -2076,12 +2189,128 @@ function toggleSearchPanel(e) {
     setTimeout(function(){ document.getElementById('search-panel-input').focus(); }, 50);
   }
 }
+// ── Favoriten ────────────────────────────────────────────────────────────────
+var FAV_DEFAULTS = [
+  {icon:'🌤️', name:'Wetter',      url:'https://www.wetter.com'},
+  {icon:'⚽',  name:'Sport',       url:'https://www.kicker.de'},
+  {icon:'📰', name:'Nachrichten', url:'https://www.tagesschau.de'},
+  {icon:'🎵', name:'Musik',       url:'https://www.last.fm'},
+  {icon:'🛒', name:'Shopping',    url:'https://www.amazon.de'},
+  {icon:'🔍', name:'Google',      url:'https://www.google.de'},
+];
+function aoiFavKey(){ return 'aoi_favorites' + (aoi_name ? '_' + aoi_name : ''); }
+function aoiGetFavorites(){
+  try{ var d=JSON.parse(localStorage.getItem(aoiFavKey())||'null'); return Array.isArray(d)?d:FAV_DEFAULTS.slice(); }
+  catch(e){ return FAV_DEFAULTS.slice(); }
+}
+function aoiSaveFavorites(arr){
+  try{ localStorage.setItem(aoiFavKey(), JSON.stringify(arr)); }catch(e){}
+}
+function aoiRenderFavPanel(){
+  var panel = document.getElementById('fav-panel');
+  if(!panel) return;
+  var favs = aoiGetFavorites();
+  var html = '<div class="menu-dd-item" onclick="closeAddrPanels();aoiGoHome()">🏠 AOI Startseite</div>';
+  if(favs.length) html += '<div class="menu-dd-sep"></div>';
+  favs.forEach(function(f, i){
+    var safeUrl = f.url.replace(/'/g,"\\'");
+    var safeName = (f.icon||'🔗')+' '+(f.name||f.url);
+    html += '<div class="menu-dd-item fav-item" style="display:flex;align-items:center;gap:0;">'
+          + '<span style="flex:1;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;" onclick="closeAddrPanels();navigateUrl(\''+safeUrl+'\')">'
+          + safeName.replace(/</g,'&lt;').replace(/>/g,'&gt;')
+          + '</span>'
+          + '<span style="color:#c00;padding:0 4px;cursor:pointer;font-weight:bold;" title="Entfernen" onclick="aoiDeleteFav('+i+')">✕</span>'
+          + '</div>';
+  });
+  html += '<div class="menu-dd-sep"></div>';
+  html += '<div class="menu-dd-item" onclick="aoiAddCurrentFav()">➕ Aktuelle Seite speichern</div>';
+  html += '<div class="menu-dd-sep"></div>';
+  html += '<div class="menu-dd-item" onclick="closeAddrPanels();aoiShowAddBuddyDialog()">👥 Buddy suchen…</div>';
+  panel.innerHTML = html;
+}
+function aoiFavCurrentUrl(){
+  var wv = document.getElementById('browser-frame');
+  return ((wv && (wv.getURL ? wv.getURL() : wv.src)) || document.getElementById('url-bar').value || '').trim();
+}
+function aoiIsFaved(url){
+  return aoiGetFavorites().some(function(f){ return f.url === url; });
+}
+function aoiUpdateStarBtn(){
+  var btn = document.getElementById('fav-star-btn');
+  if(!btn) return;
+  var url = aoiFavCurrentUrl();
+  var isAoi = !url || url === 'about:blank' || url.startsWith('aoi:');
+  btn.textContent = (!isAoi && aoiIsFaved(url)) ? '⭐' : '☆';
+  btn.style.color  = (!isAoi && aoiIsFaved(url)) ? '#e8a000' : '#888';
+}
+function aoiToggleStar(e){
+  e.stopPropagation();
+  var url = aoiFavCurrentUrl();
+  if(!url || url === 'about:blank' || url.startsWith('aoi:')) return;
+  // Wenn schon gespeichert: direkt entfernen
+  if(aoiIsFaved(url)){
+    var favs = aoiGetFavorites().filter(function(f){ return f.url !== url; });
+    aoiSaveFavorites(favs);
+    aoiRenderFavPanel();
+    aoiMeinAoiRenderFavorites();
+    aoiUpdateStarBtn();
+    document.getElementById('fav-star-popup').style.display = 'none';
+    return;
+  }
+  // Popup öffnen
+  var popup = document.getElementById('fav-star-popup');
+  var isOpen = popup.style.display !== 'none';
+  popup.style.display = isOpen ? 'none' : 'block';
+  if(!isOpen){
+    var domain = url.replace(/^https?:\/\/(www\.)?/,'').split('/')[0];
+    document.getElementById('fav-pop-name').value = domain;
+    document.getElementById('fav-pop-icon').value = '🔗';
+    document.getElementById('fav-pop-name').focus();
+    document.getElementById('fav-pop-name').select();
+  }
+}
+function aoiStarPopupSave(){
+  var url  = aoiFavCurrentUrl();
+  var name = document.getElementById('fav-pop-name').value.trim() || url;
+  var icon = document.getElementById('fav-pop-icon').value.trim() || '🔗';
+  document.getElementById('fav-star-popup').style.display = 'none';
+  if(!url) return;
+  var favs = aoiGetFavorites();
+  favs.push({icon: icon, name: name, url: url});
+  aoiSaveFavorites(favs);
+  aoiRenderFavPanel();
+  aoiMeinAoiRenderFavorites();
+  aoiUpdateStarBtn();
+}
+function aoiStarPopupCancel(){
+  document.getElementById('fav-star-popup').style.display = 'none';
+}
+function aoiAddCurrentFav(){
+  aoiToggleStar({stopPropagation:function(){}});
+}
+function aoiDeleteFav(idx){
+  var favs = aoiGetFavorites();
+  favs.splice(idx, 1);
+  aoiSaveFavorites(favs);
+  aoiRenderFavPanel();
+  aoiMeinAoiRenderFavorites();
+}
+function aoiMoveFav(idx, dir){
+  var favs = aoiGetFavorites();
+  var newIdx = idx + dir;
+  if(newIdx < 0 || newIdx >= favs.length) return;
+  var tmp = favs[idx]; favs[idx] = favs[newIdx]; favs[newIdx] = tmp;
+  aoiSaveFavorites(favs);
+  aoiRenderFavPanel();
+  aoiMeinAoiRenderFavorites();
+}
+
 function toggleFavPanel(e) {
   e.stopPropagation();
   var panel = document.getElementById('fav-panel');
   var isOpen = panel.classList.contains('open');
   closeAddrPanels();
-  if (!isOpen) panel.classList.add('open');
+  if (!isOpen) { aoiRenderFavPanel(); panel.classList.add('open'); }
 }
 function closeAddrPanels() {
   document.querySelectorAll('.addr-dropdown').forEach(function(el){ el.classList.remove('open'); });
@@ -2421,7 +2650,8 @@ function setMyAwayMessage() {
 function clearMyAwayMessage() { document.getElementById('my-status-badge').textContent='● Online'; document.getElementById('my-status-badge').style.color='#006600'; }
 
 /* ===== POSTFACH ===== */
-var _selMail = null; // {row, from, date, subject, body}
+var _selMail = null; // {row, from, date, subject, body, uid}
+var _emailTrashFolder = null;
 
 var WELCOME_MAIL_ID = 'welcome_v1';
 function buildWelcomeMailHtml(userName) {
@@ -2496,22 +2726,26 @@ function mailInitDemoEmails(userName) {
   var tr = document.createElement('tr');
   tr.className = alreadyRead ? '' : 'unread';
   tr.dataset.demoId = WELCOME_MAIL_ID;
-  tr.innerHTML = '<td>'+(alreadyRead?'📨':'✉️')+'</td><td>'+dateStr+'</td><td>AOI 9.0 Nostalgia-Team</td><td>Willkommen bei AOI 9.0 Nostalgia!</td>';
+  tr.innerHTML = '<td></td><td>'+(alreadyRead?'📨':'✉️')+'</td><td>'+dateStr+'</td><td>AOI 9.0 Nostalgia-Team</td><td>Willkommen bei AOI 9.0 Nostalgia!</td>';
   var body = buildWelcomeMailHtml(userName||'');
-  tr.onclick = function(){ previewMail(tr,'AOI 9.0 Nostalgia-Team',dateStr,'Willkommen bei AOI 9.0 Nostalgia!',body,true); };
+  tr.onclick = function(e){ if(e.target.classList.contains('mail-chk')) return; previewMail(tr,'AOI 9.0 Nostalgia-Team',dateStr,'Willkommen bei AOI 9.0 Nostalgia!',body,true); };
   tr.ondblclick = mailRead;
   tbody.insertBefore(tr, tbody.firstChild);
   mailUpdateCounter();
 }
 
-function previewMail(row, from, date, subj, txt, isHtml) {
+function previewMail(row, from, date, subj, txt, isHtml, uid) {
   var e=function(x){return x.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');};
   document.querySelectorAll('#mail-tbody tr').forEach(function(r){r.classList.remove('mail-selected');});
   row.classList.add('mail-selected');
+  var wasUnread = row.classList.contains('unread');
   row.classList.remove('unread');
-  if(row.cells[0]) row.cells[0].textContent = '📨';
+  if(row.cells[1]) row.cells[1].textContent = '📨';
   if(row.dataset.demoId) { try{ localStorage.setItem('aoi_mail_read_'+row.dataset.demoId,'1'); }catch(e){} }
-  _selMail = { row:row, from:from, date:date, subject:subj, body:txt, isHtml:!!isHtml };
+  _selMail = { row:row, from:from, date:date, subject:subj, body:txt, isHtml:!!isHtml, uid:uid||null };
+  if(wasUnread && uid && _emailCfg && window.electronAPI && window.electronAPI.emailMarkRead) {
+    window.electronAPI.emailMarkRead({cfg:_emailCfg, folder:_currentFolderPath, uid:uid});
+  }
   var bodyHtml = isHtml ? txt : e(txt).replace(/\n/g,'<br>');
   document.getElementById('mail-preview').innerHTML =
     '<b>Von:</b> '+e(from)+'&nbsp;&nbsp;<span style="color:#888;font-size:10px;">'+e(date)+'</span><br>'+
@@ -2520,17 +2754,102 @@ function previewMail(row, from, date, subj, txt, isHtml) {
   mailUpdateCounter();
 }
 
-function mailUpdateCounter() {
-  var unread = document.querySelectorAll('#mail-tbody tr.unread').length;
+function mailSetUnreadBadge(n) {
   var badge = document.getElementById('mail-counter');
-  if(badge){ badge.textContent = unread > 0 ? unread : ''; badge.style.display = unread > 0 ? '' : 'none'; }
+  if(badge){ badge.textContent = n > 0 ? n : ''; badge.style.display = n > 0 ? '' : 'none'; }
   var tabNew = document.getElementById('tab-new');
-  if(tabNew) tabNew.textContent = 'Neu'+(unread>0?' ('+unread+')':'');
-  // Portal-Widget und Splash-Text mitpflegen
-  var txt = unread===0 ? 'Keine neuen E-Mails.' : 'Sie haben <b>'+unread+' neue</b> E-Mail'+(unread!==1?'s':'')+'!';
+  if(tabNew) tabNew.textContent = 'Neu'+(n>0?' ('+n+')':'');
+  var txt = n===0 ? 'Keine neuen E-Mails.' : 'Sie haben <b>'+n+' neue</b> E-Mail'+(n!==1?'s':'')+'!';
   var wm = document.getElementById('w-mail-text'); if(wm) wm.innerHTML = txt;
   var pm = document.getElementById('portal-mail-count'); if(pm) pm.innerHTML = txt;
-  var ws = document.getElementById('w-mail-splash'); if(ws) ws.style.display = unread > 0 ? '' : 'none';
+  var ws = document.getElementById('w-mail-splash'); if(ws) ws.style.display = n > 0 ? '' : 'none';
+}
+function mailUpdateCounter() {
+  var unread = document.querySelectorAll('#mail-tbody tr.unread').length;
+  mailSetUnreadBadge(unread);
+}
+
+/* ===== MEHRFACHAUSWAHL ===== */
+var _selectedMails = new Set();
+
+function mailToggleCheck(uid, row, chk) {
+  if(!uid) return;
+  if(chk.checked) { _selectedMails.add(uid); row.classList.add('mail-multi-selected'); }
+  else            { _selectedMails.delete(uid); row.classList.remove('mail-multi-selected'); }
+  mailUpdateBulkBar();
+}
+function mailSelectAll(chk) {
+  document.querySelectorAll('#mail-tbody tr[data-uid]').forEach(function(row) {
+    var uid = parseInt(row.dataset.uid);
+    var rowChk = row.querySelector('.mail-chk');
+    if(chk.checked) { _selectedMails.add(uid); row.classList.add('mail-multi-selected'); if(rowChk) rowChk.checked=true; }
+    else            { _selectedMails.delete(uid); row.classList.remove('mail-multi-selected'); if(rowChk) rowChk.checked=false; }
+  });
+  mailUpdateBulkBar();
+}
+function mailClearSelection() {
+  _selectedMails.clear();
+  document.querySelectorAll('#mail-tbody tr.mail-multi-selected').forEach(function(r){ r.classList.remove('mail-multi-selected'); });
+  document.querySelectorAll('#mail-tbody .mail-chk').forEach(function(c){ c.checked=false; });
+  var all = document.getElementById('mail-chk-all'); if(all) all.checked=false;
+  mailUpdateBulkBar();
+}
+function mailUpdateBulkBar() {
+  var n = _selectedMails.size;
+  var bar = document.getElementById('mail-bulk-bar');
+  if(bar) bar.style.display = n > 0 ? 'flex' : 'none';
+  var cnt = document.getElementById('mail-bulk-count');
+  if(cnt) cnt.textContent = n + ' ausgewählt';
+}
+function mailDeleteSelected() {
+  if(_selectedMails.size === 0) return;
+  if(!confirm(_selectedMails.size + ' E-Mail(s) wirklich löschen?')) return;
+  var uids = Array.from(_selectedMails);
+  uids.forEach(function(uid) {
+    var row = document.querySelector('#mail-tbody tr[data-uid="'+uid+'"]');
+    if(row) row.remove();
+  });
+  if(_emailCfg && window.electronAPI && window.electronAPI.emailTrashMany) {
+    window.electronAPI.emailTrashMany({cfg:_emailCfg, folder:_currentFolderPath, uids:uids, trashFolder:_emailTrashFolder});
+  }
+  mailClearSelection();
+  mailUpdateCounter();
+}
+function mailShowMoveMenu(btn) {
+  document.querySelectorAll('.mail-move-popup').forEach(function(p){ p.remove(); });
+  var folders = [];
+  document.querySelectorAll('#mail-folder-tree [data-path]').forEach(function(el){
+    var p = el.getAttribute('data-path');
+    if(p && p !== _currentFolderPath) folders.push({path:p, label:el.textContent.trim()});
+  });
+  if(folders.length === 0) { alert('Keine anderen Ordner verfügbar.'); return; }
+  var popup = document.createElement('div');
+  popup.className = 'mail-move-popup';
+  folders.forEach(function(f) {
+    var item = document.createElement('div');
+    item.className = 'mail-save-item';
+    item.textContent = f.label;
+    item.onclick = function(){ popup.remove(); mailMoveSelected(f.path); };
+    popup.appendChild(item);
+  });
+  var rect = btn.getBoundingClientRect();
+  popup.style.top = (rect.bottom + 2) + 'px';
+  popup.style.left = rect.left + 'px';
+  document.body.appendChild(popup);
+  setTimeout(function(){ document.addEventListener('click', function h(){ popup.remove(); document.removeEventListener('click',h); }, {once:true}); }, 0);
+}
+function mailMoveSelected(targetFolder) {
+  if(_selectedMails.size === 0) return;
+  var uids = Array.from(_selectedMails);
+  uids.forEach(function(uid) {
+    var row = document.querySelector('#mail-tbody tr[data-uid="'+uid+'"]');
+    if(row) row.remove();
+  });
+  if(_emailCfg && window.electronAPI && window.electronAPI.emailMoveMany) {
+    window.electronAPI.emailMoveMany({cfg:_emailCfg, folder:_currentFolderPath, uids:uids, targetFolder:targetFolder});
+  }
+  mailClearSelection();
+  mailUpdateCounter();
 }
 
 function mailRead() {
@@ -2572,22 +2891,65 @@ function mailSaveAs() {
   document.body.removeChild(a); URL.revokeObjectURL(url);
 }
 
+function mailQuoteBlock(m) {
+  var lines = (m.body || '').split('\n');
+  var quoted = lines.map(function(l){ return '> ' + l; }).join('\n');
+  return '\n\nAm ' + m.date + ' schrieb ' + m.from + ':\n' + quoted;
+}
+
+function mailPrint() {
+  if(!_selMail){ alert('Bitte zuerst eine E-Mail auswählen.'); return; }
+  var m = _selMail;
+  var e = function(x){ return x.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); };
+  var bodyHtml = m.isHtml ? m.body : e(m.body).replace(/\n/g,'<br>');
+  var w = window.open('','_blank','width=700,height=600');
+  if(!w) { alert('Popup-Fenster wurde blockiert. Bitte Popups für AOI erlauben.'); return; }
+  w.document.write('<!doctype html><html><head><meta charset="utf-8"><title>'+e(m.subject)+'</title>'
+    +'<style>body{font-family:Tahoma,sans-serif;font-size:12px;margin:20px;color:#000;}'
+    +'.hdr{background:#d8e6f3;padding:8px 12px;border-bottom:2px solid #7faad0;margin-bottom:12px;}'
+    +'.hdr b{display:inline-block;width:60px;}hr{border:none;border-top:1px solid #ccc;margin:10px 0;}'
+    +'</style></head><body>'
+    +'<div class="hdr">'
+    +'<b>Von:</b> '+e(m.from)+'<br>'
+    +'<b>Datum:</b> '+e(m.date)+'<br>'
+    +'<b>Betreff:</b> '+e(m.subject)
+    +'</div>'
+    +'<div>'+bodyHtml+'</div>'
+    +'</body></html>');
+  w.document.close();
+  w.focus();
+  w.print();
+}
+
+function mailBuildQuote(m, label) {
+  var bodyHtml = m.isHtml ? m.body : escHtml(m.body).replace(/\n/g,'<br>');
+  return '<p id="compose-reply-start"><br></p>'
+    + '<hr style="border:none;border-top:2px solid #7faad0;margin:8px 0;">'
+    + '<div style="border-left:3px solid #aaa;padding:4px 10px;color:#555;background:#f6f8fb;font-size:11px;">'
+    + '<b>' + escHtml(label) + ':</b> ' + escHtml(m.from)
+    + ' &nbsp;|&nbsp; <b>Datum:</b> ' + escHtml(m.date)
+    + (m.subject ? ' &nbsp;|&nbsp; <b>Betreff:</b> ' + escHtml(m.subject) : '')
+    + '<br><br>' + bodyHtml + '</div>';
+}
+
 function mailReplyOpen() {
   if(!_selMail){ alert('Bitte zuerst eine E-Mail auswählen.'); return; }
-  openComposeMail(_selMail.from, 'Re: '+_selMail.subject,
-    '\n\n--- Original ---\nVon: '+_selMail.from+'\n'+_selMail.body);
+  openComposeMail(_selMail.from, 'Re: '+_selMail.subject, mailBuildQuote(_selMail, 'Von'));
 }
 
 function mailForwardOpen() {
   if(!_selMail){ alert('Bitte zuerst eine E-Mail auswählen.'); return; }
-  openComposeMail('', 'Fwd: '+_selMail.subject,
-    '\n\n--- Weitergeleitet ---\nVon: '+_selMail.from+'\n'+_selMail.body);
+  openComposeMail('', 'Fwd: '+_selMail.subject, mailBuildQuote(_selMail, 'Weitergeleitet von'));
 }
 
 function mailDelete() {
   if(!_selMail){ alert('Bitte zuerst eine E-Mail auswählen.'); return; }
+  if(!confirm('Diese E-Mail wirklich löschen?')) return;
   if(_selMail.row.dataset.demoId) {
     try{ localStorage.setItem('aoi_mail_deleted_'+_selMail.row.dataset.demoId,'1'); }catch(e){}
+  }
+  if(_selMail.uid && _emailCfg && window.electronAPI && window.electronAPI.emailTrash) {
+    window.electronAPI.emailTrash({cfg:_emailCfg, folder:_currentFolderPath, uid:_selMail.uid, trashFolder:_emailTrashFolder});
   }
   _selMail.row.remove();
   _selMail=null;
@@ -2641,7 +3003,13 @@ function emailLoadFolders() {
     });
     if (!tree) return;
     tree.innerHTML = '';
+    _emailTrashFolder = null;
     folders.forEach(function(f) {
+      var su = (f.specialUse || '').toLowerCase();
+      var p  = (f.path || '').toLowerCase();
+      if (!_emailTrashFolder && (su === '\\trash' || /trash|deleted|papierkorb|gel.scht/i.test(p))) {
+        _emailTrashFolder = f.path;
+      }
       var icon  = mailFolderIcon(f);
       var label = f.name === 'INBOX' ? 'Posteingang' : f.name;
       var div = document.createElement('div');
@@ -2651,12 +3019,15 @@ function emailLoadFolders() {
       (function(path, lbl){ div.onclick = function(){ emailSwitchFolder(path, lbl); }; })(f.path, label);
       tree.appendChild(div);
     });
+    emailFetchCurrentFolder();
   }).catch(function() {
     if (tree) tree.innerHTML = '<div class="mail-tree-item selected" onclick="emailSwitchFolder(\'INBOX\',\'Posteingang\')"><span>📬 Posteingang</span></div>';
+    emailFetchCurrentFolder();
   });
 }
 
 function emailSwitchFolder(folderPath, label) {
+  mailClearSelection();
   _currentFolderPath = folderPath;
   _currentFolderLabel = label || folderPath;
   document.querySelectorAll('.mail-tree-item').forEach(function(el){ el.classList.remove('selected'); });
@@ -2686,8 +3057,10 @@ function emailFetchCurrentFolder() {
         var tr = document.createElement('tr');
         if (!m.read) tr.className = 'unread';
         tr.id = 'mail-row-' + i;
-        tr.innerHTML = '<td>'+(m.read?'📨':'✉️')+'</td><td>'+escHtml(m.date)+'</td><td>'+escHtml(m.from)+'</td><td>'+escHtml(m.subject)+'</td>';
-        (function(msg){ tr.onclick=function(){ previewMail(tr,msg.from,msg.date,msg.subject,msg.body); }; tr.ondblclick=mailRead; })(m);
+        tr.dataset.uid = m.uid || '';
+        tr.innerHTML = '<td onclick="event.stopPropagation()"><input type="checkbox" class="mail-chk" data-uid="'+(m.uid||'')+'" onclick="mailToggleCheck('+(m.uid||0)+',this.closest(\'tr\'),this)"></td>'
+          +'<td>'+(m.read?'📨':'✉️')+'</td><td>'+escHtml(m.date)+'</td><td>'+escHtml(m.from)+'</td><td>'+escHtml(m.subject)+'</td>';
+        (function(msg){ tr.onclick=function(e){ if(e.target.classList.contains('mail-chk')) return; previewMail(tr,msg.from,msg.date,msg.subject,msg.body,false,msg.uid); }; tr.ondblclick=mailRead; })(m);
         tbody.appendChild(tr);
       });
     }
@@ -2710,13 +3083,19 @@ function mailUpdateTitle() {
 function mailMarkAsRead() {
   if (!_selMail) { alert('Bitte zuerst eine E-Mail auswählen.'); return; }
   _selMail.row.classList.remove('unread');
-  if (_selMail.row.cells[0]) _selMail.row.cells[0].textContent = '📨';
+  if (_selMail.row.cells[1]) _selMail.row.cells[1].textContent = '📨';
   if (_selMail.row.dataset.demoId) { try{ localStorage.setItem('aoi_mail_read_'+_selMail.row.dataset.demoId,'1'); }catch(e){} }
+  if (_selMail.uid && _emailCfg && window.electronAPI && window.electronAPI.emailMarkRead) {
+    window.electronAPI.emailMarkRead({cfg:_emailCfg, folder:_currentFolderPath, uid:_selMail.uid});
+  }
   mailUpdateCounter();
 }
 
 /* ===== E-MAIL EINSTELLUNGEN ===== */
 var _emailCfg = null;
+var _emailPollTimer = null;
+var _emailKnownUids = null;
+var _emailPollInterval = 3;
 
 var EMAIL_PRESETS = {
   gmx:     { imapHost:'imap.gmx.net',              imapPort:993, imapSsl:true,  smtpHost:'mail.gmx.net',              smtpPort:465, smtpSsl:true  },
@@ -2773,15 +3152,16 @@ function emailSaveSettings() {
   if(!window.electronAPI) return;
   var cfg = emailGetFormCfg();
   if(!cfg.user || !cfg.password || !cfg.imapHost) { emailSetResult('Bitte alle Felder ausfüllen.', false); return; }
+  cfg.username = aoi_name;
   window.electronAPI.emailSaveConfig(cfg).then(function(r){
-    if(r.ok){ _emailCfg = cfg; emailSetResult('✔ Gespeichert.', true); mailUpdateTitle(); emailLoadFolders(); }
+    if(r.ok){ _emailCfg = cfg; emailSetResult('✔ Gespeichert.', true); mailUpdateTitle(); emailLoadFolders(); emailStartPolling(); }
     else emailSetResult('✘ Speichern fehlgeschlagen: ' + r.error, false);
   });
 }
 
 function emailLoadSettings() {
   if(!window.electronAPI) return;
-  window.electronAPI.emailLoadConfig().then(function(r){
+  window.electronAPI.emailLoadConfig(aoi_name).then(function(r){
     if(!r.ok || !r.config) return;
     var c = r.config;
     _emailCfg = c;
@@ -2796,7 +3176,208 @@ function emailLoadSettings() {
     document.getElementById('email-tls-ignore').checked = !!c.tlsIgnoreCert;
     mailUpdateTitle();
     emailLoadFolders();
+    emailStartPolling();
   });
+}
+
+function emailStartPolling() {
+  emailStopPolling();
+  if (!_emailCfg) return;
+  var mins = _emailPollInterval || 3;
+  _emailKnownUids = null;
+  _emailPollTimer = setInterval(emailBackgroundPoll, mins * 60 * 1000);
+  emailBackgroundPoll();
+}
+function emailStopPolling() {
+  if (_emailPollTimer) { clearInterval(_emailPollTimer); _emailPollTimer = null; }
+}
+var _emailPolling = false;
+function emailBackgroundPoll() {
+  if (!window.electronAPI || !_emailCfg || _emailPolling) return;
+  _emailPolling = true;
+  window.electronAPI.emailFetch({cfg: _emailCfg, folders: ['INBOX']}).then(function(r) {
+    _emailPolling = false;
+    if (!r.ok || !r.messages) return;
+    var uids = r.messages.map(function(m) { return m.uid; });
+    var unread = r.messages.filter(function(m) { return !m.read; }).length;
+    if (_emailKnownUids === null) {
+      _emailKnownUids = new Set(uids);
+      mailSetUnreadBadge(unread);
+      return;
+    }
+    var newOnes = uids.filter(function(uid) { return !_emailKnownUids.has(uid); });
+    uids.forEach(function(uid) { _emailKnownUids.add(uid); });
+    mailSetUnreadBadge(unread);
+    if (newOnes.length > 0) {
+      playSound('snd-mail');
+      var mailWin = document.getElementById('win-mailbox');
+      if (mailWin && mailWin.style.display !== 'none' && !mailWin.classList.contains('minimized')) {
+        emailFetchCurrentFolder();
+      }
+    }
+  }).catch(function() { _emailPolling = false; });
+}
+function emailManualFetch() {
+  _emailKnownUids = null;
+  emailFetchCurrentFolder();
+  emailBackgroundPoll();
+}
+function aoiSaveEmailInterval() {
+  var inp = document.getElementById('meinaoi-email-interval');
+  var msg = document.getElementById('meinaoi-email-interval-msg');
+  var val = parseInt(inp ? inp.value : '3', 10);
+  if (isNaN(val) || val < 1) val = 1;
+  if (val > 60) val = 60;
+  _emailPollInterval = val;
+  try { localStorage.setItem('aoi_email_poll_interval', String(val)); } catch(e) {}
+  if (inp) inp.value = val;
+  if (msg) { msg.style.color='#070'; msg.textContent='✔ Intervall gespeichert – alle ' + val + ' Min.'; }
+  emailStartPolling();
+}
+
+function aoiMeinAoiRenderGroups() {
+  var list = document.getElementById('meinaoi-groups-list');
+  var msg  = document.getElementById('meinaoi-groups-msg');
+  if (!list) return;
+  if (msg) msg.textContent = '';
+  var grps    = aoiGetGroups();
+  var buddies = aoiGetBuddyList();
+  var btnBase = 'font-size:12px;padding:0 5px;cursor:pointer;border:1px solid #7f9db9;background:#f0f4f8;border-radius:2px;line-height:16px;';
+  var btnDis  = 'font-size:12px;padding:0 5px;border:1px solid #ccc;background:#f5f5f5;color:#bbb;border-radius:2px;line-height:16px;cursor:default;';
+  list.innerHTML = grps.map(function(g, idx) {
+    var safe    = g.replace(/'/g,"\\'");
+    var count   = buddies.filter(function(b) { return b.group === g; }).length;
+    var isFixed = (g === 'Buddies');
+    var isEmpty = count === 0;
+    var upBtn   = idx === 0
+      ? '<button style="'+btnDis+'" disabled title="Bereits ganz oben">▲</button>'
+      : '<button style="'+btnBase+'" onclick="aoiMeinAoiMoveGroup(\''+safe+'\',-1)" title="Nach oben">▲</button>';
+    var dnBtn   = idx === grps.length - 1
+      ? '<button style="'+btnDis+'" disabled title="Bereits ganz unten">▼</button>'
+      : '<button style="'+btnBase+'" onclick="aoiMeinAoiMoveGroup(\''+safe+'\',1)" title="Nach unten">▼</button>';
+    var delBtn  = (!isFixed && isEmpty)
+      ? '<button onclick="aoiMeinAoiDeleteGroup(\''+safe+'\')" style="font-size:10px;padding:1px 6px;cursor:pointer;border:1px solid #b44;background:#fff0f0;color:#b00;border-radius:2px;">🗑</button>'
+      : '<span style="font-size:10px;color:#aaa;">'+(isFixed?'(geschützt)':'('+count+' Buddy'+(count!==1?'s':'')+' drin)')+'</span>';
+    return '<div style="display:flex;align-items:center;gap:4px;padding:2px 0;font-size:11px;">'
+      + upBtn + dnBtn
+      + '<span style="flex:1;padding-left:4px;">'+g+'</span>'
+      + delBtn + '</div>';
+  }).join('');
+}
+function aoiMeinAoiMoveGroup(name, dir) {
+  var grps = aoiGetGroups();
+  var idx  = grps.indexOf(name);
+  var newIdx = idx + dir;
+  if (newIdx < 0 || newIdx >= grps.length) return;
+  grps.splice(idx, 1); grps.splice(newIdx, 0, name);
+  aoiSaveGroups(grps);
+  aoiMeinAoiRenderGroups();
+  aoiRenderBuddyListUI(); aoiRefreshGroupDropdowns();
+}
+function aoiDeleteName(name) {
+  var names = aoiGetSavedNames();
+  if(names.length <= 1) { alert('Der letzte Account kann nicht entfernt werden.'); return; }
+  var idx = names.indexOf(name); if(idx === -1) return;
+  names.splice(idx, 1); aoiSaveNames(names);
+  try { localStorage.removeItem('aoi_pw_hash_'+name); } catch(e){}
+  try { localStorage.removeItem('aoi_pub_'+name); } catch(e){}
+  aoiInitScreenNames();
+  aoiMeinAoiRenderAccounts();
+}
+function aoiDeleteCurrentName() {
+  var sel = document.getElementById('user-screenname');
+  var name = sel ? sel.value : '';
+  if(!name) return;
+  var names = aoiGetSavedNames();
+  if(names.length <= 1) { alert('Der letzte Account kann nicht entfernt werden.'); return; }
+  if(!confirm('Account "'+name+'" wirklich entfernen?\nDie gespeicherten Daten dieses Accounts werden gelöscht.')) return;
+  aoiDeleteName(name);
+}
+function aoiMeinAoiRenderFavorites() {
+  var list = document.getElementById('meinaoi-fav-list');
+  if(!list) return;
+  var favs = aoiGetFavorites();
+  if(!favs.length) { list.innerHTML = '<div style="font-size:11px;color:#888;">Keine Favoriten vorhanden.</div>'; return; }
+  list.innerHTML = favs.map(function(f, i) {
+    var safeName = (f.name||'').replace(/'/g,"\\'");
+    var safeIcon = (f.icon||'🔗').replace(/'/g,"\\'");
+    var safeUrl  = (f.url||'').replace(/'/g,"\\'");
+    var upDis    = i===0 ? 'opacity:.4;cursor:default;' : 'cursor:pointer;';
+    var dnDis    = i===favs.length-1 ? 'opacity:.4;cursor:default;' : 'cursor:pointer;';
+    return '<div style="display:flex;align-items:center;gap:4px;padding:2px 0;font-size:11px;">'
+      + '<span style="'+upDis+'" onclick="aoiMoveFav('+i+',-1)">▲</span>'
+      + '<span style="'+dnDis+'" onclick="aoiMoveFav('+i+',1)">▼</span>'
+      + '<span style="flex:1;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;" title="'+safeUrl+'">'
+      + (f.icon||'🔗')+' '+f.name
+      + '</span>'
+      + '<button onclick="aoiMeinAoiFavRename('+i+')" style="font-size:10px;padding:1px 5px;cursor:pointer;border:1px solid #aaa;background:#f5f5f5;border-radius:2px;">✏️</button>'
+      + '<button onclick="aoiDeleteFav('+i+')" style="font-size:10px;padding:1px 5px;cursor:pointer;border:1px solid #b44;background:#fff0f0;color:#b00;border-radius:2px;">✕</button>'
+      + '</div>';
+  }).join('');
+}
+function aoiMeinAoiFavRename(idx) {
+  var favs = aoiGetFavorites();
+  var f = favs[idx];
+  var newIcon = prompt('Icon (Emoji):', f.icon||'🔗');
+  if(newIcon === null) return;
+  var newName = prompt('Name:', f.name||'');
+  if(newName === null) return;
+  var newUrl  = prompt('URL:', f.url||'');
+  if(!newUrl) return;
+  favs[idx] = {icon: newIcon||'🔗', name: newName||newUrl, url: newUrl};
+  aoiSaveFavorites(favs);
+  aoiRenderFavPanel();
+  aoiMeinAoiRenderFavorites();
+}
+
+function aoiMeinAoiRenderAccounts() {
+  var list = document.getElementById('meinaoi-accounts-list');
+  var msg  = document.getElementById('meinaoi-accounts-msg');
+  if(!list) return;
+  if(msg) msg.textContent = '';
+  var names   = aoiGetSavedNames();
+  var current = (document.getElementById('user-screenname') || {}).value || '';
+  list.innerHTML = names.map(function(n) {
+    var safe    = n.replace(/'/g,"\\'");
+    var isOnly  = names.length <= 1;
+    var hasPw   = false; try{ hasPw = !!localStorage.getItem('aoi_pw_hash_'+n); }catch(e){}
+    var badge   = hasPw ? '<span style="font-size:9px;color:#070;margin-left:4px;">🔑</span>' : '';
+    var delBtn  = isOnly
+      ? '<span style="font-size:10px;color:#aaa;">(einziger Account)</span>'
+      : '<button onclick="aoiMeinAoiConfirmDeleteAccount(\''+safe+'\')" style="font-size:10px;padding:1px 6px;cursor:pointer;border:1px solid #b44;background:#fff0f0;color:#b00;border-radius:2px;">✕ Entfernen</button>';
+    return '<div style="display:flex;align-items:center;gap:6px;padding:2px 0;font-size:11px;">'
+      + '<span style="flex:1;">'+n+badge+'</span>' + delBtn + '</div>';
+  }).join('');
+}
+function aoiMeinAoiConfirmDeleteAccount(name) {
+  if(!confirm('Account "'+name+'" wirklich entfernen?\nDie gespeicherten Daten dieses Accounts werden gelöscht.')) return;
+  var msg = document.getElementById('meinaoi-accounts-msg');
+  aoiDeleteName(name);
+  if(msg){ msg.style.color='#070'; msg.textContent='✔ Account "'+name+'" entfernt.'; }
+}
+
+function aoiMeinAoiCreateGroup() {
+  var inp = document.getElementById('meinaoi-new-group-inp');
+  var msg = document.getElementById('meinaoi-groups-msg');
+  var name = (inp ? inp.value : '').trim();
+  if (!name) { if(msg){msg.style.color='#c00';msg.textContent='Bitte einen Namen eingeben.';} return; }
+  var grps = aoiGetGroups();
+  if (grps.indexOf(name) !== -1) { if(msg){msg.style.color='#c00';msg.textContent='Gruppe "'+name+'" existiert bereits.';} return; }
+  grps.push(name); aoiSaveGroups(grps);
+  if (inp) inp.value = '';
+  if (msg) { msg.style.color='#070'; msg.textContent='✔ Gruppe "'+name+'" angelegt.'; }
+  aoiMeinAoiRenderGroups();
+  aoiRenderBuddyListUI(); aoiRefreshGroupDropdowns();
+}
+function aoiMeinAoiDeleteGroup(name) {
+  var buddies = aoiGetBuddyList();
+  var count   = buddies.filter(function(b) { return b.group === name; }).length;
+  if (count > 0) { alert('Gruppe "'+name+'" hat noch '+count+' Buddy(s) und kann nicht gelöscht werden.'); return; }
+  aoiSaveGroups(aoiGetGroups().filter(function(g){ return g !== name; }));
+  var msg = document.getElementById('meinaoi-groups-msg');
+  if (msg) { msg.style.color='#070'; msg.textContent='✔ Gruppe "'+name+'" gelöscht.'; }
+  aoiMeinAoiRenderGroups();
+  aoiRenderBuddyListUI(); aoiRefreshGroupDropdowns();
 }
 
 function emailFetchInbox() {
@@ -2808,9 +3389,27 @@ function openComposeMail(to, subject, body) {
   document.getElementById('compose-to').value      = to      || '';
   document.getElementById('compose-cc').value      = '';
   document.getElementById('compose-subject').value = subject || '';
-  document.getElementById('compose-body').innerHTML = body   || '';
+  var bodyEl = document.getElementById('compose-body');
+  bodyEl.innerHTML = body || '';
   openWindow('win-compose');
-  document.getElementById(to ? 'compose-subject' : 'compose-to').focus();
+  if(to) {
+    document.getElementById('compose-subject').focus();
+  } else {
+    document.getElementById('compose-to').focus();
+  }
+  // Cursor in das erste leere <p> setzen (vor dem Zitatblock)
+  if(body) {
+    var target = bodyEl.querySelector('#compose-reply-start') || bodyEl.firstChild || bodyEl;
+    try {
+      var range = document.createRange();
+      range.setStart(target, 0);
+      range.collapse(true);
+      var sel = window.getSelection();
+      sel.removeAllRanges();
+      sel.addRange(range);
+      target.focus ? target.focus() : bodyEl.focus();
+    } catch(_) { bodyEl.focus(); }
+  }
 }
 
 function composeSend() {
@@ -2863,9 +3462,10 @@ window.addEventListener('DOMContentLoaded',function(){
     if(savedTok) AOI_TOKEN = savedTok;
     var savedHp = localStorage.getItem('aoi_homepage');
     if(savedHp) AOI_HOMEPAGE = savedHp;
+    var savedInterval = parseInt(localStorage.getItem('aoi_email_poll_interval') || '3', 10);
+    if(!isNaN(savedInterval) && savedInterval >= 1) _emailPollInterval = savedInterval;
   } catch(e) {}
   aoiInitScreenNames();
-  emailLoadSettings();
   aoiRenderBuddyListUI();
   // Sort-Button-Status aus localStorage wiederherstellen
   var savedSort = aoiGetSortOrder();
@@ -2886,8 +3486,16 @@ window.addEventListener('DOMContentLoaded',function(){
     wv.addEventListener('did-stop-loading', function() {
       var u = wv.getURL ? wv.getURL() : wv.src;
       if(u) document.getElementById('url-bar').value = u;
+      aoiUpdateStarBtn();
     });
   }
+
+  // Stern-Popup schließen bei Klick woanders
+  document.addEventListener('click', function(e) {
+    var popup = document.getElementById('fav-star-popup');
+    if(popup && !popup.contains(e.target) && e.target.id !== 'fav-star-btn')
+      popup.style.display = 'none';
+  });
 
   // URL-Leiste: Strg+L oder F6 fokussiert die URL-Leiste immer
   document.addEventListener('keydown', function(e) {
@@ -2938,6 +3546,7 @@ function aoiPost(payload, cb) {
 function aoiStartOnline(name) {
   aoi_name = name;
   aoi_session = 'aoi-' + Date.now() + '-' + Math.random().toString(36).slice(2, 8);
+  emailLoadSettings();
   aoiPresenceHeartbeat();
   aoi_presence_timer = setInterval(aoiPresenceHeartbeat, 20000);
   aoi_poll_timer = setInterval(aoiPollSignals, 3000);
@@ -2955,6 +3564,27 @@ function aoiStopOnline() {
   aoi_peers = {};
   aoi_known_buddies = {};
   aoi_name = '';
+  // E-Mail vollständig zurücksetzen
+  _emailCfg = null;
+  _emailKnownUids = null;
+  _selMail = null;
+  _selectedMails = new Set();
+  if(_emailPollTimer){ clearInterval(_emailPollTimer); _emailPollTimer=null; }
+  var tbody = document.getElementById('mail-tbody');
+  if(tbody) tbody.innerHTML = '';
+  var prev = document.getElementById('mail-preview');
+  if(prev) prev.innerHTML = '<i>Klicke auf eine E-Mail für die Vorschau...</i>';
+  var mailTitle = document.getElementById('mail-window-title');
+  if(mailTitle) mailTitle.textContent = '📬 Postfach';
+  var mailStatus = document.getElementById('mail-status-bar');
+  if(mailStatus) mailStatus.textContent = '';
+  var mailWin = document.getElementById('win-mailbox');
+  if(mailWin) mailWin.style.display = 'none';
+  mailSetUnreadBadge(0);
+  // E-Mail-Formular leeren
+  ['email-imap-host','email-imap-port','email-smtp-host','email-smtp-port','email-user','email-password'].forEach(function(id){
+    var el = document.getElementById(id); if(el) el.value = '';
+  });
 }
 
 function aoiPresenceHeartbeat() {
@@ -3424,9 +4054,13 @@ function aoiConfirmCreateName() {
 
 /* ===== BUDDY-LISTE (localStorage) ===== */
 function aoiGetBuddyList() {
-  try{ return JSON.parse(localStorage.getItem('aoi_buddy_list')||'[]'); }catch(e){ return []; }
+  var key = 'aoi_buddy_list' + (aoi_name ? '_' + aoi_name : '');
+  try{ return JSON.parse(localStorage.getItem(key)||'[]'); }catch(e){ return []; }
 }
-function aoiSaveBuddyList(list){ try{ localStorage.setItem('aoi_buddy_list',JSON.stringify(list)); }catch(e){} }
+function aoiSaveBuddyList(list){
+  var key = 'aoi_buddy_list' + (aoi_name ? '_' + aoi_name : '');
+  try{ localStorage.setItem(key, JSON.stringify(list)); }catch(e){}
+}
 
 function aoiGetSortOrder(){ try{ return localStorage.getItem('aoi_sort_order')||'online-first'; }catch(e){ return 'online-first'; } }
 
@@ -3686,18 +4320,27 @@ function aoiRenderBuddyListUI() {
   var groupOrder=aoiGetGroups();
   Object.keys(groups).forEach(function(g){ if(groupOrder.indexOf(g)===-1) groupOrder.push(g); });
 
+  // A-Z / Z-A: Gruppenreihenfolge ebenfalls alphabetisch sortieren
+  if(sortOrder==='az') groupOrder=groupOrder.slice().sort(function(a,b){ return a.localeCompare(b); });
+  if(sortOrder==='za') groupOrder=groupOrder.slice().sort(function(a,b){ return b.localeCompare(a); });
+
   groupOrder.forEach(function(gName){
     var members=groups[gName]||[];
-    if(members.length===0&&gName!=='Buddies') return;
     var sorted=sortNames(members);
     var onlineCount=sorted.filter(function(n){ return !!onlineSet[n]; }).length;
+
+    // Online-Modus: Gruppen ohne Online-Mitglieder ausblenden
+    if(sortOrder==='online-first' && onlineCount===0) return;
+
     var safeG=gName.replace(/'/g,"\\'").replace(/</g,'&lt;');
     html+='<div class="buddy-group" onclick="aoiToggleGroup(this)" oncontextmenu="aoiGroupContextMenu(event,\''+safeG+'\')">▾ '+gName+' ('+onlineCount+'/'+sorted.length+')</div>'
         +'<div class="buddy-group-items">';
-    if(sorted.length===0){
+    if(sortOrder!=='online-first' && sorted.length===0){
       html+='<div style="color:#aaa;font-size:9px;padding:2px 10px;">Noch niemand in dieser Gruppe.</div>';
     } else {
-      sorted.forEach(function(n){ html+=makeBuddyItem(n,true); });
+      // Online-Modus: nur Online-Mitglieder anzeigen
+      var toShow = sortOrder==='online-first' ? sorted.filter(function(n){ return !!onlineSet[n]; }) : sorted;
+      toShow.forEach(function(n){ html+=makeBuddyItem(n,true); });
     }
     html+='</div>';
   });
@@ -3808,19 +4451,45 @@ function aoiRefreshGroupDropdowns(){
   if(box){ box.innerHTML=grps.map(function(g){ return '<div class="ctx-item" onclick="aoiCtxMoveGroup(\''+g.replace(/'/g,"\\'").replace(/</g,'&lt;')+'\')">▸ Gruppe: '+g+'</div>'; }).join(''); }
 }
 function aoiCreateGroup(){
-  var name=prompt('Name der neuen Gruppe:','');
-  if(!name) return; name=name.trim(); if(!name) return;
+  var inp=document.getElementById('inp-group-name');
+  var err=document.getElementById('dlg-group-error');
+  if(inp) inp.value='';
+  if(err) err.textContent='';
+  document.getElementById('dlg-create-group').style.display='flex';
+  setTimeout(function(){ if(inp) inp.focus(); }, 50);
+}
+function aoiCreateGroupConfirm(){
+  var inp=document.getElementById('inp-group-name');
+  var err=document.getElementById('dlg-group-error');
+  var name=(inp?inp.value:'').trim();
+  if(!name){ if(err) err.textContent='Bitte einen Namen eingeben.'; return; }
   var grps=aoiGetGroups();
-  if(grps.indexOf(name)!==-1){ alert('Gruppe "'+name+'" existiert bereits.'); return; }
+  if(grps.indexOf(name)!==-1){ if(err) err.textContent='Gruppe "'+name+'" existiert bereits.'; return; }
+  document.getElementById('dlg-create-group').style.display='none';
   grps.push(name); aoiSaveGroups(grps);
   aoiRenderBuddyListUI(); aoiRefreshGroupDropdowns();
 }
+var _aoiRenameGroupOld='';
 function aoiRenameGroup(oldName){
   if(oldName==='Buddies'){ alert('"Buddies" kann nicht umbenannt werden.'); return; }
-  var newName=prompt('Neuer Name für Gruppe "'+oldName+'":', oldName);
-  if(!newName) return; newName=newName.trim(); if(!newName||newName===oldName) return;
+  _aoiRenameGroupOld=oldName;
+  var inp=document.getElementById('inp-rename-group');
+  var err=document.getElementById('dlg-rename-group-error');
+  if(inp) inp.value=oldName;
+  if(err) err.textContent='';
+  document.getElementById('dlg-rename-group').style.display='flex';
+  setTimeout(function(){ if(inp){ inp.focus(); inp.select(); } }, 50);
+}
+function aoiRenameGroupConfirm(){
+  var inp=document.getElementById('inp-rename-group');
+  var err=document.getElementById('dlg-rename-group-error');
+  var newName=(inp?inp.value:'').trim();
+  var oldName=_aoiRenameGroupOld;
+  if(!newName){ if(err) err.textContent='Bitte einen Namen eingeben.'; return; }
+  if(newName===oldName){ document.getElementById('dlg-rename-group').style.display='none'; return; }
   var grps=aoiGetGroups();
-  if(grps.indexOf(newName)!==-1){ alert('Gruppe "'+newName+'" existiert bereits.'); return; }
+  if(grps.indexOf(newName)!==-1){ if(err) err.textContent='Gruppe "'+newName+'" existiert bereits.'; return; }
+  document.getElementById('dlg-rename-group').style.display='none';
   var idx=grps.indexOf(oldName); if(idx===-1) return;
   grps[idx]=newName; aoiSaveGroups(grps);
   var list=aoiGetBuddyList();
@@ -3843,10 +4512,26 @@ var _ctxGroupName='';
 function aoiGroupContextMenu(e,name){
   e.preventDefault(); e.stopPropagation();
   _ctxGroupName=name;
-  var btn=document.getElementById('ctx-group-delete-btn');
-  if(btn){ btn.style.color=name==='Buddies'?'#aaa':'#c00'; btn.style.cursor=name==='Buddies'?'default':'pointer'; }
+  var grps=aoiGetGroups();
+  var idx=grps.indexOf(name);
+  var delBtn=document.getElementById('ctx-group-delete-btn');
+  if(delBtn){ delBtn.style.color=name==='Buddies'?'#aaa':'#c00'; delBtn.style.cursor=name==='Buddies'?'default':'pointer'; }
+  var upBtn=document.getElementById('ctx-group-up-btn');
+  if(upBtn){ var atTop=idx<=0; upBtn.style.color=atTop?'#aaa':''; upBtn.style.cursor=atTop?'default':'pointer'; }
+  var dnBtn=document.getElementById('ctx-group-down-btn');
+  if(dnBtn){ var atBot=idx>=grps.length-1; dnBtn.style.color=atBot?'#aaa':''; dnBtn.style.cursor=atBot?'default':'pointer'; }
   var m=document.getElementById('group-ctx-menu');
   m.style.left=e.clientX+'px'; m.style.top=e.clientY+'px'; m.style.display='block';
+}
+function aoiCtxGroupMove(dir){
+  var grps=aoiGetGroups();
+  var idx=grps.indexOf(_ctxGroupName);
+  var newIdx=idx+dir;
+  if(newIdx<0||newIdx>=grps.length) return;
+  document.getElementById('group-ctx-menu').style.display='none';
+  grps.splice(idx,1); grps.splice(newIdx,0,_ctxGroupName);
+  aoiSaveGroups(grps);
+  aoiRenderBuddyListUI(); aoiRefreshGroupDropdowns();
 }
 function aoiCtxGroupRename(){ document.getElementById('group-ctx-menu').style.display='none'; aoiRenameGroup(_ctxGroupName); }
 function aoiCtxGroupDelete(){ if(_ctxGroupName==='Buddies') return; document.getElementById('group-ctx-menu').style.display='none'; aoiDeleteGroup(_ctxGroupName); }
@@ -4382,6 +5067,83 @@ function fetchWetter() {
 // Beim Start und stündlich aktualisieren
 setTimeout(fetchWetter, 2000);
 setInterval(fetchWetter, 3600000);
+
+/* ===== ATOMUHR WIDGET ===== */
+var _atomuhrTimer = null;
+var _WOCHENTAGE = ['So','Mo','Di','Mi','Do','Fr','Sa'];
+var _MONATE = ['Jan','Feb','Mär','Apr','Mai','Jun','Jul','Aug','Sep','Okt','Nov','Dez'];
+
+function atomuhrTick() {
+  var el = document.getElementById('atomuhr-time');
+  if(!el) return;
+  var now = new Date();
+  var h = String(now.getHours()).padStart(2,'0');
+  var m = String(now.getMinutes()).padStart(2,'0');
+  var s = String(now.getSeconds()).padStart(2,'0');
+  el.textContent = h + ':' + m + ':' + s;
+  var dateEl = document.getElementById('atomuhr-date');
+  if(dateEl) dateEl.textContent = _WOCHENTAGE[now.getDay()] + '  '
+    + String(now.getDate()).padStart(2,'0') + '. '
+    + _MONATE[now.getMonth()] + ' ' + now.getFullYear();
+  var tzEl = document.getElementById('atomuhr-tz');
+  if(tzEl){
+    var off = -now.getTimezoneOffset();
+    var sign = off>=0?'+':'-';
+    var oh = String(Math.floor(Math.abs(off)/60)).padStart(2,'0');
+    var om = String(Math.abs(off)%60).padStart(2,'0');
+    tzEl.textContent = 'UTC'+sign+oh+':'+om;
+  }
+}
+
+function aoiToggleAtomUhr() {
+  var w = document.getElementById('atomuhr-widget');
+  if(!w) return;
+  if(w.style.display !== 'none') {
+    w.style.display = 'none';
+    if(_atomuhrTimer){ clearInterval(_atomuhrTimer); _atomuhrTimer = null; }
+    return;
+  }
+  // Position wiederherstellen oder Standardposition
+  try {
+    var pos = JSON.parse(localStorage.getItem('aoi_atomuhr_pos') || 'null');
+    if(pos){ w.style.left = pos.x+'px'; w.style.top = pos.y+'px'; }
+    else    { w.style.right='20px'; w.style.top='60px'; w.style.left=''; }
+  } catch(e) { w.style.right='20px'; w.style.top='60px'; }
+  w.style.display = 'block';
+  atomuhrTick();
+  if(!_atomuhrTimer) _atomuhrTimer = setInterval(atomuhrTick, 1000);
+}
+
+// Drag-Logik für das Widget
+(function(){
+  var dragging=false, ox=0, oy=0;
+  document.addEventListener('DOMContentLoaded', function(){
+    var w = document.getElementById('atomuhr-widget');
+    if(!w) return;
+    w.addEventListener('mousedown', function(e){
+      dragging=true;
+      var rect=w.getBoundingClientRect();
+      ox=e.clientX-rect.left; oy=e.clientY-rect.top;
+      e.preventDefault();
+    });
+    document.addEventListener('mousemove', function(e){
+      if(!dragging) return;
+      var w2=document.getElementById('atomuhr-widget');
+      if(!w2) return;
+      var x=e.clientX-ox, y=e.clientY-oy;
+      x=Math.max(0,Math.min(window.innerWidth-w2.offsetWidth, x));
+      y=Math.max(0,Math.min(window.innerHeight-w2.offsetHeight, y));
+      w2.style.left=x+'px'; w2.style.top=y+'px'; w2.style.right='';
+    });
+    document.addEventListener('mouseup', function(){
+      if(!dragging) return;
+      dragging=false;
+      var w2=document.getElementById('atomuhr-widget');
+      if(!w2) return;
+      try{ localStorage.setItem('aoi_atomuhr_pos', JSON.stringify({x:parseInt(w2.style.left),y:parseInt(w2.style.top)})); }catch(e){}
+    });
+  });
+})();
 
 /* ===== SICHERHEITSCHECK LOGIN-PANEL ===== */
 function aoiLoginSecurityCheck() {
