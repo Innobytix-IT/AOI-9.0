@@ -278,6 +278,14 @@ ipcMain.handle('email-send', async (_, { cfg, to, cc, subject, body }) => {
   } catch (e) { return { ok: false, error: e.message }; }
 });
 
+ipcMain.handle('read-server-file', async (_, filename) => {
+  const allowed = ['aoi_signal.php'];
+  if (!allowed.includes(filename)) return null;
+  try {
+    return fs.readFileSync(path.join(__dirname, 'Webspace', filename), 'utf8');
+  } catch (_e) { return null; }
+});
+
 app.on('web-contents-created', (_event, contents) => {
   contents.on('will-attach-webview', (_waEvent, webPreferences) => {
     delete webPreferences.preload;
