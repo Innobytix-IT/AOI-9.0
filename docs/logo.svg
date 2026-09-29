@@ -1,0 +1,82 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 260 140" width="260" height="140">
+  <defs>
+    <filter id="pglow" x="-200%" y="-200%" width="500%" height="500%">
+      <feGaussianBlur in="SourceAlpha" stdDeviation="2.8" result="b"/>
+      <feFlood flood-color="#55ddff" result="col"/>
+      <feComposite in="col" in2="b" operator="in" result="g"/>
+      <feMerge><feMergeNode in="g"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <filter id="nglow" x="-150%" y="-150%" width="400%" height="400%">
+      <feGaussianBlur in="SourceAlpha" stdDeviation="4.5" result="b"/>
+      <feFlood flood-color="#3ab0ff" flood-opacity="0.85" result="col"/>
+      <feComposite in="col" in2="b" operator="in" result="g"/>
+      <feMerge><feMergeNode in="g"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <filter id="bglow" x="-30%" y="-30%" width="160%" height="160%">
+      <feGaussianBlur in="SourceAlpha" stdDeviation="3.5" result="b"/>
+      <feFlood flood-color="#2a80ff" flood-opacity="0.55" result="col"/>
+      <feComposite in="col" in2="b" operator="in" result="g"/>
+      <feMerge><feMergeNode in="g"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <linearGradient id="trifill" x1="20%" y1="0%" x2="80%" y2="100%">
+      <stop offset="0%"   stop-color="#0e2860"/>
+      <stop offset="100%" stop-color="#040e28"/>
+    </linearGradient>
+    <linearGradient id="textgrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%"   stop-color="#5aaeff"/>
+      <stop offset="100%" stop-color="#1a60d0"/>
+    </linearGradient>
+    <linearGradient id="badge" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%"   stop-color="#f0a820"/>
+      <stop offset="100%" stop-color="#c96000"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Background -->
+  <rect width="260" height="140" fill="#08101e" rx="8"/>
+
+  <!-- Triangle -->
+  <polygon points="65,14 116,107 14,107" fill="url(#trifill)"/>
+  <polygon points="65,14 116,107 14,107" fill="none" stroke="#1a60d0" stroke-width="3" filter="url(#bglow)"/>
+  <polygon points="65,14 116,107 14,107" fill="none" stroke="#5aaeff" stroke-width="1.2" stroke-opacity="0.55"/>
+
+  <!-- Center lines -->
+  <line x1="65" y1="14" x2="65"  y2="76"  stroke="#1a4880" stroke-width="0.9"/>
+  <line x1="65" y1="76" x2="116" y2="107" stroke="#1a4880" stroke-width="0.9"/>
+  <line x1="65" y1="76" x2="14"  y2="107" stroke="#1a4880" stroke-width="0.9"/>
+
+  <!-- Particles (static snapshot) -->
+  <!-- Top→BR -->
+  <circle cx="73"  cy="30"  r="2.8" fill="#88e8ff" filter="url(#pglow)"/>
+  <circle cx="90"  cy="60"  r="2.0" fill="#aaf0ff" filter="url(#pglow)" opacity="0.75"/>
+  <circle cx="107" cy="90"  r="1.4" fill="#ccf8ff" filter="url(#pglow)" opacity="0.5"/>
+  <!-- BR→BL -->
+  <circle cx="99"  cy="107" r="2.8" fill="#88e8ff" filter="url(#pglow)"/>
+  <circle cx="65"  cy="107" r="2.0" fill="#aaf0ff" filter="url(#pglow)" opacity="0.75"/>
+  <circle cx="31"  cy="107" r="1.4" fill="#ccf8ff" filter="url(#pglow)" opacity="0.5"/>
+  <!-- BL→Top -->
+  <circle cx="40"  cy="90"  r="2.8" fill="#88e8ff" filter="url(#pglow)"/>
+  <circle cx="52"  cy="52"  r="2.0" fill="#aaf0ff" filter="url(#pglow)" opacity="0.75"/>
+  <!-- Center -->
+  <circle cx="65"  cy="45"  r="2.2" fill="#44ccff" filter="url(#pglow)"/>
+  <circle cx="91"  cy="92"  r="2.2" fill="#44ccff" filter="url(#pglow)"/>
+  <circle cx="40"  cy="92"  r="2.2" fill="#44ccff" filter="url(#pglow)"/>
+  <circle cx="90"  cy="60"  r="1.8" fill="#66ddff" filter="url(#pglow)" opacity="0.6"/>
+
+  <!-- Nodes -->
+  <circle cx="65"  cy="14"  r="7.5" fill="#061530" stroke="#55ccff" stroke-width="2.2" filter="url(#nglow)"/>
+  <circle cx="65"  cy="14"  r="3"   fill="#b8eeff"/>
+  <circle cx="14"  cy="107" r="7.5" fill="#061530" stroke="#55ccff" stroke-width="2.2" filter="url(#nglow)"/>
+  <circle cx="14"  cy="107" r="3"   fill="#b8eeff"/>
+  <circle cx="116" cy="107" r="7.5" fill="#061530" stroke="#55ccff" stroke-width="2.2" filter="url(#nglow)"/>
+  <circle cx="116" cy="107" r="3"   fill="#b8eeff"/>
+  <circle cx="65"  cy="76"  r="6"   fill="#061530" stroke="#33bbff" stroke-width="1.8" filter="url(#nglow)"/>
+  <circle cx="65"  cy="76"  r="2.4" fill="#88e0ff"/>
+
+  <!-- Text -->
+  <text x="128" y="68" font-family="'Arial Narrow',Impact,Arial" font-weight="900" font-size="50" fill="url(#textgrad)" letter-spacing="2">AOI</text>
+  <text x="130" y="90" font-family="'Trebuchet MS',Arial" font-weight="700" font-size="19" fill="#d4880e" letter-spacing="1">9.0</text>
+  <rect x="172" y="79" width="84" height="15" rx="7.5" fill="url(#badge)"/>
+  <rect x="172" y="79" width="84" height="7"  rx="7.5" fill="#fff" opacity="0.18"/>
+  <text x="214" y="90" font-family="Arial" font-weight="800" font-size="8" fill="#fff" text-anchor="middle" letter-spacing="2">NOSTALGIA</text>
+</svg>

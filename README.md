@@ -1,10 +1,16 @@
 # AOI 9.0 Nostalgia
 
-[![Release](https://img.shields.io/github/v/release/Innobytix-IT/AOI-9.0?label=Release&color=brightgreen)](https://github.com/Innobytix-IT/AOI-9.0/releases/latest)
-[![Build](https://img.shields.io/github/actions/workflow/status/Innobytix-IT/AOI-9.0/build.yml?label=Build)](https://github.com/Innobytix-IT/AOI-9.0/actions/workflows/build.yml)
-[![License: AGPL v3](https://img.shields.io/badge/License-AGPL%20v3-blue.svg)](https://www.gnu.org/licenses/agpl-3.0)
-[![Electron](https://img.shields.io/badge/Electron-44-47848F?logo=electron&logoColor=white)](https://www.electronjs.org/)
-[![Platform](https://img.shields.io/badge/Platform-Windows%20%7C%20Linux-lightgrey)](https://github.com/Innobytix-IT/AOI-9.0/releases/latest)
+<p align="center">
+  <img src="docs/logo.svg" alt="AOI 9.0 Nostalgia Logo" width="300"/>
+</p>
+
+<p align="center">
+  <a href="https://github.com/Innobytix-IT/AOI-9.0/releases/latest"><img src="https://img.shields.io/github/v/release/Innobytix-IT/AOI-9.0?label=Release&color=brightgreen" alt="Release"/></a>
+  <a href="https://github.com/Innobytix-IT/AOI-9.0/actions/workflows/build.yml"><img src="https://img.shields.io/github/actions/workflow/status/Innobytix-IT/AOI-9.0/build.yml?label=Build" alt="Build"/></a>
+  <a href="https://www.gnu.org/licenses/agpl-3.0"><img src="https://img.shields.io/badge/License-AGPL%20v3-blue.svg" alt="License: AGPL v3"/></a>
+  <a href="https://www.electronjs.org/"><img src="https://img.shields.io/badge/Electron-44-47848F?logo=electron&logoColor=white" alt="Electron"/></a>
+  <a href="https://github.com/Innobytix-IT/AOI-9.0/releases/latest"><img src="https://img.shields.io/badge/Platform-Windows%20%7C%20Linux-lightgrey" alt="Platform"/></a>
+</p>
 
 **Retro AOL-style Electron desktop app with WebRTC P2P messaging**
 
@@ -37,15 +43,23 @@ Ein klassischer Instant-Messenger-Look, echter P2P-Chat via WebRTC und ein integ
 
 - **Retro-Design** – Klassische AOL-Optik mit Buddy-Liste, Sounds und Modem-Verbindungsanimation
 - **WebRTC P2P Messaging** – Direkte Nachrichten zwischen Buddies ohne zentralen Nachrichtenserver
+- **Video- & Audioanrufe** – Echte P2P-Video- und Audioanrufe via WebRTC direkt zwischen Buddies
 - **Dateiübertragung ohne Limit** – Beliebige Dateien direkt P2P via DataChannel, kein Umweg über Server
+- **LAN-Direktverbindung** – Automatische Erkennung von Buddies im lokalen Netz (IPv4 LAN Fallback)
 - **Buddy-Verwaltung** – Gruppen, Online/Offline-Status, Sortierung, Kontextmenü, Buddy-Suche
 - **Screen Names** – Mehrere Namen pro Installation, Eindeutigkeitsprüfung via Server
 - **Integrierter Browser** – Webviewer mit Navigationsliste (Wetter, Sport, Musik, Suche …)
 - **Integriertes E-Mail-Postfach** – IMAP/SMTP mit Ordnernavigation, Hintergrundpolling, Benachrichtigung
 - **Sounds** – Modem-Einwahl, Türklingeln bei Buddy-Login, E-Mail-Benachrichtigung (optional)
-- **Eigener Signaling-Server** – PHP 7.2-kompatibel, läuft auf jedem Standard-Webspace
+- **Eigener Signaling-Server** – PHP 7.2+, läuft auf jedem Standard-Webspace
 - **Föderations-Netzwerk** – Dezentrales Gossip-Netz; AOI-Instanzen finden sich ohne Root-Server
 - **AGPL-3.0** – Quelloffene Software; wer das Netzwerk nutzt, muss den Quellcode teilen
+
+### Neu in v9.2
+
+- **Video- & Audioanrufe** – Vollständige WebRTC-basierte Video- und Audioanrufe zwischen Buddies; In-Band-Signaling über den bestehenden DataChannel, kein separater Signaling-Kanal nötig
+- **LAN-Direktverbindung** – Automatischer IPv4-LAN-Fallback: Buddies im selben Netz verbinden sich direkt ohne Umweg über den Signaling-Server
+- **Animiertes P2P-Logo** – Neues Erscheinungsbild mit animierten Datenpunkten zwischen Netzwerkknoten; symbolisiert das dezentrale P2P-Konzept; CSS-basierte Animation (kein SMIL-Delay beim Start)
 
 ### Neu in v9.1
 
@@ -62,7 +76,9 @@ Ein klassischer Instant-Messenger-Look, echter P2P-Chat via WebRTC und ein integ
 | Schicht | Technologie |
 |---------|-------------|
 | Desktop-App | [Electron 44](https://www.electronjs.org/) |
-| P2P-Übertragung | WebRTC DataChannel (DTLS/SRTP E2E) |
+| Chat P2P | WebRTC DataChannel (DTLS/SRTP E2E) |
+| Video- & Audioanrufe | WebRTC MediaStream – In-Band-Signaling via DataChannel |
+| LAN-Direktverbindung | IPv4-LAN-Fallback, automatische Peer-Erkennung |
 | Signaling-Verschlüsselung | Noise IK – X25519 + HKDF-SHA256 + AES-256-GCM |
 | Server-Vertrauen | TOFU-Pinning des Server-Noise-Pub-Keys |
 | Schlüsselspeicher | AOI Tresor (AES-256-GCM + PBKDF2) / Windows DPAPI |
