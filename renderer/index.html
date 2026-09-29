@@ -1,4 +1,5 @@
 <title>AOI 9.0 Nostalgia</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@900&display=swap">
 <style>
 * { box-sizing: border-box; margin: 0; padding: 0; user-select: none; }
 body {
@@ -428,14 +429,84 @@ body {
         <div class="card-top">
           <div class="logo-container">
             <svg class="aoi-logo-svg" viewBox="0 0 260 140">
-              <polygon points="65,15 115,105 15,105" fill="url(#blueGrad)" stroke="#003580" stroke-width="4"/>
-              <ellipse cx="65" cy="68" rx="22" ry="14" fill="#fff"/><ellipse cx="65" cy="68" rx="11" ry="11" fill="#0058ee"/>
-              <circle cx="65" cy="68" r="5" fill="#031b4d"/><circle cx="62" cy="65" r="2.5" fill="#fff"/>
-              <text x="125" y="65" font-family="'Trebuchet MS',Arial" font-weight="900" font-size="44" fill="#0048aa">AOI</text>
-              <text x="125" y="92" font-family="Arial" font-weight="bold" font-size="20" fill="#e89d1b">9.0</text>
-              <rect x="160" y="80" width="80" height="13" rx="3" fill="#e89d1b"/>
-              <text x="163" y="90" font-family="Arial" font-weight="bold" font-size="9" fill="#fff">NOSTALGIA</text>
-              <defs><linearGradient id="blueGrad" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stop-color="#4aa4ff"/><stop offset="100%" stop-color="#0037a3"/></linearGradient></defs>
+              <defs>
+                <path id="aoi-p-top-br" d="M 65 14 L 116 107"/>
+                <path id="aoi-p-br-bl"  d="M 116 107 L 14 107"/>
+                <path id="aoi-p-bl-top" d="M 14 107 L 65 14"/>
+                <path id="aoi-p-top-ct" d="M 65 14 L 65 76"/>
+                <path id="aoi-p-ct-br"  d="M 65 76 L 116 107"/>
+                <path id="aoi-p-ct-bl"  d="M 65 76 L 14 107"/>
+                <path id="aoi-p-br-top" d="M 116 107 L 65 14"/>
+                <filter id="aoi-pglow" x="-200%" y="-200%" width="500%" height="500%">
+                  <feGaussianBlur in="SourceAlpha" stdDeviation="2.8" result="b"/>
+                  <feFlood flood-color="#55ddff" result="col"/>
+                  <feComposite in="col" in2="b" operator="in" result="g"/>
+                  <feMerge><feMergeNode in="g"/><feMergeNode in="SourceGraphic"/></feMerge>
+                </filter>
+                <filter id="aoi-nglow" x="-150%" y="-150%" width="400%" height="400%">
+                  <feGaussianBlur in="SourceAlpha" stdDeviation="4.5" result="b"/>
+                  <feFlood flood-color="#3ab0ff" flood-opacity="0.85" result="col"/>
+                  <feComposite in="col" in2="b" operator="in" result="g"/>
+                  <feMerge><feMergeNode in="g"/><feMergeNode in="SourceGraphic"/></feMerge>
+                </filter>
+                <filter id="aoi-bglow" x="-30%" y="-30%" width="160%" height="160%">
+                  <feGaussianBlur in="SourceAlpha" stdDeviation="3.5" result="b"/>
+                  <feFlood flood-color="#2a80ff" flood-opacity="0.55" result="col"/>
+                  <feComposite in="col" in2="b" operator="in" result="g"/>
+                  <feMerge><feMergeNode in="g"/><feMergeNode in="SourceGraphic"/></feMerge>
+                </filter>
+                <linearGradient id="aoi-trifill" x1="20%" y1="0%" x2="80%" y2="100%">
+                  <stop offset="0%"   stop-color="#0e2860"/>
+                  <stop offset="100%" stop-color="#040e28"/>
+                </linearGradient>
+                <linearGradient id="aoi-text" x1="0%" y1="0%" x2="0%" y2="100%">
+                  <stop offset="0%"   stop-color="#5aaeff"/>
+                  <stop offset="100%" stop-color="#1a60d0"/>
+                </linearGradient>
+                <linearGradient id="aoi-badge" x1="0%" y1="0%" x2="100%" y2="0%">
+                  <stop offset="0%"   stop-color="#f0a820"/>
+                  <stop offset="100%" stop-color="#c96000"/>
+                </linearGradient>
+              </defs>
+              <!-- Dreieck -->
+              <polygon points="65,14 116,107 14,107" fill="url(#aoi-trifill)"/>
+              <polygon points="65,14 116,107 14,107" fill="none" stroke="#1a60d0" stroke-width="3" filter="url(#aoi-bglow)"/>
+              <polygon points="65,14 116,107 14,107" fill="none" stroke="#5aaeff" stroke-width="1.2" stroke-opacity="0.55"/>
+              <!-- Center-Verbindungslinien -->
+              <line x1="65" y1="14" x2="65"  y2="76"  stroke="#1a4880" stroke-width="0.9"/>
+              <line x1="65" y1="76" x2="116" y2="107" stroke="#1a4880" stroke-width="0.9"/>
+              <line x1="65" y1="76" x2="14"  y2="107" stroke="#1a4880" stroke-width="0.9"/>
+              <!-- Partikel: Top→BR -->
+              <circle r="2.8" fill="#88e8ff" filter="url(#aoi-pglow)"><animateMotion dur="2.2s" repeatCount="indefinite" begin="0s"><mpath href="#aoi-p-top-br"/></animateMotion></circle>
+              <circle r="2.0" fill="#aaf0ff" filter="url(#aoi-pglow)" opacity="0.75"><animateMotion dur="2.2s" repeatCount="indefinite" begin="0.73s"><mpath href="#aoi-p-top-br"/></animateMotion></circle>
+              <circle r="1.4" fill="#ccf8ff" filter="url(#aoi-pglow)" opacity="0.5"><animateMotion dur="2.2s" repeatCount="indefinite" begin="1.46s"><mpath href="#aoi-p-top-br"/></animateMotion></circle>
+              <!-- Partikel: BR→BL -->
+              <circle r="2.8" fill="#88e8ff" filter="url(#aoi-pglow)"><animateMotion dur="2.6s" repeatCount="indefinite" begin="0.3s"><mpath href="#aoi-p-br-bl"/></animateMotion></circle>
+              <circle r="2.0" fill="#aaf0ff" filter="url(#aoi-pglow)" opacity="0.75"><animateMotion dur="2.6s" repeatCount="indefinite" begin="1.17s"><mpath href="#aoi-p-br-bl"/></animateMotion></circle>
+              <circle r="1.4" fill="#ccf8ff" filter="url(#aoi-pglow)" opacity="0.5"><animateMotion dur="2.6s" repeatCount="indefinite" begin="2.04s"><mpath href="#aoi-p-br-bl"/></animateMotion></circle>
+              <!-- Partikel: BL→Top -->
+              <circle r="2.8" fill="#88e8ff" filter="url(#aoi-pglow)"><animateMotion dur="2.2s" repeatCount="indefinite" begin="0.55s"><mpath href="#aoi-p-bl-top"/></animateMotion></circle>
+              <circle r="2.0" fill="#aaf0ff" filter="url(#aoi-pglow)" opacity="0.75"><animateMotion dur="2.2s" repeatCount="indefinite" begin="1.28s"><mpath href="#aoi-p-bl-top"/></animateMotion></circle>
+              <!-- Partikel: Center -->
+              <circle r="2.2" fill="#44ccff" filter="url(#aoi-pglow)"><animateMotion dur="1.3s" repeatCount="indefinite" begin="0s"><mpath href="#aoi-p-top-ct"/></animateMotion></circle>
+              <circle r="2.2" fill="#44ccff" filter="url(#aoi-pglow)"><animateMotion dur="1.5s" repeatCount="indefinite" begin="0.35s"><mpath href="#aoi-p-ct-br"/></animateMotion></circle>
+              <circle r="2.2" fill="#44ccff" filter="url(#aoi-pglow)"><animateMotion dur="1.5s" repeatCount="indefinite" begin="0.65s"><mpath href="#aoi-p-ct-bl"/></animateMotion></circle>
+              <circle r="1.8" fill="#66ddff" filter="url(#aoi-pglow)" opacity="0.6"><animateMotion dur="1.3s" repeatCount="indefinite" begin="0.9s"><mpath href="#aoi-p-br-top"/></animateMotion></circle>
+              <!-- Nodes -->
+              <circle cx="65" cy="14" r="7.5" fill="#061530" stroke="#55ccff" stroke-width="2.2" filter="url(#aoi-nglow)"><animate attributeName="r" values="7.5;9;7.5" dur="2.1s" repeatCount="indefinite"/><animate attributeName="stroke-opacity" values="1;0.35;1" dur="2.1s" repeatCount="indefinite"/></circle>
+              <circle cx="65" cy="14" r="3" fill="#b8eeff"/>
+              <circle cx="14" cy="107" r="7.5" fill="#061530" stroke="#55ccff" stroke-width="2.2" filter="url(#aoi-nglow)"><animate attributeName="r" values="7.5;9;7.5" dur="2.5s" repeatCount="indefinite" begin="0.4s"/><animate attributeName="stroke-opacity" values="1;0.35;1" dur="2.5s" repeatCount="indefinite" begin="0.4s"/></circle>
+              <circle cx="14" cy="107" r="3" fill="#b8eeff"/>
+              <circle cx="116" cy="107" r="7.5" fill="#061530" stroke="#55ccff" stroke-width="2.2" filter="url(#aoi-nglow)"><animate attributeName="r" values="7.5;9;7.5" dur="1.8s" repeatCount="indefinite" begin="0.8s"/><animate attributeName="stroke-opacity" values="1;0.35;1" dur="1.8s" repeatCount="indefinite" begin="0.8s"/></circle>
+              <circle cx="116" cy="107" r="3" fill="#b8eeff"/>
+              <circle cx="65" cy="76" r="6" fill="#061530" stroke="#33bbff" stroke-width="1.8" filter="url(#aoi-nglow)"><animate attributeName="r" values="6;7.5;6" dur="1.55s" repeatCount="indefinite" begin="0.2s"/><animate attributeName="stroke-opacity" values="1;0.3;1" dur="1.55s" repeatCount="indefinite" begin="0.2s"/></circle>
+              <circle cx="65" cy="76" r="2.4" fill="#88e0ff"/>
+              <!-- Text -->
+              <text x="128" y="68" font-family="'Barlow Condensed','Arial Narrow',Impact,Arial" font-weight="900" font-size="50" fill="url(#aoi-text)" letter-spacing="2">AOI</text>
+              <text x="130" y="90" font-family="'Trebuchet MS',Arial" font-weight="700" font-size="19" fill="#d4880e" letter-spacing="1">9.0</text>
+              <rect x="172" y="79" width="84" height="15" rx="7.5" fill="url(#aoi-badge)"/>
+              <rect x="172" y="79" width="84" height="7"  rx="7.5" fill="#fff" opacity="0.18"/>
+              <text x="214" y="90" font-family="Arial" font-weight="800" font-size="8" fill="#fff" text-anchor="middle" letter-spacing="2">NOSTALGIA</text>
             </svg>
           </div>
           <div class="form-container">
@@ -568,14 +639,38 @@ body {
     <div class="toolbar-right">
       <div class="tool-btn" onclick="openWindow('win-main')"><span class="tool-icon">🌐</span><span class="tool-label">Portal</span></div>
       <svg style="width:90px;height:46px;cursor:pointer;" viewBox="0 0 260 140" onclick="aoiGoHome()" title="AOI 9.0 Nostalgia – Startseite">
-        <polygon points="65,15 115,105 15,105" fill="url(#tbGrad)" stroke="#003580" stroke-width="4"/>
-        <ellipse cx="65" cy="68" rx="22" ry="14" fill="#fff"/><ellipse cx="65" cy="68" rx="11" ry="11" fill="#0058ee"/>
-        <circle cx="65" cy="68" r="5" fill="#031b4d"/><circle cx="62" cy="65" r="2.5" fill="#fff"/>
-        <text x="125" y="65" font-family="'Trebuchet MS',Arial" font-weight="900" font-size="44" fill="#0048aa">AOI</text>
-        <text x="125" y="92" font-family="Arial" font-weight="bold" font-size="20" fill="#e89d1b">9.0</text>
-        <rect x="160" y="80" width="80" height="13" rx="3" fill="#e89d1b"/>
-        <text x="163" y="90" font-family="Arial" font-weight="bold" font-size="9" fill="#fff">NOSTALGIA</text>
-        <defs><linearGradient id="tbGrad" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stop-color="#4aa4ff"/><stop offset="100%" stop-color="#0037a3"/></linearGradient></defs>
+        <!-- Identisch mit Login-Logo, IDs aus dem Login-SVG-defs werden geteilt -->
+        <polygon points="65,14 116,107 14,107" fill="url(#aoi-trifill)"/>
+        <polygon points="65,14 116,107 14,107" fill="none" stroke="#1a60d0" stroke-width="3" filter="url(#aoi-bglow)"/>
+        <polygon points="65,14 116,107 14,107" fill="none" stroke="#5aaeff" stroke-width="1.2" stroke-opacity="0.55"/>
+        <line x1="65" y1="14" x2="65"  y2="76"  stroke="#1a4880" stroke-width="0.9"/>
+        <line x1="65" y1="76" x2="116" y2="107" stroke="#1a4880" stroke-width="0.9"/>
+        <line x1="65" y1="76" x2="14"  y2="107" stroke="#1a4880" stroke-width="0.9"/>
+        <circle r="2.8" fill="#88e8ff" filter="url(#aoi-pglow)"><animateMotion dur="2.2s" repeatCount="indefinite" begin="0s"><mpath href="#aoi-p-top-br"/></animateMotion></circle>
+        <circle r="2.0" fill="#aaf0ff" filter="url(#aoi-pglow)" opacity="0.75"><animateMotion dur="2.2s" repeatCount="indefinite" begin="0.73s"><mpath href="#aoi-p-top-br"/></animateMotion></circle>
+        <circle r="1.4" fill="#ccf8ff" filter="url(#aoi-pglow)" opacity="0.5"><animateMotion dur="2.2s" repeatCount="indefinite" begin="1.46s"><mpath href="#aoi-p-top-br"/></animateMotion></circle>
+        <circle r="2.8" fill="#88e8ff" filter="url(#aoi-pglow)"><animateMotion dur="2.6s" repeatCount="indefinite" begin="0.3s"><mpath href="#aoi-p-br-bl"/></animateMotion></circle>
+        <circle r="2.0" fill="#aaf0ff" filter="url(#aoi-pglow)" opacity="0.75"><animateMotion dur="2.6s" repeatCount="indefinite" begin="1.17s"><mpath href="#aoi-p-br-bl"/></animateMotion></circle>
+        <circle r="1.4" fill="#ccf8ff" filter="url(#aoi-pglow)" opacity="0.5"><animateMotion dur="2.6s" repeatCount="indefinite" begin="2.04s"><mpath href="#aoi-p-br-bl"/></animateMotion></circle>
+        <circle r="2.8" fill="#88e8ff" filter="url(#aoi-pglow)"><animateMotion dur="2.2s" repeatCount="indefinite" begin="0.55s"><mpath href="#aoi-p-bl-top"/></animateMotion></circle>
+        <circle r="2.0" fill="#aaf0ff" filter="url(#aoi-pglow)" opacity="0.75"><animateMotion dur="2.2s" repeatCount="indefinite" begin="1.28s"><mpath href="#aoi-p-bl-top"/></animateMotion></circle>
+        <circle r="2.2" fill="#44ccff" filter="url(#aoi-pglow)"><animateMotion dur="1.3s" repeatCount="indefinite" begin="0s"><mpath href="#aoi-p-top-ct"/></animateMotion></circle>
+        <circle r="2.2" fill="#44ccff" filter="url(#aoi-pglow)"><animateMotion dur="1.5s" repeatCount="indefinite" begin="0.35s"><mpath href="#aoi-p-ct-br"/></animateMotion></circle>
+        <circle r="2.2" fill="#44ccff" filter="url(#aoi-pglow)"><animateMotion dur="1.5s" repeatCount="indefinite" begin="0.65s"><mpath href="#aoi-p-ct-bl"/></animateMotion></circle>
+        <circle r="1.8" fill="#66ddff" filter="url(#aoi-pglow)" opacity="0.6"><animateMotion dur="1.3s" repeatCount="indefinite" begin="0.9s"><mpath href="#aoi-p-br-top"/></animateMotion></circle>
+        <circle cx="65" cy="14" r="7.5" fill="#061530" stroke="#55ccff" stroke-width="2.2" filter="url(#aoi-nglow)"><animate attributeName="r" values="7.5;9;7.5" dur="2.1s" repeatCount="indefinite"/><animate attributeName="stroke-opacity" values="1;0.35;1" dur="2.1s" repeatCount="indefinite"/></circle>
+        <circle cx="65" cy="14" r="3" fill="#b8eeff"/>
+        <circle cx="14" cy="107" r="7.5" fill="#061530" stroke="#55ccff" stroke-width="2.2" filter="url(#aoi-nglow)"><animate attributeName="r" values="7.5;9;7.5" dur="2.5s" repeatCount="indefinite" begin="0.4s"/><animate attributeName="stroke-opacity" values="1;0.35;1" dur="2.5s" repeatCount="indefinite" begin="0.4s"/></circle>
+        <circle cx="14" cy="107" r="3" fill="#b8eeff"/>
+        <circle cx="116" cy="107" r="7.5" fill="#061530" stroke="#55ccff" stroke-width="2.2" filter="url(#aoi-nglow)"><animate attributeName="r" values="7.5;9;7.5" dur="1.8s" repeatCount="indefinite" begin="0.8s"/><animate attributeName="stroke-opacity" values="1;0.35;1" dur="1.8s" repeatCount="indefinite" begin="0.8s"/></circle>
+        <circle cx="116" cy="107" r="3" fill="#b8eeff"/>
+        <circle cx="65" cy="76" r="6" fill="#061530" stroke="#33bbff" stroke-width="1.8" filter="url(#aoi-nglow)"><animate attributeName="r" values="6;7.5;6" dur="1.55s" repeatCount="indefinite" begin="0.2s"/><animate attributeName="stroke-opacity" values="1;0.3;1" dur="1.55s" repeatCount="indefinite" begin="0.2s"/></circle>
+        <circle cx="65" cy="76" r="2.4" fill="#88e0ff"/>
+        <text x="128" y="68" font-family="'Barlow Condensed','Arial Narrow',Impact,Arial" font-weight="900" font-size="50" fill="url(#aoi-text)" letter-spacing="2">AOI</text>
+        <text x="130" y="90" font-family="'Trebuchet MS',Arial" font-weight="700" font-size="19" fill="#d4880e" letter-spacing="1">9.0</text>
+        <rect x="172" y="79" width="84" height="15" rx="7.5" fill="url(#aoi-badge)"/>
+        <rect x="172" y="79" width="84" height="7"  rx="7.5" fill="#fff" opacity="0.18"/>
+        <text x="214" y="90" font-family="Arial" font-weight="800" font-size="8" fill="#fff" text-anchor="middle" letter-spacing="2">NOSTALGIA</text>
       </svg>
     </div>
   </div>
