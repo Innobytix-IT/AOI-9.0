@@ -69,6 +69,7 @@ define('ROOM_PREFIX',    DATEN_DIR . '/room_');
 define('OFFLINE_TTL',    604800);
 define('MAX_OFFLINE',    50);
 define('MAX_MSG_LEN',      2000);
+define('MAX_RELAY_LEN',    4096);
 define('MAX_ROOM_MEMBERS', 25);
 define('ROOM_TTL',         7200);
 
@@ -590,12 +591,13 @@ if ($aktion === 'signal') {
     $typ = isset($ein['typ']) ? (string)$ein['typ'] : '';
     if (!name_ok($an))  aoi_fehler('Ungueltiger Empfaenger.');
     if ($an === $name)  aoi_fehler('Kann nicht an sich selbst senden.');
-    if (!in_array($typ, array('offer','answer','ice'), true)) aoi_fehler('Unbekannter Signaltyp.');
+    if (!in_array($typ, array('offer','answer','ice','relay'), true)) aoi_fehler('Unbekannter Signaltyp.');
     $daten = isset($ein['daten']) ? $ein['daten'] : null;
     if ($daten === null) aoi_fehler('Kein Signal-Inhalt.');
     $daten_json = json_encode($daten);
     if ($daten_json === false) aoi_fehler('Nicht serialisierbar.');
-    if (strlen($daten_json) > ($typ === 'ice' ? MAX_ICE : MAX_SDP)) aoi_fehler('Signal zu gross.');
+    $max_len = $typ === 'ice' ? MAX_ICE : ($typ === 'relay' ? MAX_RELAY_LEN : MAX_SDP);
+    if (strlen($daten_json) > $max_len) aoi_fehler('Signal zu gross.');
 
     // Federation: Wenn Empfänger nicht lokal online ist, lokalen Cache befragen
     if (FEDERATION_ENABLED) {
@@ -626,6 +628,14 @@ if ($aktion === 'poll') {
     $frisch = array_values(bereinige(lies($pfad), SIGNAL_TTL));
     schreibe($pfad, array());
     aoi_ok(array('signale' => $frisch));
+}
+
+if ($aktion === 'get_noise_pub') {
+    $target = isset($ein['ziel']) ? strtolower(trim((string)$ein['ziel'])) : '';
+    if (!name_ok($target)) aoi_fehler('Ungueltiger Name.');
+    $clients = lies(NOISE_CLIENTS_FILE);
+    if (!isset($clients[$target])) aoi_fehler('Unbekannter Nutzer.');
+    aoi_ok(array('noise_pub' => $clients[$target]['spk']));
 }
 
 if ($aktion === 'bye') {

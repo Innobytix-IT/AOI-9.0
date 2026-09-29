@@ -2456,7 +2456,8 @@ var _typingTimers = {};    // name → clearTimeout handle
 function aoiUpdateIMStatus(name) {
   var online = !!aoi_known_buddies[name];
   var connected = aoi_peers[name] && aoi_peers[name].ready;
-  var statusText = connected ? '🔗 P2P verbunden' : (online ? '● Online' : '○ Offline');
+  var relay = !connected && !!_relayMode[name];
+  var statusText = connected ? '🔗 P2P verbunden' : (relay ? '⚡ Relay-Modus' : (online ? '● Online' : '○ Offline'));
   if(currentIMBuddy === name) {
     var statusEl = document.getElementById('im-buddy-away-disp');
     if(statusEl) statusEl.textContent = statusText;
@@ -2552,11 +2553,19 @@ function aoiSendExtraIM(name) {
   aoiSaveChatMsg(name,'out',d.innerHTML);
   playSound('snd-msg-sent');
   if(!aoiSendViaDataChannel(name, text)) {
-    aoiQueueOfflineMsg(name, text, d.innerHTML);
-    var hint=document.createElement('div');
-    hint.style.cssText='font-size:10px;color:#999;font-style:italic;margin-left:4px;';
-    hint.textContent='↪ Wird zugestellt sobald '+name+' online ist.';
-    logEl.appendChild(hint); logEl.scrollTop=logEl.scrollHeight;
+    if(_relayMode[name]) {
+      aoiRelaySend(name, text);
+      var rhint=document.createElement('div');
+      rhint.style.cssText='font-size:10px;color:#777;font-style:italic;margin-left:4px;';
+      rhint.textContent='⚡ Via Relay zugestellt.';
+      logEl.appendChild(rhint); logEl.scrollTop=logEl.scrollHeight;
+    } else {
+      aoiQueueOfflineMsg(name, text, d.innerHTML);
+      var hint=document.createElement('div');
+      hint.style.cssText='font-size:10px;color:#999;font-style:italic;margin-left:4px;';
+      hint.textContent='↪ Wird zugestellt sobald '+name+' online ist.';
+      logEl.appendChild(hint); logEl.scrollTop=logEl.scrollHeight;
+    }
   }
 }
 
@@ -2566,6 +2575,56 @@ function aoiExtraIMKey(e, name) {
 
 function aoiReopenLastIM(){
   if(currentIMBuddy) openIM(currentIMBuddy);
+}
+
+/* ===== RELAY-FALLBACK (CGNAT/DS-Lite) ===== */
+// Ephemeral X25519 + HKDF-SHA256 + AES-256-GCM – server sieht nur Ciphertext.
+
+async function aoiGetPeerNoisePub(name) {
+  if(_peerNoisePubs[name]) return _peerNoisePubs[name];
+  return new Promise(function(resolve) {
+    aoiPost({aktion:'get_noise_pub', name:aoi_name, ziel:name}, function(err, data) {
+      if(err || !data || !data.ok || !data.noise_pub) { resolve(null); return; }
+      crypto.subtle.importKey('raw', _noiseB64dec(data.noise_pub), {name:'X25519'}, false, [])
+        .then(function(k) { _peerNoisePubs[name]=k; resolve(k); })
+        .catch(function() { resolve(null); });
+    });
+  });
+}
+
+async function aoiRelayEncrypt(toName, plaintext) {
+  var recipPub = await aoiGetPeerNoisePub(toName);
+  if(!recipPub) return null;
+  var eph = await crypto.subtle.generateKey({name:'X25519'}, true, ['deriveBits']);
+  var ephPubRaw = new Uint8Array(await crypto.subtle.exportKey('raw', eph.publicKey));
+  var ikm = new Uint8Array(await crypto.subtle.deriveBits({name:'X25519', public:recipPub}, eph.privateKey, 256));
+  var hkdfKey = await crypto.subtle.importKey('raw', ikm, 'HKDF', false, ['deriveKey']);
+  var aesKey = await crypto.subtle.deriveKey(
+    {name:'HKDF', hash:'SHA-256', salt:new Uint8Array(32), info:new TextEncoder().encode('aoi-relay-v1')},
+    hkdfKey, {name:'AES-GCM', length:256}, false, ['encrypt']);
+  var iv = crypto.getRandomValues(new Uint8Array(12));
+  var ct = new Uint8Array(await crypto.subtle.encrypt({name:'AES-GCM', iv:iv}, aesKey, new TextEncoder().encode(plaintext)));
+  return {v:'relay1', ephPub:_noiseB64enc(ephPubRaw.buffer), iv:_noiseB64enc(iv.buffer), chiffre:_noiseB64enc(ct.buffer)};
+}
+
+async function aoiRelayDecrypt(payload) {
+  if(!_aoiNoiseSpkPriv || payload.v !== 'relay1') return null;
+  try {
+    var ephPubKey = await crypto.subtle.importKey('raw', _noiseB64dec(payload.ephPub), {name:'X25519'}, false, []);
+    var ikm = new Uint8Array(await crypto.subtle.deriveBits({name:'X25519', public:ephPubKey}, _aoiNoiseSpkPriv, 256));
+    var hkdfKey = await crypto.subtle.importKey('raw', ikm, 'HKDF', false, ['deriveKey']);
+    var aesKey = await crypto.subtle.deriveKey(
+      {name:'HKDF', hash:'SHA-256', salt:new Uint8Array(32), info:new TextEncoder().encode('aoi-relay-v1')},
+      hkdfKey, {name:'AES-GCM', length:256}, false, ['decrypt']);
+    var pt = await crypto.subtle.decrypt({name:'AES-GCM', iv:_noiseB64dec(payload.iv)}, aesKey, _noiseB64dec(payload.chiffre));
+    return new TextDecoder().decode(pt);
+  } catch(e) { return null; }
+}
+
+async function aoiRelaySend(toName, text) {
+  var payload = await aoiRelayEncrypt(toName, text);
+  if(!payload) { console.warn('[Relay] Verschlüsselung fehlgeschlagen für', toName); return; }
+  aoiPost({aktion:'signal', name:aoi_name, an:toName, typ:'relay', daten:payload}, null);
 }
 
 /* ===== RADIO ===== */
@@ -2591,6 +2650,15 @@ function sendIMMessage() {
   log.appendChild(d); input.innerHTML=''; log.scrollTop=log.scrollHeight; playSound('snd-msg-sent');
   aoiSaveChatMsg(currentIMBuddy,'out',d.innerHTML);
   if(aoiSendViaDataChannel(currentIMBuddy, text)) return;
+  // Relay-Modus aktiv (CGNAT/DS-Lite Fallback)
+  if(_relayMode[currentIMBuddy]) {
+    aoiRelaySend(currentIMBuddy, text);
+    var rhint=document.createElement('div');
+    rhint.style.cssText='font-size:10px;color:#777;font-style:italic;margin-left:4px;';
+    rhint.textContent='⚡ Via Relay zugestellt.';
+    log.appendChild(rhint); log.scrollTop=log.scrollHeight;
+    return;
+  }
   // Buddy offline oder P2P noch nicht aufgebaut → in Queue legen
   aoiQueueOfflineMsg(currentIMBuddy, text, d.innerHTML);
   var hint=document.createElement('div');
@@ -3586,6 +3654,8 @@ var aoi_poll_timer = null;
 var _currentPollInterval = 3000;
 var aoi_peers = {};          // name -> {pc, dc, ready}
 var aoi_known_buddies = {};  // name -> true (aktuell online lt. Server)
+var _relayMode = {};         // name -> true wenn Relay-Fallback aktiv
+var _peerNoisePubs = {};     // name -> CryptoKey (X25519 pub, gecacht)
 var ICE_SERVERS = [{ urls: 'stun:stun.l.google.com:19302' }];
 
 function aoiPost(payload, cb) {
@@ -3769,6 +3839,10 @@ function aoiHandleSignal(sig) {
     var peer2 = aoi_peers[von];
     if(peer2 && peer2.pc && daten) peer2.pc.addIceCandidate(new RTCIceCandidate(daten))
       .catch(function(e){ console.warn('[AOI] ICE error', e); });
+  } else if(typ === 'relay') {
+    aoiRelayDecrypt(daten).then(function(plaintext) {
+      if(plaintext !== null) aoiReceiveIM(von, plaintext);
+    });
   }
 }
 
@@ -3806,7 +3880,15 @@ function aoiInitiatePeer(name) {
 }
 
 function aoiSetupDataChannel(dc, fromName) {
-  dc.onopen  = function() {
+  var relayTimer = setTimeout(function() {
+    if(!aoi_peers[fromName] || !aoi_peers[fromName].ready) {
+      _relayMode[fromName] = true;
+      aoiUpdateIMStatus(fromName);
+    }
+  }, 35000);
+  dc.onopen = function() {
+    clearTimeout(relayTimer);
+    _relayMode[fromName] = false;
     if(aoi_peers[fromName]) aoi_peers[fromName].ready=true;
     aoiUpdateBuddyListUI(); aoiUpdateIMStatus(fromName);
     // Status + ausstehende Offline-Msgs senden
