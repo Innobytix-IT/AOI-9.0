@@ -1011,6 +1011,40 @@ body {
       </div>
     </div>
 
+    <!-- VIDEO/AUDIO CALL FENSTER (NetMeeting-/AOL-LiveCam-Stil) -->
+    <div class="mdi-window" id="win-videocall" style="display:none;top:60px;left:60px;width:430px;height:370px;z-index:60;min-width:280px;min-height:220px;">
+      <div class="title-bar" onmousedown="focusAndDrag(event,'win-videocall')">
+        <div class="title-left"><span id="vc-title">📹 AOL LiveCam</span></div>
+        <div class="title-controls">
+          <div class="btn-win" onclick="minimizeWindow('win-videocall')">_</div>
+          <div class="btn-win close" onclick="aoiCallEnd(currentCallName)">✕</div>
+        </div>
+      </div>
+      <div style="flex:1;background:#111;position:relative;overflow:hidden;display:flex;align-items:center;justify-content:center;">
+        <video id="vc-remote" autoplay playsinline style="width:100%;height:100%;object-fit:cover;"></video>
+        <video id="vc-local"  autoplay muted  playsinline style="position:absolute;bottom:8px;right:8px;width:110px;height:82px;object-fit:cover;border:2px solid #fff;border-radius:3px;background:#222;"></video>
+        <div id="vc-calling-overlay" style="position:absolute;inset:0;background:rgba(0,20,60,0.88);display:flex;flex-direction:column;align-items:center;justify-content:center;color:#fff;gap:10px;">
+          <div style="font-size:32px;">📞</div>
+          <div id="vc-calling-text" style="font-size:13px;">Verbinde…</div>
+        </div>
+      </div>
+      <div style="background:#ddeeff;border-top:1px solid #8ab;padding:4px 8px;display:flex;justify-content:center;gap:8px;flex-shrink:0;">
+        <button id="vc-mute-btn"  class="btn-options" onclick="aoiCallToggleMute()"  style="font-size:11px;">🎤 Stumm</button>
+        <button id="vc-video-btn" class="btn-options" onclick="aoiCallToggleVideo()" style="font-size:11px;">📷 Video aus</button>
+        <button class="btn-options" onclick="aoiCallEnd(currentCallName)" style="background:linear-gradient(to bottom,#ff4444,#cc0000);color:#fff;border-color:#aa0000;font-size:11px;">📵 Auflegen</button>
+      </div>
+    </div>
+
+    <!-- Eingehender Anruf – Benachrichtigung -->
+    <div id="dlg-incoming-call" style="display:none;position:fixed;bottom:60px;right:20px;background:#eaf2fb;border:2px solid #0044cc;border-radius:5px;padding:14px 16px;z-index:9100;box-shadow:5px 5px 12px rgba(0,0,0,0.4);font-size:12px;min-width:230px;">
+      <div style="font-weight:bold;color:#003399;margin-bottom:6px;font-size:13px;">📞 Eingehender Anruf</div>
+      <div id="dlg-incoming-caller" style="margin-bottom:10px;color:#333;"></div>
+      <div style="display:flex;gap:8px;justify-content:flex-end;">
+        <button class="btn-options" style="background:linear-gradient(to bottom,#ff4444,#cc0000);color:#fff;border-color:#aa0000;" onclick="aoiCallReject(_incomingCallName)">📵 Ablehnen</button>
+        <button class="btn-options" style="background:linear-gradient(to bottom,#22cc44,#008822);color:#fff;border-color:#006600;" onclick="aoiCallAccept(_incomingCallName)">📞 Annehmen</button>
+      </div>
+    </div>
+
     <!-- P2P-Direktverbindungs-Dialog (Off-Grid / LAN-Party-Modus) -->
     <div id="dlg-direct-connect" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.45);z-index:9000;align-items:center;justify-content:center;">
       <div style="background:#eaf2fb;border:2px solid #6b98c3;border-radius:4px;padding:18px 20px;width:370px;font-size:12px;box-shadow:6px 6px 12px rgba(0,0,0,0.4);">
@@ -1213,7 +1247,8 @@ body {
           <div id="im-transfer-label" style="font-size:9px;color:#555;text-align:right;margin-top:1px;"></div>
         </div>
         <div class="im-send-row">
-          <button class="btn-options" title="Datei senden" onclick="document.getElementById('im-file-input').click()" style="padding:4px 8px;font-size:13px;">📎</button>
+          <button id="im-file-btn" class="btn-options" title="Datei senden" onclick="document.getElementById('im-file-input').click()" style="padding:4px 8px;font-size:13px;">📎</button>
+          <button id="im-call-btn" class="btn-options" title="Anrufen (erfordert Direktverbindung)" onclick="aoiCallStart(currentIMBuddy)" style="padding:4px 8px;font-size:13px;" disabled>📞</button>
           <button class="btn-options" onclick="sendIMMessage()">Senden</button>
         </div>
       </div>
@@ -2482,6 +2517,17 @@ function aoiUpdateIMStatus(name) {
     if(statusEl) statusEl.textContent = statusText;
     var avatarEl = document.getElementById('im-buddy-avatar');
     if(avatarEl) avatarEl.textContent = online ? '🟢' : '🔴';
+    // Datei & Anruf: nur bei echter WebRTC-Direktverbindung aktiv
+    var fileBtn = document.getElementById('im-file-btn');
+    var callBtn = document.getElementById('im-call-btn');
+    if(fileBtn) {
+      fileBtn.disabled = !connected;
+      fileBtn.title = connected ? 'Datei senden' : 'Dateitransfer erfordert Direktverbindung (nicht im Relay-Modus)';
+    }
+    if(callBtn) {
+      callBtn.disabled = !connected;
+      callBtn.title = connected ? 'Video-/Audioanruf starten' : 'Telefonie erfordert Direktverbindung (nicht im Relay-Modus)';
+    }
   }
   var ew = aoi_im_wins[name];
   if(ew) { var se=ew.querySelector('.im-extra-status'); if(se) se.textContent=statusText; }
@@ -3706,6 +3752,11 @@ var _relayMode = {};         // name -> true wenn Relay-Fallback aktiv
 var _peerNoisePubs = {};     // name -> CryptoKey (X25519 pub, gecacht)
 var _p2pMode = {};           // name -> true wenn Node P2P IPv6 aktiv
 var _p2pPrivB64 = null;      // base64 PKCS8 des eigenen X25519-Keys (für p2p.js)
+var _callState = {};         // name -> 'calling'|'ringing'|'active'
+var _localStream = null;     // aktiver MediaStream (Kamera/Mikro)
+var currentCallName = null;  // Name des aktiven Gesprächspartners
+var _incomingCallName = null;
+var _pendingCallSdp = null;  // SDP vom Anrufer, bis Nutzer annimmt
 var ICE_SERVERS = [
   { urls: 'stun:stun.l.google.com:19302' },
   { urls: 'stun:stun.l.google.com:5349' },    // Google IPv6
@@ -3987,6 +4038,104 @@ async function aoiDirectConnectDo() {
   openIM(name);
 }
 
+// ── Video-/Audioanruf (WebRTC, via DataChannel signalisiert) ──────────────
+
+async function aoiCallStart(name) {
+  if(!name) return;
+  var peer = aoi_peers[name];
+  if(!peer || !peer.ready || !peer.dc || peer.dc.readyState !== 'open') return;
+  if(_callState[name]) return;
+  try {
+    _localStream = await navigator.mediaDevices.getUserMedia({audio:true, video:true});
+  } catch(e) {
+    try { _localStream = await navigator.mediaDevices.getUserMedia({audio:true, video:false}); }
+    catch(e2) { alert('Kein Mikrofon oder Kamera gefunden.'); return; }
+  }
+  currentCallName = name; _callState[name] = 'calling';
+  document.getElementById('vc-local').srcObject = _localStream;
+  // Tracks → PC → onnegotiationneeded → Offer erstellen
+  _localStream.getTracks().forEach(function(t){ peer.pc.addTrack(t, _localStream); });
+  var offer = await peer.pc.createOffer();
+  await peer.pc.setLocalDescription(offer);
+  peer.dc.send(JSON.stringify({aoi:'call-request', sdp: peer.pc.localDescription}));
+  // Video-Fenster öffnen
+  document.getElementById('vc-title').textContent = '📞 Wähle… ' + name;
+  document.getElementById('vc-calling-text').textContent = 'Warte auf Antwort von ' + name + '…';
+  document.getElementById('vc-calling-overlay').style.display = 'flex';
+  document.getElementById('vc-remote').srcObject = null;
+  openWindow('win-videocall');
+}
+
+async function aoiCallAccept(name) {
+  document.getElementById('dlg-incoming-call').style.display = 'none';
+  var peer = aoi_peers[name];
+  if(!peer || !peer.pc || !peer.dc) return;
+  try {
+    _localStream = await navigator.mediaDevices.getUserMedia({audio:true, video:true});
+  } catch(e) {
+    try { _localStream = await navigator.mediaDevices.getUserMedia({audio:true, video:false}); }
+    catch(e2) { peer.dc.send(JSON.stringify({aoi:'call-reject',reason:'no_device'})); return; }
+  }
+  currentCallName = name; _callState[name] = 'active';
+  document.getElementById('vc-local').srcObject = _localStream;
+  _localStream.getTracks().forEach(function(t){ peer.pc.addTrack(t, _localStream); });
+  if(_pendingCallSdp) {
+    await peer.pc.setRemoteDescription(_pendingCallSdp);
+    _pendingCallSdp = null;
+    var answer = await peer.pc.createAnswer();
+    await peer.pc.setLocalDescription(answer);
+    peer.dc.send(JSON.stringify({aoi:'call-accept', sdp: peer.pc.localDescription}));
+  }
+  document.getElementById('vc-title').textContent = '📹 AOL LiveCam: ' + name;
+  document.getElementById('vc-calling-text').textContent = 'Verbinde…';
+  document.getElementById('vc-calling-overlay').style.display = 'flex';
+  document.getElementById('vc-remote').srcObject = null;
+  openWindow('win-videocall');
+}
+
+function aoiCallReject(name) {
+  document.getElementById('dlg-incoming-call').style.display = 'none';
+  _incomingCallName = null; _pendingCallSdp = null;
+  var peer = aoi_peers[name];
+  if(peer && peer.dc && peer.dc.readyState==='open') peer.dc.send(JSON.stringify({aoi:'call-reject'}));
+}
+
+function aoiCallEnd(name) {
+  if(!name) return;
+  if(_localStream) { _localStream.getTracks().forEach(function(t){ t.stop(); }); _localStream = null; }
+  var peer = aoi_peers[name];
+  if(peer && peer.pc) {
+    peer.pc.getSenders().forEach(function(s){ try{ peer.pc.removeTrack(s); }catch(e){} });
+    if(peer.dc && peer.dc.readyState==='open') peer.dc.send(JSON.stringify({aoi:'call-end'}));
+  }
+  var rv = document.getElementById('vc-remote'), lv = document.getElementById('vc-local');
+  if(rv) rv.srcObject = null; if(lv) lv.srcObject = null;
+  delete _callState[name];
+  if(currentCallName===name) currentCallName = null;
+  _incomingCallName = null; _pendingCallSdp = null;
+  document.getElementById('win-videocall').style.display = 'none';
+}
+
+function aoiCallToggleMute() {
+  if(!_localStream) return;
+  var at = _localStream.getAudioTracks();
+  if(!at.length) return;
+  var nowMuted = !at[0].enabled;
+  at.forEach(function(t){ t.enabled = nowMuted; });
+  var btn = document.getElementById('vc-mute-btn');
+  if(btn) btn.textContent = nowMuted ? '🎤 Stumm' : '🔇 Ton ein';
+}
+
+function aoiCallToggleVideo() {
+  if(!_localStream) return;
+  var vt = _localStream.getVideoTracks();
+  if(!vt.length) return;
+  var nowOn = !vt[0].enabled;
+  vt.forEach(function(t){ t.enabled = nowOn; });
+  var btn = document.getElementById('vc-video-btn');
+  if(btn) btn.textContent = nowOn ? '📷 Video aus' : '📹 Video ein';
+}
+
 function aoiGetOrCreatePC(name, initiator) {
   if(aoi_peers[name] && aoi_peers[name].pc) return aoi_peers[name].pc;
   var pc = new RTCPeerConnection({iceServers: ICE_SERVERS});
@@ -4007,6 +4156,13 @@ function aoiGetOrCreatePC(name, initiator) {
   pc.onconnectionstatechange = function() {
     var s = pc.connectionState;
     if(s==='disconnected'||s==='failed'||s==='closed') { if(aoi_peers[name]) aoi_peers[name].ready=false; }
+  };
+  pc.ontrack = function(e) {
+    if(!e.streams || !e.streams[0]) return;
+    var remVid = document.getElementById('vc-remote');
+    if(remVid) remVid.srcObject = e.streams[0];
+    document.getElementById('vc-calling-overlay').style.display = 'none';
+    document.getElementById('vc-title').textContent = '📹 AOL LiveCam: ' + name;
   };
   return pc;
 }
@@ -4052,6 +4208,30 @@ function aoiReceiveIM(fromName, text) {
       if(msg.aoi==='status') { aoiReceiveBuddyStatus(fromName, msg.v); return; }
       if(msg.aoi==='room')        { aoiRoomReceive(fromName, msg); return; }
       if(msg.aoi==='room_invite') { aoiReceiveRoomInvite(fromName, msg); return; }
+      // ── Anruf-Signale (via DataChannel, kein Server) ──────────────────────
+      if(msg.aoi==='call-request') {
+        _incomingCallName = fromName;
+        _pendingCallSdp   = new RTCSessionDescription(msg.sdp);
+        document.getElementById('dlg-incoming-caller').textContent = fromName + ' möchte einen Video-/Audioanruf starten.';
+        document.getElementById('dlg-incoming-call').style.display = 'block';
+        playSound('snd-door'); return;
+      }
+      if(msg.aoi==='call-accept') {
+        _callState[fromName] = 'active';
+        var cpeer = aoi_peers[fromName];
+        if(cpeer && cpeer.pc && msg.sdp) cpeer.pc.setRemoteDescription(new RTCSessionDescription(msg.sdp)).catch(function(){});
+        document.getElementById('vc-title').textContent = '📹 AOL LiveCam: ' + fromName;
+        return;
+      }
+      if(msg.aoi==='call-reject') {
+        delete _callState[fromName];
+        if(currentCallName===fromName) aoiCallEnd(fromName);
+        return;
+      }
+      if(msg.aoi==='call-end') {
+        if(_callState[fromName] || currentCallName===fromName) aoiCallEnd(fromName);
+        return;
+      }
     } catch(e) {}
   }
   // Richtiges Log-Element ermitteln

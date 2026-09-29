@@ -523,11 +523,12 @@ app.on('web-contents-created', (_event, contents) => {
 });
 
 app.whenReady().then(() => {
-  // Vollbild erlauben, alle anderen Berechtigungen (Kamera, Mikrofon, Standort …) verweigern
-  const permHandler = (_wc, perm, cb) => cb(perm === 'fullscreen');
-  session.defaultSession.setPermissionRequestHandler(permHandler);
-  session.fromPartition('persist:aoi-browser').setPermissionRequestHandler(permHandler);
-  session.fromPartition('persist:aoi-radio').setPermissionRequestHandler(permHandler);
+  // Haupt-App: Kamera/Mikrofon für Video-Anrufe + Fullscreen erlauben
+  session.defaultSession.setPermissionRequestHandler((_wc, perm, cb) => cb(perm === 'fullscreen' || perm === 'media'));
+  // Browser-/Radio-Webview: nur Fullscreen – kein Kamera-/Mikrofon-Zugriff für externe Sites
+  const restrictedHandler = (_wc, perm, cb) => cb(perm === 'fullscreen');
+  session.fromPartition('persist:aoi-browser').setPermissionRequestHandler(restrictedHandler);
+  session.fromPartition('persist:aoi-radio').setPermissionRequestHandler(restrictedHandler);
   createWindow();
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();
