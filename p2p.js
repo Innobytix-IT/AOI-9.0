@@ -157,7 +157,8 @@ class PeerConn {
 let sock     = null;
 let privKey  = null;  // Node.js KeyObject (X25519)
 let pubRaw   = null;  // Buffer 32 B
-let localIPv6 = null;
+let localIPv6 = null; // globale IPv6 (bevorzugt)
+let localIPv4 = null; // LAN-IPv4-Fallback (für Offline-LAN ohne IPv6)
 let localPort = 0;
 let emit      = () => {};  // Callback → Electron main
 
@@ -170,6 +171,16 @@ function globalIPv6() {
   for (const addrs of Object.values(os.networkInterfaces())) {
     for (const a of addrs) {
       if (!a.internal && a.family === 'IPv6' && /^[23]/.test(a.address))
+        return a.address;
+    }
+  }
+  return null;
+}
+
+function lanIPv4() {
+  for (const addrs of Object.values(os.networkInterfaces())) {
+    for (const a of addrs) {
+      if (!a.internal && a.family === 'IPv4' && /^(10\.|172\.(1[6-9]|2\d|3[01])\.|192\.168\.)/.test(a.address))
         return a.address;
     }
   }
@@ -281,13 +292,15 @@ function init(privPkcs8B64, pubRawB64, cb) {
   s.bind(0, '::', () => {
     localPort = s.address().port;
     localIPv6 = globalIPv6();
+    localIPv4 = lanIPv4();
     sock = s;
-    if (cb) cb(null, { addr: localIPv6, port: localPort });
+    if (cb) cb(null, { addr: localIPv6, ip4: localIPv4, port: localPort });
   });
 }
 
 function getAddr() {
-  return localIPv6 ? { addr: localIPv6, port: localPort } : null;
+  if (!localPort) return null;
+  return { addr: localIPv6, ip4: localIPv4, port: localPort };
 }
 
 function connect(name, peerPubB64, peerAddr, peerPort) {

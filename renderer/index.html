@@ -3918,24 +3918,36 @@ async function aoiInitP2P(name) {
 
 // ── Off-Grid Direktverbindung (kein Signaling-Server nötig) ────────────────
 
+function _parseDirectCode(raw) {
+  // Tolerant: [IPv6]:port:key  oder  IPv4:port:key  (Klammern optional, Whitespace egal)
+  var m = raw.trim().match(/^\[?([0-9a-fA-F:.]+)\]?:(\d+):([A-Za-z0-9+/=_-]+)$/);
+  if (!m) return null;
+  var port = parseInt(m[2], 10);
+  if (isNaN(port) || port < 1 || port > 65535) return null;
+  return { addr: m[1], port: port, pub: m[3] };
+}
+
 async function aoiCopyDirectCode() {
   if (!window.electronAPI || !window.electronAPI.p2pGetAddr) {
     alert('P2P nicht verfügbar (nur in der Electron-App).'); return;
   }
-  var addrInfo = await window.electronAPI.p2pGetAddr();
-  if (!addrInfo || !addrInfo.addr) {
-    alert('Kein globales IPv6 gefunden.\nDirektverbindung erfordert eine öffentliche IPv6-Adresse.'); return;
-  }
   if (!_aoiNoiseSpkPub) {
     alert('Noise-Schlüssel nicht geladen. Bitte erst einloggen.'); return;
   }
-  var code = '[' + addrInfo.addr + ']:' + addrInfo.port + ':' + _noiseB64enc(_aoiNoiseSpkPub.buffer);
+  var addrInfo = await window.electronAPI.p2pGetAddr();
+  if (!addrInfo || (!addrInfo.addr && !addrInfo.ip4)) {
+    alert('Keine Netzwerkadresse gefunden.\nBitte sicherstellen, dass eine Netzwerkverbindung besteht.'); return;
+  }
+  var pub  = _noiseB64enc(_aoiNoiseSpkPub.buffer);
+  // Bevorzugt globales IPv6, Fallback auf LAN-IPv4 (für Offline-LAN ohne IPv6)
+  var code = addrInfo.addr
+    ? '[' + addrInfo.addr + ']:' + addrInfo.port + ':' + pub
+    : addrInfo.ip4 + ':' + addrInfo.port + ':' + pub;
   try {
     await navigator.clipboard.writeText(code);
     var btn = event && event.target;
     if (btn) { var orig=btn.textContent; btn.textContent='✅ Kopiert!'; setTimeout(function(){btn.textContent=orig;},1800); }
   } catch(e) {
-    // Fallback: prompt zeigt den Code zum manuellen Kopieren
     prompt('Dein Direkt-Code (kopieren und an Buddy schicken):', code);
   }
 }
@@ -3957,21 +3969,22 @@ async function aoiDirectConnectDo() {
   if (!name) { statusEl.textContent = 'Bitte einen Buddynamen eingeben.'; return; }
   if (!code) { statusEl.textContent = 'Bitte den Direkt-Code einfügen.'; return; }
 
-  // Format: [ipv6addr]:port:Base64PubKey
-  var m = code.match(/^\[([^\]]+)\]:(\d+):(.+)$/);
-  if (!m) { statusEl.textContent = 'Ungültiges Format – erwartet: [IPv6]:Port:Key'; return; }
+  var parsed = _parseDirectCode(code);
+  if (!parsed) { statusEl.textContent = 'Ungültiges Format – erwartet: [IPv6]:Port:Key  oder  IPv4:Port:Key'; return; }
 
-  var addr = m[1], port = parseInt(m[2], 10), pub = m[3].trim();
-  if (!addr || isNaN(port) || port < 1 || port > 65535 || !pub) {
-    statusEl.textContent = 'Ungültige Adresse, Port oder Schlüssel.'; return;
-  }
   if (!window.electronAPI || !window.electronAPI.p2pConnect) {
     statusEl.textContent = 'P2P nicht verfügbar (nur in der Electron-App).'; return;
   }
 
   document.getElementById('dlg-direct-connect').style.display = 'none';
-  window.electronAPI.p2pConnect(name, pub, addr, port);
-  openIM(name); // Chat-Fenster sofort öffnen
+
+  // Buddy temporär als online markieren → gewohntes AOL-Chatfenster mit 🚀-Status
+  if (!aoi_known_buddies[name]) aoi_known_buddies[name] = {away:'● Online', avatar:'🟢', reply:null};
+  _p2pMode[name] = false; // Wird auf true gesetzt sobald p2p-connected Event eintrifft
+  aoiRenderBuddyListUI();
+
+  window.electronAPI.p2pConnect(name, parsed.pub, parsed.addr, parsed.port);
+  openIM(name);
 }
 
 function aoiGetOrCreatePC(name, initiator) {
