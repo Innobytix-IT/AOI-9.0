@@ -1004,7 +1004,25 @@ body {
             <button class="buddy-act-btn" onclick="aoiShowBuddyInfo()">Info</button>
             <button class="buddy-act-btn" onclick="aoiCreateGroup()" style="grid-column:span 2;">➕ Neue Gruppe</button>
             <button class="buddy-act-btn" onclick="openWindow('win-userdir');aoiLoadUserDir()" style="grid-column:span 2;">🔍 Nutzersuche</button>
+            <button class="buddy-act-btn" onclick="aoiCopyDirectCode()" title="Meinen Direkt-Code für Off-Grid-Verbindung kopieren">📋 Mein Code</button>
+            <button class="buddy-act-btn" onclick="aoiShowDirectConnectDialog()" title="Ohne Server verbinden (LAN / Off-Grid)">🔌 Verbinden</button>
           </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- P2P-Direktverbindungs-Dialog (Off-Grid / LAN-Party-Modus) -->
+    <div id="dlg-direct-connect" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.45);z-index:9000;align-items:center;justify-content:center;">
+      <div style="background:#eaf2fb;border:2px solid #6b98c3;border-radius:4px;padding:18px 20px;width:370px;font-size:12px;box-shadow:6px 6px 12px rgba(0,0,0,0.4);">
+        <div style="font-weight:bold;color:#003399;margin-bottom:12px;font-size:13px;">🔌 Direktverbindung (Off-Grid / LAN)</div>
+        <div style="margin-bottom:4px;">Buddyname:</div>
+        <input id="dlg-direct-name" type="text" placeholder="z.B. rudi" style="width:100%;box-sizing:border-box;padding:4px 6px;border:1px solid #6b98c3;border-radius:3px;margin-bottom:10px;font-size:12px;">
+        <div style="margin-bottom:4px;">Direkt-Code (vom Buddy einfügen):</div>
+        <textarea id="dlg-direct-code" rows="3" placeholder="[2001:db8::1]:54321:Base64PublicKey" style="width:100%;box-sizing:border-box;padding:4px 6px;border:1px solid #6b98c3;border-radius:3px;font-family:monospace;font-size:10px;resize:vertical;margin-bottom:8px;"></textarea>
+        <div id="dlg-direct-status" style="color:#cc0000;font-size:11px;min-height:14px;margin-bottom:10px;"></div>
+        <div style="display:flex;justify-content:flex-end;gap:8px;">
+          <button class="btn-options" onclick="document.getElementById('dlg-direct-connect').style.display='none'">Abbrechen</button>
+          <button class="btn-options" style="background:linear-gradient(to bottom,#4488ff 0%,#0033cc 100%);color:#fff;border-color:#0033cc;" onclick="aoiDirectConnectDo()">Verbinden</button>
         </div>
       </div>
     </div>
@@ -3896,6 +3914,64 @@ async function aoiInitP2P(name) {
   var pub = _noiseB64enc(_aoiNoiseSpkPub.buffer);
   aoiPost({aktion:'signal', name:aoi_name, an:name, typ:'p2p_addr',
     daten:{addr:addrInfo.addr, port:addrInfo.port, pub:pub}}, null);
+}
+
+// ── Off-Grid Direktverbindung (kein Signaling-Server nötig) ────────────────
+
+async function aoiCopyDirectCode() {
+  if (!window.electronAPI || !window.electronAPI.p2pGetAddr) {
+    alert('P2P nicht verfügbar (nur in der Electron-App).'); return;
+  }
+  var addrInfo = await window.electronAPI.p2pGetAddr();
+  if (!addrInfo || !addrInfo.addr) {
+    alert('Kein globales IPv6 gefunden.\nDirektverbindung erfordert eine öffentliche IPv6-Adresse.'); return;
+  }
+  if (!_aoiNoiseSpkPub) {
+    alert('Noise-Schlüssel nicht geladen. Bitte erst einloggen.'); return;
+  }
+  var code = '[' + addrInfo.addr + ']:' + addrInfo.port + ':' + _noiseB64enc(_aoiNoiseSpkPub.buffer);
+  try {
+    await navigator.clipboard.writeText(code);
+    var btn = event && event.target;
+    if (btn) { var orig=btn.textContent; btn.textContent='✅ Kopiert!'; setTimeout(function(){btn.textContent=orig;},1800); }
+  } catch(e) {
+    // Fallback: prompt zeigt den Code zum manuellen Kopieren
+    prompt('Dein Direkt-Code (kopieren und an Buddy schicken):', code);
+  }
+}
+
+function aoiShowDirectConnectDialog() {
+  document.getElementById('dlg-direct-name').value = '';
+  document.getElementById('dlg-direct-code').value = '';
+  document.getElementById('dlg-direct-status').textContent = '';
+  document.getElementById('dlg-direct-connect').style.display = 'flex';
+  setTimeout(function(){ document.getElementById('dlg-direct-name').focus(); }, 50);
+}
+
+async function aoiDirectConnectDo() {
+  var name     = document.getElementById('dlg-direct-name').value.trim();
+  var code     = document.getElementById('dlg-direct-code').value.trim();
+  var statusEl = document.getElementById('dlg-direct-status');
+  statusEl.textContent = '';
+
+  if (!name) { statusEl.textContent = 'Bitte einen Buddynamen eingeben.'; return; }
+  if (!code) { statusEl.textContent = 'Bitte den Direkt-Code einfügen.'; return; }
+
+  // Format: [ipv6addr]:port:Base64PubKey
+  var m = code.match(/^\[([^\]]+)\]:(\d+):(.+)$/);
+  if (!m) { statusEl.textContent = 'Ungültiges Format – erwartet: [IPv6]:Port:Key'; return; }
+
+  var addr = m[1], port = parseInt(m[2], 10), pub = m[3].trim();
+  if (!addr || isNaN(port) || port < 1 || port > 65535 || !pub) {
+    statusEl.textContent = 'Ungültige Adresse, Port oder Schlüssel.'; return;
+  }
+  if (!window.electronAPI || !window.electronAPI.p2pConnect) {
+    statusEl.textContent = 'P2P nicht verfügbar (nur in der Electron-App).'; return;
+  }
+
+  document.getElementById('dlg-direct-connect').style.display = 'none';
+  window.electronAPI.p2pConnect(name, pub, addr, port);
+  openIM(name); // Chat-Fenster sofort öffnen
 }
 
 function aoiGetOrCreatePC(name, initiator) {
