@@ -591,7 +591,7 @@ if ($aktion === 'signal') {
     $typ = isset($ein['typ']) ? (string)$ein['typ'] : '';
     if (!name_ok($an))  aoi_fehler('Ungueltiger Empfaenger.');
     if ($an === $name)  aoi_fehler('Kann nicht an sich selbst senden.');
-    if (!in_array($typ, array('offer','answer','ice','relay'), true)) aoi_fehler('Unbekannter Signaltyp.');
+    if (!in_array($typ, array('offer','answer','ice','relay','p2p_addr'), true)) aoi_fehler('Unbekannter Signaltyp.');
     $daten = isset($ein['daten']) ? $ein['daten'] : null;
     if ($daten === null) aoi_fehler('Kein Signal-Inhalt.');
     $daten_json = json_encode($daten);

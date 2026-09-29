@@ -2457,7 +2457,8 @@ function aoiUpdateIMStatus(name) {
   var online = !!aoi_known_buddies[name];
   var connected = aoi_peers[name] && aoi_peers[name].ready;
   var relay = !connected && !!_relayMode[name];
-  var statusText = connected ? '🔗 P2P verbunden' : (relay ? '⚡ Relay-Modus' : (online ? '● Online' : '○ Offline'));
+  var p2pIpv6 = !connected && !relay && !!_p2pMode[name];
+  var statusText = connected ? '🔗 P2P verbunden' : (p2pIpv6 ? '🚀 P2P IPv6' : (relay ? '⚡ Relay-Modus' : (online ? '● Online' : '○ Offline')));
   if(currentIMBuddy === name) {
     var statusEl = document.getElementById('im-buddy-away-disp');
     if(statusEl) statusEl.textContent = statusText;
@@ -2553,7 +2554,13 @@ function aoiSendExtraIM(name) {
   aoiSaveChatMsg(name,'out',d.innerHTML);
   playSound('snd-msg-sent');
   if(!aoiSendViaDataChannel(name, text)) {
-    if(_relayMode[name]) {
+    if(_p2pMode[name] && window.electronAPI && window.electronAPI.p2pSend) {
+      window.electronAPI.p2pSend(name, text);
+      var p2phint=document.createElement('div');
+      p2phint.style.cssText='font-size:10px;color:#06c;font-style:italic;margin-left:4px;';
+      p2phint.textContent='🚀 Via P2P IPv6 zugestellt.';
+      logEl.appendChild(p2phint); logEl.scrollTop=logEl.scrollHeight;
+    } else if(_relayMode[name]) {
       aoiRelaySend(name, text);
       var rhint=document.createElement('div');
       rhint.style.cssText='font-size:10px;color:#777;font-style:italic;margin-left:4px;';
@@ -2650,6 +2657,15 @@ function sendIMMessage() {
   log.appendChild(d); input.innerHTML=''; log.scrollTop=log.scrollHeight; playSound('snd-msg-sent');
   aoiSaveChatMsg(currentIMBuddy,'out',d.innerHTML);
   if(aoiSendViaDataChannel(currentIMBuddy, text)) return;
+  // P2P IPv6 (CGNAT/DS-Lite: direktes UDP6 Tunnel)
+  if(_p2pMode[currentIMBuddy] && window.electronAPI && window.electronAPI.p2pSend) {
+    window.electronAPI.p2pSend(currentIMBuddy, text);
+    var p2phint=document.createElement('div');
+    p2phint.style.cssText='font-size:10px;color:#06c;font-style:italic;margin-left:4px;';
+    p2phint.textContent='🚀 Via P2P IPv6 zugestellt.';
+    log.appendChild(p2phint); log.scrollTop=log.scrollHeight;
+    return;
+  }
   // Relay-Modus aktiv (CGNAT/DS-Lite Fallback)
   if(_relayMode[currentIMBuddy]) {
     aoiRelaySend(currentIMBuddy, text);
@@ -3602,6 +3618,20 @@ window.addEventListener('DOMContentLoaded',function(){
   } catch(e) {}
   aoiInitScreenNames();
   aoiRenderBuddyListUI();
+  // P2P-Events aus dem Node-UDP-Socket entgegennehmen
+  if (window.electronAPI && window.electronAPI.onP2pEvent) {
+    window.electronAPI.onP2pEvent(function(event, data) {
+      if (event === 'connected') {
+        _p2pMode[data.peer] = true;
+        aoiUpdateIMStatus(data.peer);
+      } else if (event === 'message') {
+        aoiReceiveIM(data.peer, data.data);
+      } else if (event === 'error') {
+        _p2pMode[data.peer] = false;
+        aoiUpdateIMStatus(data.peer);
+      }
+    });
+  }
   // Sort-Button-Status aus localStorage wiederherstellen
   var savedSort = aoiGetSortOrder();
   document.querySelectorAll('.sort-btn').forEach(function(b){ b.classList.remove('active'); });
@@ -3656,6 +3686,8 @@ var aoi_peers = {};          // name -> {pc, dc, ready}
 var aoi_known_buddies = {};  // name -> true (aktuell online lt. Server)
 var _relayMode = {};         // name -> true wenn Relay-Fallback aktiv
 var _peerNoisePubs = {};     // name -> CryptoKey (X25519 pub, gecacht)
+var _p2pMode = {};           // name -> true wenn Node P2P IPv6 aktiv
+var _p2pPrivB64 = null;      // base64 PKCS8 des eigenen X25519-Keys (für p2p.js)
 var ICE_SERVERS = [
   { urls: 'stun:stun.l.google.com:19302' },
   { urls: 'stun:stun.l.google.com:5349' },    // Google IPv6
@@ -3848,7 +3880,22 @@ function aoiHandleSignal(sig) {
     aoiRelayDecrypt(daten).then(function(plaintext) {
       if(plaintext !== null) aoiReceiveIM(von, plaintext);
     });
+  } else if(typ === 'p2p_addr') {
+    // Gegenstelle kündigt ihre IPv6-Adresse für direktes UDP P2P an
+    if (window.electronAPI && window.electronAPI.p2pConnect && daten && daten.addr && daten.port && daten.pub) {
+      window.electronAPI.p2pConnect(von, daten.pub, daten.addr, daten.port);
+    }
   }
+}
+
+async function aoiInitP2P(name) {
+  if (!window.electronAPI || !window.electronAPI.p2pGetAddr) return;
+  var addrInfo = await window.electronAPI.p2pGetAddr();
+  if (!addrInfo || !addrInfo.addr) return; // Kein globales IPv6 → kein P2P
+  if (!_aoiNoiseSpkPub) return;
+  var pub = _noiseB64enc(_aoiNoiseSpkPub.buffer);
+  aoiPost({aktion:'signal', name:aoi_name, an:name, typ:'p2p_addr',
+    daten:{addr:addrInfo.addr, port:addrInfo.port, pub:pub}}, null);
 }
 
 function aoiGetOrCreatePC(name, initiator) {
@@ -3889,11 +3936,13 @@ function aoiSetupDataChannel(dc, fromName) {
     if(!aoi_peers[fromName] || !aoi_peers[fromName].ready) {
       _relayMode[fromName] = true;
       aoiUpdateIMStatus(fromName);
+      aoiInitP2P(fromName); // nach Relay-Fallback auch IPv6-UDP versuchen
     }
   }, 35000);
   dc.onopen = function() {
     clearTimeout(relayTimer);
     _relayMode[fromName] = false;
+    _p2pMode[fromName]   = false; // WebRTC direkt gewonnen → P2P IPv6 nicht nötig
     if(aoi_peers[fromName]) aoi_peers[fromName].ready=true;
     aoiUpdateBuddyListUI(); aoiUpdateIMStatus(fromName);
     // Status + ausstehende Offline-Msgs senden
@@ -5754,12 +5803,14 @@ async function aoiNoiseInit(name) {
     }
     var pubStored  = localStorage.getItem('aoi_noise_pub_'+name);
     if (privStored && pubStored) {
+      _p2pPrivB64 = privStored; // PKCS8 Base64 für p2p.js
       _aoiNoiseSpkPriv = await crypto.subtle.importKey('pkcs8', _noiseB64dec(privStored), {name:'X25519'}, false, ['deriveBits']);
       _aoiNoiseSpkPub  = _noiseB64dec(pubStored);
     } else {
       var kp       = await crypto.subtle.generateKey({name:'X25519'}, true, ['deriveBits']);
       var privPkcs8 = new Uint8Array(await crypto.subtle.exportKey('pkcs8', kp.privateKey));
       var pubRaw    = new Uint8Array(await crypto.subtle.exportKey('raw',   kp.publicKey));
+      _p2pPrivB64 = _noiseB64enc(privPkcs8); // PKCS8 Base64 für p2p.js
       if (aoiUseTresor()) {
         await aoiTresorSet(name, 'noise_priv', _noiseB64enc(privPkcs8));
       } else {
@@ -5768,6 +5819,10 @@ async function aoiNoiseInit(name) {
       try { localStorage.setItem('aoi_noise_pub_'+name, _noiseB64enc(pubRaw)); } catch(e) {}
       _aoiNoiseSpkPriv = await crypto.subtle.importKey('pkcs8', privPkcs8, {name:'X25519'}, false, ['deriveBits']);
       _aoiNoiseSpkPub  = pubRaw;
+    }
+    // Node P2P UDP-Socket mit unserem X25519-Key initialisieren
+    if (_p2pPrivB64 && _aoiNoiseSpkPub && window.electronAPI && window.electronAPI.p2pInit) {
+      window.electronAPI.p2pInit(_p2pPrivB64, _noiseB64enc(_aoiNoiseSpkPub.buffer)).catch(function(){});
     }
   } catch(e) { aoiNoiseLock(); return; }
 

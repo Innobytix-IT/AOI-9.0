@@ -4,6 +4,7 @@ const { exec } = require('child_process');
 const fs = require('fs');
 const { ImapFlow } = require('imapflow');
 const nodemailer = require('nodemailer');
+const p2p = require('./p2p.js');
 
 function createWindow() {
   const win = new BrowserWindow({
@@ -536,3 +537,29 @@ app.whenReady().then(() => {
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') app.quit();
 });
+
+// ── P2P IPv6 (node:dgram + Noise IK) ──────────────────────────────────────
+
+function getMainWindow() {
+  return BrowserWindow.getAllWindows()[0] || null;
+}
+
+p2p.setEmitter((event, data) => {
+  const win = getMainWindow();
+  if (win) win.webContents.send(event, data);
+});
+
+ipcMain.handle('p2p-init', (_, privB64, pubB64) => {
+  return new Promise(resolve => {
+    p2p.init(privB64, pubB64, (err, info) => {
+      if (err) { resolve({ ok: false, error: err.message }); return; }
+      resolve({ ok: true, addr: info ? info.addr : null, port: info ? info.port : null });
+    });
+  });
+});
+
+ipcMain.handle('p2p-get-addr',    ()                         => p2p.getAddr());
+ipcMain.handle('p2p-connect',     (_, name, pub, addr, port) => p2p.connect(name, pub, addr, port));
+ipcMain.handle('p2p-send',        (_, name, text)            => p2p.send(name, text));
+ipcMain.handle('p2p-disconnect',  (_, name)                  => { p2p.disconnect(name); return true; });
+ipcMain.handle('p2p-is-ready',    (_, name)                  => p2p.isReady(name));

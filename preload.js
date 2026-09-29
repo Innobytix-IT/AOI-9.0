@@ -24,4 +24,16 @@ contextBridge.exposeInMainWorld('electronAPI', {
   tresorRead:            (u)       => ipcRenderer.invoke('tresor-read', u),
   tresorWrite:           (u, b)    => ipcRenderer.invoke('tresor-write', u, b),
   tresorDelete:          (u)       => ipcRenderer.invoke('tresor-delete', u),
+
+  p2pInit:         (priv, pub)             => ipcRenderer.invoke('p2p-init', priv, pub),
+  p2pGetAddr:      ()                      => ipcRenderer.invoke('p2p-get-addr'),
+  p2pConnect:      (name, pub, addr, port) => ipcRenderer.invoke('p2p-connect', name, pub, addr, port),
+  p2pSend:         (name, text)            => ipcRenderer.invoke('p2p-send', name, text),
+  p2pDisconnect:   (name)                  => ipcRenderer.invoke('p2p-disconnect', name),
+  p2pIsReady:      (name)                  => ipcRenderer.invoke('p2p-is-ready', name),
+  onP2pEvent:      (cb) => {
+    ipcRenderer.on('p2p-connected', (_, d) => cb('connected', d));
+    ipcRenderer.on('p2p-message',   (_, d) => cb('message',   d));
+    ipcRenderer.on('p2p-error',     (_, d) => cb('error',     d));
+  },
 });
