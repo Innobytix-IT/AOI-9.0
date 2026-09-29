@@ -3583,6 +3583,7 @@ var aoi_name = '';
 var aoi_session = '';
 var aoi_presence_timer = null;
 var aoi_poll_timer = null;
+var _currentPollInterval = 3000;
 var aoi_peers = {};          // name -> {pc, dc, ready}
 var aoi_known_buddies = {};  // name -> true (aktuell online lt. Server)
 var ICE_SERVERS = [{ urls: 'stun:stun.l.google.com:19302' }];
@@ -3621,9 +3622,36 @@ function aoiPost(payload, cb) {
   }
 }
 
+function aoiNeedsFastPoll() {
+  var names = Object.keys(aoi_known_buddies);
+  if(names.length === 0) return false;
+  for(var i=0; i<names.length; i++) {
+    var p = aoi_peers[names[i]];
+    if(!p || !p.ready) return true;
+  }
+  return false;
+}
+
+function aoiAdaptPollInterval(hadSignals) {
+  if(!aoi_poll_timer) return;
+  var needed = (hadSignals || aoiNeedsFastPoll()) ? 3000 : 15000;
+  if(needed === _currentPollInterval) return;
+  clearInterval(aoi_poll_timer);
+  _currentPollInterval = needed;
+  aoi_poll_timer = setInterval(aoiPollSignals, needed);
+}
+
+function aoiSetFastPoll() {
+  if(_currentPollInterval === 3000 || !aoi_poll_timer) return;
+  clearInterval(aoi_poll_timer);
+  _currentPollInterval = 3000;
+  aoi_poll_timer = setInterval(aoiPollSignals, 3000);
+}
+
 function aoiStartOnline(name) {
   aoi_name = name;
   aoi_session = 'aoi-' + Date.now() + '-' + Math.random().toString(36).slice(2, 8);
+  _currentPollInterval = 3000;
   aoiPresenceHeartbeat();
   aoi_presence_timer = setInterval(aoiPresenceHeartbeat, 20000);
   aoi_poll_timer = setInterval(aoiPollSignals, 3000);
@@ -3710,7 +3738,9 @@ function aoiPollSignals() {
   if(!aoi_name) return;
   aoiPost({aktion:'poll', name:aoi_name}, function(err, data) {
     if(err || !data || !data.ok) return;
-    (data.signale || []).forEach(aoiHandleSignal);
+    var signals = data.signale || [];
+    signals.forEach(aoiHandleSignal);
+    aoiAdaptPollInterval(signals.length > 0);
   });
 }
 
@@ -3783,7 +3813,7 @@ function aoiSetupDataChannel(dc, fromName) {
     if(aoi_my_status!=='avail') dc.send(JSON.stringify({aoi:'status',v:aoi_my_status}));
     aoiDeliverPendingMsgs(fromName);
   };
-  dc.onclose = function() { if(aoi_peers[fromName]) aoi_peers[fromName].ready=false; aoiUpdateIMStatus(fromName); };
+  dc.onclose = function() { if(aoi_peers[fromName]) aoi_peers[fromName].ready=false; aoiUpdateIMStatus(fromName); aoiSetFastPoll(); };
   dc.onmessage = function(e) { aoiReceiveIM(fromName, e.data); };
 }
 
@@ -3816,6 +3846,7 @@ function aoiShowBuddyOnline(name) {
   showBuddyNotify(name, 'hat sich angemeldet');
   if(!buddyData[name]) buddyData[name] = {away:'● Online', avatar:'🟢', reply:null};
   aoiUpdateIMStatus(name);
+  aoiSetFastPoll();
 }
 
 function aoiShowBuddyOffline(name) {
