@@ -189,6 +189,7 @@ body {
   border-bottom:1px solid #6b9bc2;display:flex;align-items:center;justify-content:space-between;padding:0 10px;
 }
 .toolbar-left,.toolbar-right { display:flex;align-items:center;gap:8px; }
+.toolbar-right { margin-right:5px; }
 .tool-btn { display:flex;flex-direction:column;align-items:center;cursor:pointer;padding:3px 6px;border-radius:4px;position:relative; }
 .tool-btn:hover { background:rgba(255,255,255,.4); }
 .tool-icon { font-size:17px;filter:drop-shadow(1px 1px 1px rgba(0,0,0,.3)); }
@@ -655,7 +656,7 @@ body {
     </div>
     <div class="toolbar-right">
       <div class="tool-btn" onclick="openWindow('win-main')"><span class="tool-icon">🌐</span><span class="tool-label">Portal</span></div>
-      <svg style="width:46px;height:46px;cursor:pointer;" viewBox="6 6 116 107" onclick="aoiGoHome()" title="AOI 9.0 Nostalgia – Startseite">
+      <svg style="width:46px;height:46px;cursor:pointer;" viewBox="6 6 116 114" onclick="aoiGoHome()" title="AOI 9.0 Nostalgia – Startseite">
         <!-- Titelleiste: nur das animierte Dreieck, kein Text -->
         <polygon points="65,14 116,107 14,107" fill="url(#aoi-trifill)"/>
         <polygon points="65,14 116,107 14,107" fill="none" stroke="#1a60d0" stroke-width="3" filter="url(#aoi-bglow)"/>
@@ -2732,11 +2733,12 @@ function aoiSendExtraIM(name) {
       p2phint.textContent='🚀 Via P2P IPv6 zugestellt.';
       logEl.appendChild(p2phint); logEl.scrollTop=logEl.scrollHeight;
     } else if(_relayMode[name]) {
-      aoiRelaySend(name, text);
-      var rhint=document.createElement('div');
-      rhint.style.cssText='font-size:10px;color:#777;font-style:italic;margin-left:4px;';
-      rhint.textContent='⚡ Via Relay zugestellt.';
-      logEl.appendChild(rhint); logEl.scrollTop=logEl.scrollHeight;
+      aoiRelaySend(name, text).then(function(ok) {
+        var rhint=document.createElement('div');
+        rhint.style.cssText='font-size:10px;font-style:italic;margin-left:4px;color:'+(ok?'#777':'#c00')+';';
+        rhint.textContent= ok ? '⚡ Via Relay zugestellt.' : '⚠ Relay fehlgeschlagen – Nachricht nicht zugestellt.';
+        logEl.appendChild(rhint); logEl.scrollTop=logEl.scrollHeight;
+      });
     } else {
       aoiQueueOfflineMsg(name, text, d.innerHTML);
       var hint=document.createElement('div');
@@ -2801,8 +2803,17 @@ async function aoiRelayDecrypt(payload) {
 
 async function aoiRelaySend(toName, text) {
   var payload = await aoiRelayEncrypt(toName, text);
-  if(!payload) { console.warn('[Relay] Verschlüsselung fehlgeschlagen für', toName); return; }
-  aoiPost({aktion:'signal', name:aoi_name, an:toName, typ:'relay', daten:payload}, null);
+  if(!payload) { console.warn('[Relay] Verschlüsselung fehlgeschlagen für', toName); return false; }
+  return new Promise(function(resolve) {
+    aoiPost({aktion:'signal', name:aoi_name, an:toName, typ:'relay', daten:payload}, function(err, data) {
+      if(err || !data || !data.ok) {
+        console.warn('[Relay] Server-Fehler:', err || (data && data.fehler) || 'unbekannt');
+        resolve(false);
+      } else {
+        resolve(true);
+      }
+    });
+  });
 }
 
 /* ===== RADIO ===== */
@@ -2839,11 +2850,12 @@ function sendIMMessage() {
   }
   // Relay-Modus aktiv (CGNAT/DS-Lite Fallback)
   if(_relayMode[currentIMBuddy]) {
-    aoiRelaySend(currentIMBuddy, text);
-    var rhint=document.createElement('div');
-    rhint.style.cssText='font-size:10px;color:#777;font-style:italic;margin-left:4px;';
-    rhint.textContent='⚡ Via Relay zugestellt.';
-    log.appendChild(rhint); log.scrollTop=log.scrollHeight;
+    aoiRelaySend(currentIMBuddy, text).then(function(ok) {
+      var rhint=document.createElement('div');
+      rhint.style.cssText='font-size:10px;font-style:italic;margin-left:4px;color:'+(ok?'#777':'#c00')+';';
+      rhint.textContent= ok ? '⚡ Via Relay zugestellt.' : '⚠ Relay fehlgeschlagen – Nachricht nicht zugestellt.';
+      log.appendChild(rhint); log.scrollTop=log.scrollHeight;
+    });
     return;
   }
   // Buddy offline oder P2P noch nicht aufgebaut → in Queue legen
@@ -4287,6 +4299,11 @@ function aoiSetupDataChannel(dc, fromName) {
   var relayTimer = setTimeout(function() {
     if(!aoi_peers[fromName] || !aoi_peers[fromName].ready) {
       _relayMode[fromName] = true;
+      // PC schließen: stoppt ICE-Kandidaten-Flut in der Server-Inbox
+      if(aoi_peers[fromName] && aoi_peers[fromName].pc) {
+        try { aoi_peers[fromName].pc.close(); } catch(e) {}
+        aoi_peers[fromName].pc = null;
+      }
       aoiUpdateIMStatus(fromName);
       aoiInitP2P(fromName); // nach Relay-Fallback auch IPv6-UDP versuchen
     }
