@@ -36,4 +36,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.on('p2p-message',   (_, d) => cb('message',   d));
     ipcRenderer.on('p2p-error',     (_, d) => cb('error',     d));
   },
+  onUpdate:      (cb) => ipcRenderer.on('aoi-update', (_, d) => cb(d)),
+  updateDownload: ()  => ipcRenderer.send('update-download'),
+  updateInstall:  ()  => ipcRenderer.send('update-install'),
 });

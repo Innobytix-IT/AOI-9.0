@@ -5,6 +5,7 @@ const fs = require('fs');
 const { ImapFlow } = require('imapflow');
 const nodemailer = require('nodemailer');
 const p2p = require('./p2p.js');
+const { autoUpdater } = require('electron-updater');
 
 function createWindow() {
   const win = new BrowserWindow({
@@ -522,6 +523,26 @@ app.on('web-contents-created', (_event, contents) => {
   }
 });
 
+// ── Auto-Update ───────────────────────────────────────────────────────────────
+autoUpdater.autoDownload = false; // Nutzer entscheidet selbst
+autoUpdater.autoInstallOnAppQuit = false;
+
+autoUpdater.on('update-available', info => {
+  getMainWindow()?.webContents.send('aoi-update', { event: 'available', version: info.version });
+});
+autoUpdater.on('download-progress', prog => {
+  getMainWindow()?.webContents.send('aoi-update', { event: 'progress', percent: Math.round(prog.percent) });
+});
+autoUpdater.on('update-downloaded', info => {
+  getMainWindow()?.webContents.send('aoi-update', { event: 'ready', version: info.version });
+});
+autoUpdater.on('error', err => {
+  console.warn('[Update] Fehler:', err.message);
+});
+
+ipcMain.on('update-download', () => autoUpdater.downloadUpdate().catch(e => console.warn('[Update]', e.message)));
+ipcMain.on('update-install',  () => autoUpdater.quitAndInstall());
+
 app.whenReady().then(() => {
   // Haupt-App: Kamera/Mikrofon für Video-Anrufe + Fullscreen erlauben
   session.defaultSession.setPermissionRequestHandler((_wc, perm, cb) => cb(perm === 'fullscreen' || perm === 'media'));
@@ -533,6 +554,8 @@ app.whenReady().then(() => {
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();
   });
+  // Update-Check 5s nach Start (damit App erst vollständig geladen ist)
+  setTimeout(() => autoUpdater.checkForUpdates().catch(e => console.warn('[Update]', e.message)), 5000);
 });
 
 app.on('window-all-closed', () => {

@@ -23,16 +23,10 @@ jobs:
       - name: Dependencies installieren
         run: npm ci
 
-      - name: Windows Build
-        run: npm run dist:win -- --publish never
+      - name: Windows Build & Release
+        run: npm run dist:win -- --publish always
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Installer hochladen
-        uses: softprops/action-gh-release@v2
-        with:
-          files: dist/*.exe
-          tag_name: ${{ github.ref_name }}
 
   build-linux:
     name: Linux Pakete (.AppImage, .deb)
@@ -48,15 +42,7 @@ jobs:
       - name: Dependencies installieren
         run: npm ci
 
-      - name: Linux Build
-        run: npm run dist:linux -- --publish never
+      - name: Linux Build & Release
+        run: npm run dist:linux -- --publish always
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Pakete hochladen
-        uses: softprops/action-gh-release@v2
-        with:
-          files: |
-            dist/*.AppImage
-            dist/*.deb
-          tag_name: ${{ github.ref_name }}

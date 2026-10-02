@@ -61,6 +61,11 @@
         "en_US"
       ],
       "language": "1031"
+    },
+    "publish": {
+      "provider": "github",
+      "owner": "Innobytix-IT",
+      "repo": "AOI-9.0"
     }
   },
   "devDependencies": {
@@ -68,6 +73,7 @@
     "electron-builder": "^25.0.0"
   },
   "dependencies": {
+    "electron-updater": "^6.6.2",
     "imapflow": "^2.0.8",
     "nodemailer": "^10.0.11"
   }

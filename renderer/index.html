@@ -1805,6 +1805,30 @@ body {
   </div>
 </div>
 
+<!-- UPDATE-BENACHRICHTIGUNG -->
+<div class="aoi-modal" id="dlg-update" style="display:none;z-index:99999;">
+  <div class="aoi-modal-box" style="width:360px;">
+    <div class="aoi-modal-title">
+      <span>⬆ AOI Update verfügbar</span>
+      <span onclick="document.getElementById('dlg-update').style.display='none'" style="cursor:pointer;">✕</span>
+    </div>
+    <div class="aoi-modal-body" style="padding:14px 16px;">
+      <div id="upd-msg" style="font-size:12px;color:#002266;margin-bottom:12px;line-height:1.5;"></div>
+      <div id="upd-progress-wrap" style="display:none;margin-bottom:12px;">
+        <div style="font-size:11px;color:#555;margin-bottom:4px;">Lade herunter…</div>
+        <div style="background:#c8dff5;border-radius:3px;height:14px;overflow:hidden;">
+          <div id="upd-progress-bar" style="height:100%;background:linear-gradient(to right,#1a60d0,#55aaff);width:0%;transition:width 0.3s;"></div>
+        </div>
+        <div id="upd-progress-pct" style="font-size:10px;color:#555;margin-top:3px;text-align:right;"></div>
+      </div>
+      <div style="display:flex;gap:8px;justify-content:flex-end;">
+        <button class="btn-options" id="upd-btn-skip" onclick="document.getElementById('dlg-update').style.display='none'">Später</button>
+        <button class="btn-signon" id="upd-btn-action" style="padding:4px 16px;font-size:12px;" onclick="aoiUpdateAction()">Jetzt herunterladen</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <!-- CHATROOM-FENSTER -->
 <div class="mdi-window" id="win-chatroom" style="top:50px;left:180px;width:580px;height:460px;z-index:28;display:none;">
   <div class="title-bar" onmousedown="focusAndDrag(event,'win-chatroom')">
@@ -6752,5 +6776,52 @@ function aoiReceiveRoomInvite(fromName, msg) {
 aoiInitTheme();
 aoiInitFontSize();
 aoiLoadSoundPrefs();
+
+/* ===== AUTO-UPDATE ===== */
+var _updReady = false;
+
+function aoiUpdateAction() {
+  if(_updReady) {
+    if(window.electronAPI && window.electronAPI.updateInstall) window.electronAPI.updateInstall();
+  } else {
+    document.getElementById('upd-btn-action').disabled = true;
+    document.getElementById('upd-btn-action').textContent = 'Lädt…';
+    document.getElementById('upd-progress-wrap').style.display = 'block';
+    if(window.electronAPI && window.electronAPI.updateDownload) window.electronAPI.updateDownload();
+  }
+}
+
+if(window.electronAPI && window.electronAPI.onUpdate) {
+  window.electronAPI.onUpdate(function(data) {
+    var dlg  = document.getElementById('dlg-update');
+    var msg  = document.getElementById('upd-msg');
+    var btn  = document.getElementById('upd-btn-action');
+    var bar  = document.getElementById('upd-progress-bar');
+    var pct  = document.getElementById('upd-progress-pct');
+    var wrap = document.getElementById('upd-progress-wrap');
+    if(data.event === 'available') {
+      msg.innerHTML = '🎉 <b>AOI ' + data.version + '</b> ist verfügbar.<br>Möchtest du jetzt herunterladen und installieren?';
+      btn.textContent = 'Jetzt herunterladen';
+      btn.disabled = false;
+      _updReady = false;
+      wrap.style.display = 'none';
+      dlg.style.display = 'flex';
+    } else if(data.event === 'progress') {
+      wrap.style.display = 'block';
+      bar.style.width = data.percent + '%';
+      pct.textContent = data.percent + '%';
+      btn.textContent = 'Lädt…';
+      btn.disabled = true;
+    } else if(data.event === 'ready') {
+      _updReady = true;
+      wrap.style.display = 'none';
+      msg.innerHTML = '✅ <b>AOI ' + data.version + '</b> wurde heruntergeladen.<br>AOI jetzt neu starten und installieren?';
+      btn.textContent = 'Neu starten & installieren';
+      btn.disabled = false;
+      document.getElementById('upd-btn-skip').textContent = 'Später';
+      dlg.style.display = 'flex';
+    }
+  });
+}
 </script>
 
