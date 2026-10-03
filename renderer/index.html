@@ -4104,8 +4104,13 @@ function aoiHandleSignal(sig) {
   } else if(typ === 'p2p_addr') {
     // Gegenstelle kündigt Adressen für direktes UDP P2P an
     if (window.electronAPI && window.electronAPI.p2pConnect && daten && daten.port && daten.pub) {
-      // Bevorzuge server-reflektierte IP (echte öffentliche Adresse), dann lokale
-      var punchAddr = daten.reflex || daten.addr || daten.ip4;
+      // IPv6 bevorzugen: kein NAT, kein Hole-Punching nötig — direkte globale Adresse
+      // IPv4 nur als Fallback (DS-Lite/CGN = Symmetric NAT → Punching oft wirkungslos)
+      var punchAddr = (daten.reflex && daten.reflex.includes(':'))
+        ? daten.reflex                         // IPv6 vom Server gesehen → direkt
+        : (daten.addr && daten.addr.includes(':'))
+          ? daten.addr                         // lokale IPv6-Adresse
+          : (daten.reflex || daten.ip4);       // IPv4 letzter Versuch
       if (punchAddr) window.electronAPI.p2pConnect(von, daten.pub, punchAddr, daten.port);
       // Gleichzeitig eigene Adresse zurückschicken (simultanes Hole Punching)
       if (!_p2pPunchReplied[von]) { _p2pPunchReplied[von] = true; aoiInitP2P(von); }

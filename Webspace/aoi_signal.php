@@ -651,8 +651,8 @@ if ($aktion === 'get_noise_pub') {
 }
 
 // Server-reflektierte IP zurückgeben (wie der Server den Client sieht – echter STUN-Ersatz)
+// Token wurde bereits global bei Zeile ~499 geprüft
 if ($aktion === 'get_reflexive_addr') {
-    token_ok();
     $ip = isset($_SERVER['HTTP_X_FORWARDED_FOR'])
         ? trim(explode(',', $_SERVER['HTTP_X_FORWARDED_FOR'])[0])
         : ($_SERVER['REMOTE_ADDR'] ?? '');
