@@ -641,7 +641,9 @@ ipcMain.handle('firewall-open-p2p', async () => {
       const linuxOk = () => { try { fs.writeFileSync(fwFlagPath, '1', 'utf8'); } catch(_){} resolve({ ok: true }); };
       exec('which ufw', errUfw => {
         if (!errUfw) {
-          exec('pkexec ufw allow 7777/udp', e => e ? resolve({ ok: false, error: e.message }) : linuxOk());
+          // allow + enable (--force verhindert SSH-Rückfrage); beide Befehle idempotent
+          exec('pkexec sh -c "ufw allow 7777/udp; ufw --force enable"',
+            e => e ? resolve({ ok: false, error: e.message }) : linuxOk());
         } else {
           exec('which firewall-cmd', errFw => {
             if (!errFw) {
