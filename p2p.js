@@ -190,7 +190,7 @@ function lanIPv4() {
 function tx(buf, port, addr) {
   // IPv4-mapped IPv6 wenn nötig
   const target = addr.includes(':') ? addr : `::ffff:${addr}`;
-  sock.send(buf, port, target, err => { if (err) console.error('[P2P] send', err.message); });
+  sock.send(buf, port, target, err => { if (err) try { console.error('[P2P] send', err.message); } catch(_){} });
 }
 
 function onPacket(buf, ri) {

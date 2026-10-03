@@ -1,4 +1,7 @@
 const { app, BrowserWindow, ipcMain, safeStorage, session, shell } = require('electron');
+// EPIPE-Schutz: verhindert Crash wenn stdout/stderr geschlossen ist (z.B. nach npm start | head)
+process.stdout.on('error', e => { if (e.code !== 'EPIPE') throw e; });
+process.stderr.on('error', e => { if (e.code !== 'EPIPE') throw e; });
 const path = require('path');
 const { exec } = require('child_process');
 const fs = require('fs');
