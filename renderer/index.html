@@ -852,6 +852,21 @@ body {
                 <button class="btn-options" style="font-size:10px;margin-top:4px;" onclick="openWindow('win-userdir')">🔍 Nutzersuche öffnen</button>
                 <div style="font-size:10px;color:#888;margin-top:4px;">Andere AOI-Nutzer können deinen Namen dann in der Suche finden.</div>
               </div>
+              <div class="mein-aoi-section" id="meinaoi-p2p-section">
+                <div class="mein-aoi-title">🔌 Direkt-P2P</div>
+                <div style="font-size:11px;color:#555;margin-bottom:7px;">Für direkte, verschlüsselte Verbindungen ohne Server-Umweg muss deine Firewall UDP-Port 7777 für AOI freigeben. <b>Einmalig einrichten – bleibt dauerhaft aktiv.</b></div>
+                <div id="meinaoi-p2p-status" style="display:none;margin-bottom:7px;padding:5px 8px;border-radius:3px;font-size:11px;font-weight:bold;"></div>
+                <div id="meinaoi-p2p-manual" style="display:none;background:#f0f0f0;border:1px solid #c0bdb5;border-radius:3px;padding:6px 8px;font-family:monospace;font-size:10px;color:#333;word-break:break-all;margin-bottom:6px;">
+                  Terminal:<br><span id="meinaoi-p2p-manual-cmd" style="color:#003399;"></span>
+                </div>
+                <button id="meinaoi-p2p-btn" class="btn-signon" style="border-radius:3px;padding:3px 14px;font-size:11px;display:none;" onclick="aoiMeinAoiFirewallSetup()">🛡️ Jetzt einrichten</button>
+              </div>
+              <div class="mein-aoi-section" id="meinaoi-update-section">
+                <div class="mein-aoi-title">🔄 Software-Update</div>
+                <div style="font-size:11px;color:#555;margin-bottom:7px;">Version: <span id="meinaoi-app-version" style="font-family:monospace;color:#003399;"></span></div>
+                <div id="meinaoi-update-status" style="display:none;margin-bottom:7px;padding:5px 8px;border-radius:3px;font-size:11px;font-weight:bold;"></div>
+                <button id="meinaoi-update-btn" class="btn-options" style="font-size:10px;" onclick="aoiMeinAoiCheckUpdates()">🔍 Nach Updates suchen</button>
+              </div>
               <div class="mein-aoi-section">
                 <div class="mein-aoi-title">🖥️ Eigenen AOI-Server betreiben</div>
                 <div style="font-size:11px;color:#555;margin-bottom:6px;">Dateien für deinen eigenen AHPT-Signalserver herunterladen und einrichten.</div>
@@ -1447,7 +1462,6 @@ body {
       <div id="srv-tab-anleitung" onclick="aoiSrvTab('anleitung')" style="padding:5px 14px;font-size:11px;font-weight:bold;cursor:pointer;border-right:1px solid #aac;background:#fff;border-bottom:2px solid #fff;margin-bottom:-2px;">📋 Anleitung</div>
       <div id="srv-tab-download" onclick="aoiSrvTab('download')" style="padding:5px 14px;font-size:11px;cursor:pointer;border-right:1px solid #aac;color:#555;">📥 Downloads</div>
       <div id="srv-tab-server" onclick="aoiSrvTab('server')" style="padding:5px 14px;font-size:11px;cursor:pointer;color:#555;">🔗 Server-URL</div>
-      <div id="srv-tab-p2p" onclick="aoiSrvTab('p2p')" style="padding:5px 14px;font-size:11px;cursor:pointer;color:#555;">🔌 Direkt-P2P</div>
     </div>
     <!-- TAB: ANLEITUNG -->
     <div id="srv-pane-anleitung" style="flex:1;overflow-y:auto;padding:12px;font-size:11px;line-height:1.6;color:#222;">
@@ -1526,21 +1540,6 @@ body {
     </div>
     <!-- TAB: SERVER-URL -->
     <!-- TAB: DIREKT-P2P -->
-    <div id="srv-pane-p2p" style="display:none;flex:1;overflow-y:auto;padding:12px;font-size:11px;">
-      <div style="font-weight:bold;font-size:12px;color:#003399;margin-bottom:8px;">🔌 Direkte P2P-Verbindung einrichten</div>
-      <div style="color:#555;margin-bottom:10px;line-height:1.5;">Damit AOI eine direkte, verschlüsselte Verbindung zu deinem Chat-Partner aufbauen kann (ohne Umweg über den Server), muss deine Firewall eingehende UDP-Pakete auf Port 7777 für AOI zulassen.<br><b style="color:#003399;">Auf Windows wird die Freigabe ausschließlich auf den AOI-Prozess beschränkt</b> – kein anderes Programm kann diesen Port nutzen.</div>
-      <div id="srv-p2p-status" style="display:none;margin-bottom:10px;padding:7px 10px;border-radius:3px;font-size:11px;font-weight:bold;"></div>
-      <div style="display:flex;flex-direction:column;gap:6px;">
-        <button id="srv-p2p-btn" class="btn-signon" style="border-radius:4px;padding:5px 18px;width:fit-content;" onclick="aoiFirewallSetup()">🛡️ Firewall-Regel jetzt einrichten</button>
-        <div id="srv-p2p-manual" style="display:none;background:#f0f0f0;border:1px solid #c0bdb5;border-radius:3px;padding:8px 10px;font-family:monospace;font-size:10px;color:#333;word-break:break-all;">
-          Bitte in einem Terminal ausführen:<br>
-          <span id="srv-p2p-manual-cmd" style="color:#003399;"></span>
-        </div>
-      </div>
-      <div style="margin-top:14px;padding:8px;background:#fff8e0;border:1px solid #d4b800;border-radius:3px;font-size:10px;color:#555;">
-        💡 <b>macOS:</b> Die Firewall wird automatisch gefragt, wenn AOI die erste Verbindung annimmt – keine manuelle Einrichtung nötig.
-      </div>
-    </div>
     <div id="srv-pane-server" style="display:none;flex:1;overflow-y:auto;padding:12px;font-size:11px;">
       <div style="font-weight:bold;font-size:12px;color:#003399;margin-bottom:10px;">Server-URL einstellen</div>
       <div style="color:#555;margin-bottom:10px;">Hier kannst du die URL deines AHPT-Signalservers einstellen. Diese Einstellung wird beim nächsten Anmelden verwendet.</div>
@@ -2190,6 +2189,13 @@ function switchPortalTab(id) {
     aoiMeinAoiRenderGroups();
     aoiMeinAoiRenderFavorites();
     aoiMeinAoiRenderAccounts();
+    aoiMeinAoiP2PCheck();
+    if (window.electronAPI && window.electronAPI.getAppVersion) {
+      window.electronAPI.getAppVersion().then(function(v) {
+        var el = document.getElementById('meinaoi-app-version');
+        if (el) el.textContent = v || '';
+      });
+    }
   }
 }
 
@@ -4617,7 +4623,7 @@ function aoiRenderUserDir(users) {
 
 /* ===== SERVER-EINRICHTUNG ===== */
 function aoiSrvTab(tab) {
-  ['anleitung','download','server','p2p'].forEach(function(t) {
+  ['anleitung','download','server'].forEach(function(t) {
     var pane = document.getElementById('srv-pane-'+t);
     var btn  = document.getElementById('srv-tab-'+t);
     if(!pane || !btn) return;
@@ -4632,7 +4638,6 @@ function aoiSrvTab(tab) {
     var inp = document.getElementById('srv-url-input');
     if(inp) inp.value = AOI_SIGNAL_URL || '';
   }
-  if(tab === 'p2p') aoiFirewallAutoCheck();
 }
 function aoiSrvTabInit() {
   aoiSrvTab('anleitung');
@@ -4688,6 +4693,75 @@ async function aoiFirewallSetup() {
   }
   if (btn) btn.style.display = 'none';
 }
+async function aoiMeinAoiP2PCheck() {
+  if (!window.electronAPI || !window.electronAPI.firewallCheckP2P) return;
+  var btn = document.getElementById('meinaoi-p2p-btn');
+  var statusEl = document.getElementById('meinaoi-p2p-status');
+  if (statusEl) { statusEl.style.display=''; statusEl.style.background='#f0f0f0'; statusEl.style.color='#555'; statusEl.textContent='⏳ Prüfe Firewall-Status…'; }
+  var r = await window.electronAPI.firewallCheckP2P();
+  if (!r) return;
+  if (r.macos) {
+    if (statusEl) { statusEl.style.background='#e8f8e8'; statusEl.style.color='#006600'; statusEl.textContent='✅ macOS fragt automatisch – keine Einrichtung nötig.'; }
+    if (btn) btn.style.display = 'none';
+  } else if (r.set) {
+    if (statusEl) { statusEl.style.background='#e8f8e8'; statusEl.style.color='#006600'; statusEl.textContent='✅ Firewall-Regel ist eingerichtet. Keine Aktion erforderlich.'; }
+    if (btn) btn.style.display = 'none';
+  } else {
+    if (statusEl) { statusEl.style.background='#fff3cd'; statusEl.style.color='#7a5900'; statusEl.textContent='⚠️ Firewall-Regel noch nicht gesetzt. Bitte einmalig einrichten:'; }
+    if (btn) btn.style.display = '';
+  }
+}
+
+async function aoiMeinAoiFirewallSetup() {
+  if (!window.electronAPI || !window.electronAPI.firewallOpenP2P) return;
+  var btn = document.getElementById('meinaoi-p2p-btn');
+  var statusEl = document.getElementById('meinaoi-p2p-status');
+  var manualEl = document.getElementById('meinaoi-p2p-manual');
+  var manualCmd = document.getElementById('meinaoi-p2p-manual-cmd');
+  if (btn) btn.disabled = true;
+  if (statusEl) { statusEl.style.display=''; statusEl.style.background='#e8f0ff'; statusEl.style.color='#003399'; statusEl.textContent='⏳ Firewall wird konfiguriert…'; }
+  var r = await window.electronAPI.firewallOpenP2P();
+  if (r && r.ok && r.already && r.macos) {
+    statusEl.style.background='#e8f8e8'; statusEl.style.color='#006600';
+    statusEl.textContent='✅ macOS fragt automatisch – keine Einrichtung nötig.';
+  } else if (r && r.ok && r.already) {
+    statusEl.style.background='#e8f8e8'; statusEl.style.color='#006600';
+    statusEl.textContent='✅ Firewall-Regel ist bereits eingerichtet.';
+  } else if (r && r.ok) {
+    statusEl.style.background='#e8f8e8'; statusEl.style.color='#006600';
+    statusEl.textContent='✅ Firewall-Regel erfolgreich gesetzt! AOI kann jetzt direkte P2P-Verbindungen empfangen.';
+  } else if (r && r.manual) {
+    statusEl.style.background='#fff8e0'; statusEl.style.color='#7a5900';
+    statusEl.textContent='⚠️ Kein ufw/firewalld gefunden. Bitte manuell ausführen:';
+    if (manualEl) manualEl.style.display='';
+    if (manualCmd) manualCmd.textContent='sudo iptables -A INPUT -p udp --dport 7777 -j ACCEPT && sudo ip6tables -A INPUT -p udp --dport 7777 -j ACCEPT';
+    if (btn) btn.disabled = false; return;
+  } else {
+    statusEl.style.background='#ffe8e8'; statusEl.style.color='#990000';
+    statusEl.textContent='❌ Fehler: ' + ((r && r.error) || 'Unbekannter Fehler');
+    if (btn) btn.disabled = false; return;
+  }
+  if (btn) btn.style.display = 'none';
+}
+
+async function aoiMeinAoiCheckUpdates() {
+  var btn = document.getElementById('meinaoi-update-btn');
+  var statusEl = document.getElementById('meinaoi-update-status');
+  if (btn) btn.disabled = true;
+  if (statusEl) { statusEl.style.display=''; statusEl.style.background='#e8f0ff'; statusEl.style.color='#003399'; statusEl.textContent='⏳ Suche nach Updates…'; }
+  try {
+    var r = await window.electronAPI.checkForUpdates();
+    if (r && r.error) {
+      if (statusEl) { statusEl.style.background='#f0f0f0'; statusEl.style.color='#555'; statusEl.textContent='ℹ️ Kein Update-Server erreichbar (nur im Produktions-Modus verfügbar).'; }
+    } else {
+      if (statusEl) { statusEl.style.background='#e8f8e8'; statusEl.style.color='#006600'; statusEl.textContent='✅ Suche läuft – du wirst benachrichtigt falls ein Update verfügbar ist.'; }
+    }
+  } catch(e) {
+    if (statusEl) { statusEl.style.background='#f0f0f0'; statusEl.style.color='#555'; statusEl.textContent='ℹ️ Kein Update-Server erreichbar.'; }
+  }
+  if (btn) btn.disabled = false;
+}
+
 function aoiToggleFedUi() {
   var chk = document.getElementById('fed-enabled');
   var block = document.getElementById('fed-url-block');

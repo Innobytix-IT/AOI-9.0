@@ -545,6 +545,8 @@ autoUpdater.on('error', err => {
 
 ipcMain.on('update-download', () => autoUpdater.downloadUpdate().catch(e => console.warn('[Update]', e.message)));
 ipcMain.on('update-install',  () => autoUpdater.quitAndInstall());
+ipcMain.handle('get-app-version', () => app.getVersion());
+ipcMain.handle('check-for-updates', () => autoUpdater.checkForUpdates().catch(e => ({ error: e.message })));
 
 app.whenReady().then(() => {
   // Haupt-App: Kamera/Mikrofon für Video-Anrufe + Fullscreen erlauben
