@@ -3836,7 +3836,10 @@ window.addEventListener('DOMContentLoaded',function(){
     window.electronAPI.onP2pEvent(function(event, data) {
       if (event === 'connected') {
         _p2pMode[data.peer] = true;
+        _relayMode[data.peer] = false;   // Relay abschalten – direkte P2P-Verbindung aktiv
+        _p2pPunchReplied[data.peer] = true; // kein weiterer Punch nötig
         aoiUpdateIMStatus(data.peer);
+        aoiUpdateBuddyListUI();
       } else if (event === 'message') {
         aoiReceiveIM(data.peer, data.data);
       } else if (event === 'error') {
@@ -4099,21 +4102,43 @@ function aoiHandleSignal(sig) {
       if(plaintext !== null) aoiReceiveIM(von, plaintext);
     });
   } else if(typ === 'p2p_addr') {
-    // Gegenstelle kündigt ihre IPv6-Adresse für direktes UDP P2P an
-    if (window.electronAPI && window.electronAPI.p2pConnect && daten && daten.addr && daten.port && daten.pub) {
-      window.electronAPI.p2pConnect(von, daten.pub, daten.addr, daten.port);
+    // Gegenstelle kündigt Adressen für direktes UDP P2P an
+    if (window.electronAPI && window.electronAPI.p2pConnect && daten && daten.port && daten.pub) {
+      // Bevorzuge server-reflektierte IP (echte öffentliche Adresse), dann lokale
+      var punchAddr = daten.reflex || daten.addr || daten.ip4;
+      if (punchAddr) window.electronAPI.p2pConnect(von, daten.pub, punchAddr, daten.port);
+      // Gleichzeitig eigene Adresse zurückschicken (simultanes Hole Punching)
+      if (!_p2pPunchReplied[von]) { _p2pPunchReplied[von] = true; aoiInitP2P(von); }
     }
   }
 }
 
+var _p2pPunchReplied = {}; // verhindert Punch-Endlosschleife
+
 async function aoiInitP2P(name) {
   if (!window.electronAPI || !window.electronAPI.p2pGetAddr) return;
   var addrInfo = await window.electronAPI.p2pGetAddr();
-  if (!addrInfo || !addrInfo.addr) return; // Kein globales IPv6 → kein P2P
+  if (!addrInfo || (!addrInfo.addr && !addrInfo.ip4)) return;
   if (!_aoiNoiseSpkPub) return;
   var pub = _noiseB64enc(_aoiNoiseSpkPub.buffer);
+
+  // Server-reflektierte IP holen (echte öffentliche Adresse, wie STUN)
+  var reflexIP = null;
+  try {
+    var rr = await fetch(AOI_SIGNAL_URL, {method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({aktion:'get_reflexive_addr', name:aoi_name, token:AOI_TOKEN})});
+    if (rr.ok) { var rd = await rr.json(); if (rd && rd.ok && rd.ip) reflexIP = rd.ip; }
+  } catch(e) {}
+
   aoiPost({aktion:'signal', name:aoi_name, an:name, typ:'p2p_addr',
-    daten:{addr:addrInfo.addr, port:addrInfo.port, pub:pub}}, null);
+    daten:{
+      addr:   addrInfo.addr,   // lokale IPv6 (kann null sein)
+      ip4:    addrInfo.ip4,    // lokale IPv4
+      reflex: reflexIP,        // server-reflektierte öffentliche IP
+      port:   addrInfo.port,
+      pub:    pub
+    }}, null);
 }
 
 // ── Off-Grid Direktverbindung (kein Signaling-Server nötig) ────────────────
@@ -4303,6 +4328,9 @@ function aoiGetOrCreatePC(name, initiator) {
         _relayMode[name] = true;
         aoiUpdateIMStatus(name);
         aoiRelayDeliverPending(name);
+        // Hole-Punch versuchen: eigene reflexive Adresse an Gegenstelle schicken
+        _p2pPunchReplied[name] = false; // erlaubt einmaligen Punch-Versuch
+        aoiInitP2P(name);
       }
     }, 14000);
     pc.ondatachannel = function(e) {
@@ -4343,6 +4371,7 @@ function aoiSetupDataChannel(dc, fromName) {
         aoi_peers[fromName].pc = null;
       }
       aoiUpdateIMStatus(fromName);
+      _p2pPunchReplied[fromName] = false; // erlaubt einmaligen Punch-Versuch
       aoiInitP2P(fromName);
       aoiRelayDeliverPending(fromName); // ausstehende Nachrichten via Relay nachliefern
     }

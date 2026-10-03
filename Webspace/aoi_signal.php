@@ -498,6 +498,18 @@ if (isset($ein['v']) && (int)$ein['v'] === 1) {
 
 if (!$noise_authenticated && !token_ok($token)) aoi_fehler('Ungueltiger Token.', 403);
 
+// Noise-Key im Klartext registrieren – kein Noise IK nötig (Public Key ist öffentlich)
+if ($aktion === 'noise_register_plain') {
+    if (!name_ok($name)) aoi_fehler('Ungueltiger Name.');
+    $spk_b64   = isset($ein['spk']) ? (string)$ein['spk'] : '';
+    $spk_dec   = base64_decode($spk_b64, true);
+    if (!$spk_dec || strlen($spk_dec) !== 32) aoi_fehler('Ungueltiger Schluessel.');
+    $clients = lies(NOISE_CLIENTS_FILE);
+    $clients[strtolower($name)] = array('spk' => $spk_b64, 'ts' => time());
+    schreibe(NOISE_CLIENTS_FILE, $clients);
+    aoi_ok(array('registered' => true));
+}
+
 // list_users braucht keinen Screen-Namen
 if ($aktion === 'list_users') {
     $dir      = lies(DIRECTORY_FILE);
@@ -636,6 +648,15 @@ if ($aktion === 'get_noise_pub') {
     $clients = lies(NOISE_CLIENTS_FILE);
     if (!isset($clients[$target])) aoi_fehler('Unbekannter Nutzer.');
     aoi_ok(array('noise_pub' => $clients[$target]['spk']));
+}
+
+// Server-reflektierte IP zurückgeben (wie der Server den Client sieht – echter STUN-Ersatz)
+if ($aktion === 'get_reflexive_addr') {
+    token_ok();
+    $ip = isset($_SERVER['HTTP_X_FORWARDED_FOR'])
+        ? trim(explode(',', $_SERVER['HTTP_X_FORWARDED_FOR'])[0])
+        : ($_SERVER['REMOTE_ADDR'] ?? '');
+    aoi_ok(array('ip' => $ip));
 }
 
 if ($aktion === 'bye') {
