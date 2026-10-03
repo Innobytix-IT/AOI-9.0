@@ -4,7 +4,7 @@
   "description": "AOI 9.0 Nostalgia – Retro Online-Software",
   "main": "main.js",
   "scripts": {
-    "start": "electron .",
+    "start": "electron . --no-sandbox",
     "dist:win": "electron-builder --win",
     "dist:linux": "electron-builder --linux",
     "dist:all": "electron-builder --win --linux"

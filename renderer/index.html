@@ -2757,17 +2757,20 @@ function aoiSendExtraIM(name) {
       p2phint.textContent='🚀 Via P2P IPv6 zugestellt.';
       logEl.appendChild(p2phint); logEl.scrollTop=logEl.scrollHeight;
     } else if(_relayMode[name]) {
-      aoiRelaySend(name, text).then(function(ok) {
+      aoiRelaySend(name, text).then(function(r) {
         var rhint=document.createElement('div');
-        rhint.style.cssText='font-size:10px;font-style:italic;margin-left:4px;color:'+(ok?'#777':'#c00')+';';
-        rhint.textContent= ok ? '⚡ Via Relay zugestellt.' : '⚠ Relay fehlgeschlagen – Nachricht nicht zugestellt.';
+        rhint.style.cssText='font-size:10px;font-style:italic;margin-left:4px;color:'+(r.ok?'#777':'#c00')+';';
+        rhint.textContent= r.ok ? '⚡ Via Relay zugestellt.' : '⚠ Relay fehlgeschlagen: '+r.grund;
         logEl.appendChild(rhint); logEl.scrollTop=logEl.scrollHeight;
       });
     } else {
       aoiQueueOfflineMsg(name, text, d.innerHTML);
       var hint=document.createElement('div');
+      hint.classList.add('im-offline-hint');
       hint.style.cssText='font-size:10px;color:#999;font-style:italic;margin-left:4px;';
-      hint.textContent='↪ Wird zugestellt sobald '+name+' online ist.';
+      hint.textContent= aoi_known_buddies[name]
+        ? '⏳ Verbindung wird aufgebaut – wird in Kürze automatisch zugestellt...'
+        : '↪ Wird zugestellt sobald '+name+' online ist.';
       logEl.appendChild(hint); logEl.scrollTop=logEl.scrollHeight;
     }
   }
@@ -2827,14 +2830,14 @@ async function aoiRelayDecrypt(payload) {
 
 async function aoiRelaySend(toName, text) {
   var payload = await aoiRelayEncrypt(toName, text);
-  if(!payload) { console.warn('[Relay] Verschlüsselung fehlgeschlagen für', toName); return false; }
+  if(!payload) { return {ok:false, grund:'Key-Abfrage fehlgeschlagen – '+toName+' muss sich neu anmelden'}; }
   return new Promise(function(resolve) {
     aoiPost({aktion:'signal', name:aoi_name, an:toName, typ:'relay', daten:payload}, function(err, data) {
       if(err || !data || !data.ok) {
-        console.warn('[Relay] Server-Fehler:', err || (data && data.fehler) || 'unbekannt');
-        resolve(false);
+        var g = (data && data.fehler) ? data.fehler : (err || 'Server nicht erreichbar');
+        resolve({ok:false, grund:'Server: '+g});
       } else {
-        resolve(true);
+        resolve({ok:true, grund:''});
       }
     });
   });
@@ -2874,10 +2877,10 @@ function sendIMMessage() {
   }
   // Relay-Modus aktiv (CGNAT/DS-Lite Fallback)
   if(_relayMode[currentIMBuddy]) {
-    aoiRelaySend(currentIMBuddy, text).then(function(ok) {
+    aoiRelaySend(currentIMBuddy, text).then(function(r) {
       var rhint=document.createElement('div');
-      rhint.style.cssText='font-size:10px;font-style:italic;margin-left:4px;color:'+(ok?'#777':'#c00')+';';
-      rhint.textContent= ok ? '⚡ Via Relay zugestellt.' : '⚠ Relay fehlgeschlagen – Nachricht nicht zugestellt.';
+      rhint.style.cssText='font-size:10px;font-style:italic;margin-left:4px;color:'+(r.ok?'#777':'#c00')+';';
+      rhint.textContent= r.ok ? '⚡ Via Relay zugestellt.' : '⚠ Relay fehlgeschlagen: '+r.grund;
       log.appendChild(rhint); log.scrollTop=log.scrollHeight;
     });
     return;
@@ -2885,8 +2888,11 @@ function sendIMMessage() {
   // Buddy offline oder P2P noch nicht aufgebaut → in Queue legen
   aoiQueueOfflineMsg(currentIMBuddy, text, d.innerHTML);
   var hint=document.createElement('div');
+  hint.classList.add('im-offline-hint');
   hint.style.cssText='font-size:10px;color:#999;font-style:italic;margin-left:4px;';
-  hint.textContent='↪ Wird zugestellt sobald '+currentIMBuddy+' online ist.';
+  hint.textContent= aoi_known_buddies[currentIMBuddy]
+    ? '⏳ Verbindung wird aufgebaut – wird in Kürze automatisch zugestellt...'
+    : '↪ Wird zugestellt sobald '+currentIMBuddy+' online ist.';
   log.appendChild(hint); log.scrollTop=log.scrollHeight;
 }
 
@@ -4323,15 +4329,15 @@ function aoiSetupDataChannel(dc, fromName) {
   var relayTimer = setTimeout(function() {
     if(!aoi_peers[fromName] || !aoi_peers[fromName].ready) {
       _relayMode[fromName] = true;
-      // PC schließen: stoppt ICE-Kandidaten-Flut in der Server-Inbox
       if(aoi_peers[fromName] && aoi_peers[fromName].pc) {
         try { aoi_peers[fromName].pc.close(); } catch(e) {}
         aoi_peers[fromName].pc = null;
       }
       aoiUpdateIMStatus(fromName);
-      aoiInitP2P(fromName); // nach Relay-Fallback auch IPv6-UDP versuchen
+      aoiInitP2P(fromName);
+      aoiRelayDeliverPending(fromName); // ausstehende Nachrichten via Relay nachliefern
     }
-  }, 35000);
+  }, 12000);
   dc.onopen = function() {
     clearTimeout(relayTimer);
     _relayMode[fromName] = false;
@@ -6243,6 +6249,13 @@ async function aoiNoiseInit(name) {
     }
   } catch(e) { aoiNoiseLock(); return; }
 
+  // SPK sofort beim Server registrieren – zu diesem Zeitpunkt ist _aoiNoiseSpkPub garantiert gesetzt
+  try {
+    await fetch(AOI_SIGNAL_URL, {method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({aktion:'noise_register_plain', name:name, token:AOI_TOKEN, spk:_noiseB64enc(_aoiNoiseSpkPub)})
+    });
+  } catch(e) {}
+
   // Server-Public-Key holen (TOFU: Trust on First Use)
   var urlCacheKey = 'aoi_noise_spub_' + btoa(AOI_SIGNAL_URL).replace(/[^a-zA-Z0-9]/g,'_').slice(0,40);
   var pinnedKey = null;
@@ -6268,16 +6281,6 @@ async function aoiNoiseInit(name) {
   }
   if (!_aoiServerNoisePub) { aoiNoiseLock(); return; }
 
-  // SPK beim Server registrieren – Token reist verschlüsselt im Noise-Payload
-  try {
-    var regWrapped = await aoiNoiseWrap({aktion:'noise_register', name:name, token:AOI_TOKEN});
-    if (regWrapped) {
-      await fetch(AOI_SIGNAL_URL, {
-        method:'POST', headers:{'Content-Type':'application/json'},
-        body: JSON.stringify(regWrapped.envelope)
-      });
-    }
-  } catch(e) {}
 }
 
 async function aoiNoiseWrap(payload) {
@@ -6357,6 +6360,43 @@ async function aoiDeliverPendingMsgs(name) {
   note.style.cssText='margin:6px 0;padding:5px 8px;background:#eaf5ea;border:1px solid #6aaa6a;border-radius:3px;font-size:10px;color:#256025;';
   note.innerHTML='✓ <b>'+escHtml(name)+'</b> ist online – '+sent+(sent===1?' Nachricht wurde':' Nachrichten wurden')+' automatisch zugestellt.';
   logEl.appendChild(note); logEl.scrollTop=logEl.scrollHeight;
+}
+
+async function aoiRelayDeliverPending(name) {
+  await aoiLoadPendingMsgs(name);
+  var msgs = _pendingMsgs[name];
+  if(!msgs || !msgs.length) return;
+  var logEl;
+  if(aoi_im_wins[name]) logEl = aoi_im_wins[name].querySelector('.im-extra-log');
+  else if(currentIMBuddy === name) logEl = document.getElementById('im-chat-log');
+  _pendingMsgs[name] = [];
+  try { localStorage.removeItem('aoi_pending_' + name); } catch(e) {}
+  var sent = 0;
+  for(var i = 0; i < msgs.length; i++) {
+    var r = await aoiRelaySend(name, msgs[i].text);
+    if(r.ok) { sent++; }
+    else {
+      // Relay fehlgeschlagen – Nachricht wieder in Queue zurücklegen
+      if(!_pendingMsgs[name]) _pendingMsgs[name] = [];
+      _pendingMsgs[name] = _pendingMsgs[name].concat(msgs.slice(i));
+      if(logEl) {
+        var errNote = document.createElement('div');
+        errNote.style.cssText = 'font-size:10px;color:#c00;font-style:italic;margin:4px 0;';
+        errNote.textContent = '⚠ Relay fehlgeschlagen: ' + r.grund + ' – Nachrichten konnten nicht zugestellt werden.';
+        logEl.appendChild(errNote); logEl.scrollTop = logEl.scrollHeight;
+      }
+      break;
+    }
+    if(i < msgs.length - 1) await new Promise(function(resolve){ setTimeout(resolve, 200); });
+  }
+  if(logEl && sent > 0) {
+    // Offline-Hints entfernen
+    logEl.querySelectorAll('.im-offline-hint').forEach(function(el){ el.remove(); });
+    var note = document.createElement('div');
+    note.style.cssText = 'margin:6px 0;padding:5px 8px;background:#eaf0f8;border:1px solid #5a8abf;border-radius:3px;font-size:10px;color:#1a4a7a;';
+    note.innerHTML = '⚡ <b>Relay aktiv</b> – ' + sent + (sent===1?' Nachricht wurde':' Nachrichten wurden') + ' via Relay zugestellt.';
+    logEl.appendChild(note); logEl.scrollTop = logEl.scrollHeight;
+  }
 }
 
 /* ===== b4: SCHRIFTGRÖSSE & SOUND-PREFS ===== */
