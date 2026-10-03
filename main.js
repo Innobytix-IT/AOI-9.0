@@ -590,3 +590,57 @@ ipcMain.handle('p2p-connect',     (_, name, pub, addr, port) => p2p.connect(name
 ipcMain.handle('p2p-send',        (_, name, text)            => p2p.send(name, text));
 ipcMain.handle('p2p-disconnect',  (_, name)                  => { p2p.disconnect(name); return true; });
 ipcMain.handle('p2p-is-ready',    (_, name)                  => p2p.isReady(name));
+
+ipcMain.handle('get-platform', () => process.platform);
+
+ipcMain.handle('firewall-open-p2p', async () => {
+  const { exec } = require('child_process');
+  const os  = require('os');
+  const fs  = require('fs');
+  const path = require('path');
+  const plat = process.platform;
+
+  return new Promise(resolve => {
+    if (plat === 'win32') {
+      // Prüfe ob Regel bereits existiert
+      exec(`powershell -NoProfile -Command "Get-NetFirewallRule -DisplayName 'AOI P2P' -ErrorAction SilentlyContinue | Measure-Object | Select-Object -ExpandProperty Count"`,
+        (_, stdout) => {
+          if (stdout && stdout.trim() !== '0') { resolve({ ok: true, already: true }); return; }
+          // Regel per Prozess-Pfad einschränken: nur AOI-Pakete dürfen durch
+          const exePath = process.execPath;
+          const script  = `New-NetFirewallRule -DisplayName 'AOI P2P' -Direction Inbound -Protocol UDP -Program '${exePath}' -Action Allow`;
+          const tmp = path.join(os.tmpdir(), 'aoi_fw_setup.ps1');
+          try { fs.writeFileSync(tmp, script, 'utf8'); } catch(e) { resolve({ ok: false, error: e.message }); return; }
+          exec(`powershell -NoProfile -Command "Start-Process powershell -Verb RunAs -Wait -ArgumentList '-NoProfile -File \\"${tmp}\\"'"`,
+            err2 => {
+              try { fs.unlinkSync(tmp); } catch(_){}
+              resolve(err2 ? { ok: false, error: err2.message } : { ok: true });
+            }
+          );
+        }
+      );
+    } else if (plat === 'linux') {
+      exec('which ufw', errUfw => {
+        if (!errUfw) {
+          exec('pkexec ufw allow 7777/udp', e => resolve(e ? { ok: false, error: e.message } : { ok: true }));
+        } else {
+          exec('which firewall-cmd', errFw => {
+            if (!errFw) {
+              exec('pkexec firewall-cmd --add-port=7777/udp --permanent', e => {
+                if (e) { resolve({ ok: false, error: e.message }); return; }
+                exec('pkexec firewall-cmd --reload', e2 => resolve(e2 ? { ok: false, error: e2.message } : { ok: true }));
+              });
+            } else {
+              // Kein ufw, kein firewalld → manuelle Anleitung zeigen
+              resolve({ ok: false, manual: true });
+            }
+          });
+        }
+      });
+    } else if (plat === 'darwin') {
+      resolve({ ok: true, already: true, macos: true });
+    } else {
+      resolve({ ok: false, error: 'Unbekanntes Betriebssystem' });
+    }
+  });
+});

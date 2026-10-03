@@ -286,16 +286,28 @@ function init(privPkcs8B64, pubRawB64, cb) {
 
   if (sock) { if (cb) cb(null, { addr: localIPv6, port: localPort }); return; }
 
-  const s = dgram.createSocket({ type: 'udp6', ipv6Only: true });
-  s.on('error', e => console.error('[P2P] socket:', e.message));
-  s.on('message', onPacket);
-  s.bind(0, '::', () => {
-    localPort = s.address().port;
-    localIPv6 = globalIPv6();
-    localIPv4 = lanIPv4();
-    sock = s;
-    if (cb) cb(null, { addr: localIPv6, ip4: localIPv4, port: localPort });
-  });
+  // Versuche festen Port 7777 (für Firewall-Regel); falls belegt → zufälligen Port
+  function _bindSocket(port) {
+    const s = dgram.createSocket({ type: 'udp6', ipv6Only: true });
+    s.on('message', onPacket);
+    s.once('error', e => {
+      if (e.code === 'EADDRINUSE' && port !== 0) {
+        _bindSocket(0);
+      } else {
+        try { console.error('[P2P] socket:', e.message); } catch(_){}
+        if (cb) cb(e);
+      }
+    });
+    s.bind(port, '::', () => {
+      s.on('error', e => { try { console.error('[P2P] socket:', e.message); } catch(_){} });
+      localPort = s.address().port;
+      localIPv6 = globalIPv6();
+      localIPv4 = lanIPv4();
+      sock = s;
+      if (cb) cb(null, { addr: localIPv6, ip4: localIPv4, port: localPort });
+    });
+  }
+  _bindSocket(7777);
 }
 
 function getAddr() {
