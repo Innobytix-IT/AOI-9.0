@@ -6056,12 +6056,20 @@ function aoiLoginSecurityCheck() {
     var r  = res[0] || {};
     var fw = res[1];
 
-    // Firewall aktiv wenn Systemfirewall ODER AOI-P2P-Regel gesetzt
+    // Firewall: Systemfirewall ODER AOI-P2P-Regel gesetzt; macOS = Automatisch
     var sysFwActive = r.firewalls && r.firewalls.some(function(f){ return f.enabled; });
-    var p2pFwActive = fw && (fw.set || fw.macos);
-    var fwActive = !!(sysFwActive || p2pFwActive);
-    fwEl.textContent = fwActive ? 'Aktiv' : 'Inaktiv';
-    fwEl.className   = fwActive ? 'status-on' : 'status-off';
+    var p2pFwActive = fw && fw.set;
+    var isMac       = fw && fw.macos;
+    if (isMac) {
+      fwEl.textContent = 'Automatisch';
+      fwEl.className   = 'status-on';
+      fwEl.style.color = '#888';
+    } else {
+      var fwActive = !!(sysFwActive || p2pFwActive);
+      fwEl.textContent = fwActive ? 'Aktiv' : 'Inaktiv';
+      fwEl.className   = fwActive ? 'status-on' : 'status-off';
+      fwEl.style.color = '';
+    }
 
     var avActive = r.antiviruses && r.antiviruses.some(function(a){ return a.enabled; });
     var avName   = r.antiviruses && r.antiviruses.find(function(a){ return a.enabled; });
