@@ -4004,7 +4004,7 @@ function aoiStartOnline(name) {
   aoi_session = 'aoi-' + Date.now() + '-' + Math.random().toString(36).slice(2, 8);
   _currentPollInterval = 3000;
   aoiPresenceHeartbeat();
-  aoi_presence_timer = setInterval(aoiPresenceHeartbeat, 20000);
+  aoi_presence_timer = setInterval(aoiPresenceHeartbeat, 10000);
   aoi_poll_timer = setInterval(aoiPollSignals, 3000);
 }
 
@@ -4369,7 +4369,10 @@ function aoiGetOrCreatePC(name, initiator) {
   }
   pc.onconnectionstatechange = function() {
     var s = pc.connectionState;
-    if(s==='disconnected'||s==='failed'||s==='closed') { if(aoi_peers[name]) aoi_peers[name].ready=false; }
+    if(s==='disconnected'||s==='failed'||s==='closed') {
+      if(aoi_peers[name]) aoi_peers[name].ready=false;
+      if(!_p2pMode[name]) _relayMode[name] = true;
+    }
   };
   pc.ontrack = function(e) {
     if(!e.streams || !e.streams[0]) return;
@@ -4414,7 +4417,13 @@ function aoiSetupDataChannel(dc, fromName) {
     if(aoi_my_status!=='avail') dc.send(JSON.stringify({aoi:'status',v:aoi_my_status}));
     aoiDeliverPendingMsgs(fromName);
   };
-  dc.onclose = function() { if(aoi_peers[fromName]) aoi_peers[fromName].ready=false; aoiUpdateIMStatus(fromName); aoiSetFastPoll(); };
+  dc.onclose = function() {
+    if(aoi_peers[fromName]) aoi_peers[fromName].ready=false;
+    if(!_p2pMode[fromName]) _relayMode[fromName] = true;
+    aoiUpdateIMStatus(fromName);
+    aoiSetFastPoll();
+    aoiRelayDeliverPending(fromName);
+  };
   dc.onmessage = function(e) { aoiReceiveIM(fromName, e.data); };
 }
 

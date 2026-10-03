@@ -55,7 +55,7 @@ define('PRESENCE_FILE',  DATEN_DIR . '/presence.php');
 define('DIRECTORY_FILE', DATEN_DIR . '/directory.php');
 define('INBOX_PREFIX',   DATEN_DIR . '/inbox_');
 define('TOKEN_DATEI',   __DIR__ . '/aoi_token.php');
-define('PRESENCE_TTL',  45);
+define('PRESENCE_TTL',  90);
 define('SIGNAL_TTL',    120);
 define('MAX_SIGNALE',   64);
 define('MAX_NAME',      32);

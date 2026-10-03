@@ -34,6 +34,9 @@ function createWindow() {
 
   win.loadFile(path.join(__dirname, 'renderer', 'index.html'));
   win.webContents.setBackgroundThrottling(false);
+  win.webContents.on('before-input-event', (_, input) => {
+    if (input.key === 'F12') win.webContents.toggleDevTools();
+  });
 }
 
 ipcMain.on('window-minimize', () => BrowserWindow.getFocusedWindow()?.minimize());
