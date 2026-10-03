@@ -4632,9 +4632,29 @@ function aoiSrvTab(tab) {
     var inp = document.getElementById('srv-url-input');
     if(inp) inp.value = AOI_SIGNAL_URL || '';
   }
+  if(tab === 'p2p') aoiFirewallAutoCheck();
 }
 function aoiSrvTabInit() {
   aoiSrvTab('anleitung');
+}
+
+async function aoiFirewallAutoCheck() {
+  if (!window.electronAPI || !window.electronAPI.firewallCheckP2P) return;
+  var btn = document.getElementById('srv-p2p-btn');
+  var statusEl = document.getElementById('srv-p2p-status');
+  if (statusEl) { statusEl.style.display=''; statusEl.style.background='#f0f0f0'; statusEl.style.color='#555'; statusEl.textContent='⏳ Prüfe Firewall-Status…'; }
+  var r = await window.electronAPI.firewallCheckP2P();
+  if (!r) return;
+  if (r.macos) {
+    if (statusEl) { statusEl.style.background='#e8f8e8'; statusEl.style.color='#006600'; statusEl.textContent='✅ macOS fragt automatisch – keine Einrichtung nötig.'; }
+    if (btn) btn.style.display = 'none';
+  } else if (r.set) {
+    if (statusEl) { statusEl.style.background='#e8f8e8'; statusEl.style.color='#006600'; statusEl.textContent='✅ Firewall-Regel ist eingerichtet. Keine Aktion erforderlich.'; }
+    if (btn) btn.style.display = 'none';
+  } else {
+    if (statusEl) { statusEl.style.background='#fff3cd'; statusEl.style.color='#7a5900'; statusEl.textContent='⚠️ Firewall-Regel noch nicht gesetzt. Bitte einmalig einrichten:'; }
+    if (btn) btn.style.display = '';
+  }
 }
 
 async function aoiFirewallSetup() {

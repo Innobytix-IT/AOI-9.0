@@ -593,6 +593,29 @@ ipcMain.handle('p2p-is-ready',    (_, name)                  => p2p.isReady(name
 
 ipcMain.handle('get-platform', () => process.platform);
 
+ipcMain.handle('firewall-check-p2p', async () => {
+  const { exec } = require('child_process');
+  const plat = process.platform;
+  return new Promise(resolve => {
+    if (plat === 'win32') {
+      exec(`powershell -NoProfile -Command "Get-NetFirewallRule -DisplayName 'AOI P2P' -ErrorAction SilentlyContinue | Measure-Object | Select-Object -ExpandProperty Count"`,
+        (_, stdout) => resolve({ ok: true, set: !!(stdout && stdout.trim() !== '0') })
+      );
+    } else if (plat === 'linux') {
+      exec('ufw status 2>/dev/null | grep 7777', (err, stdout) => {
+        if (!err && stdout && stdout.includes('7777')) { resolve({ ok: true, set: true }); return; }
+        exec('iptables -C INPUT -p udp --dport 7777 -j ACCEPT 2>/dev/null', err2 =>
+          resolve({ ok: true, set: !err2 })
+        );
+      });
+    } else if (plat === 'darwin') {
+      resolve({ ok: true, set: true, macos: true });
+    } else {
+      resolve({ ok: true, set: false });
+    }
+  });
+});
+
 ipcMain.handle('firewall-open-p2p', async () => {
   const { exec } = require('child_process');
   const os  = require('os');

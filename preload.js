@@ -32,7 +32,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
   p2pDisconnect:   (name)                  => ipcRenderer.invoke('p2p-disconnect', name),
   p2pIsReady:      (name)                  => ipcRenderer.invoke('p2p-is-ready', name),
   getPlatform:     ()                      => ipcRenderer.invoke('get-platform'),
-  firewallOpenP2P: ()                      => ipcRenderer.invoke('firewall-open-p2p'),
+  firewallOpenP2P:  ()                      => ipcRenderer.invoke('firewall-open-p2p'),
+  firewallCheckP2P: ()                      => ipcRenderer.invoke('firewall-check-p2p'),
   onP2pEvent:      (cb) => {
     ipcRenderer.on('p2p-connected', (_, d) => cb('connected', d));
     ipcRenderer.on('p2p-message',   (_, d) => cb('message',   d));
