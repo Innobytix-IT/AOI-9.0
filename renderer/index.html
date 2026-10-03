@@ -2676,11 +2676,8 @@ function aoiUpdateIMStatus(name) {
     var fileBtn = document.getElementById('im-file-btn');
     var callBtn = document.getElementById('im-call-btn');
     if(fileBtn) {
-      var canSendFile = connected || !!_relayMode[name];
-      fileBtn.disabled = !canSendFile;
-      fileBtn.title = connected      ? 'Datei senden (P2P direkt)'
-                    : _relayMode[name] ? 'Datei senden (via Relay – verschlüsselt)'
-                    : 'Dateiübertragung: Warte auf Verbindung…';
+      fileBtn.disabled = !connected;
+      fileBtn.title = connected ? 'Datei senden (P2P direkt)' : 'Dateiübertragung erfordert P2P-Direktverbindung';
     }
     if(callBtn) {
       callBtn.disabled = !connected;
@@ -6088,9 +6085,8 @@ function aoiLoginSecurityCheck() {
 setTimeout(aoiLoginSecurityCheck, 800);
 
 /* ===== DATEIÜBERTRAGUNG ===== */
-var AOI_CHUNK       = 16384; // 16 KB DataChannel-Chunks
-var AOI_RELAY_CHUNK = 32768; // 32 KB Relay-Chunks (weniger HTTP-Requests)
-var _fileTransfers  = {};    // laufende Empfänge: name -> {name,mime,chunks:[],total}
+var AOI_CHUNK      = 16384; // 16 KB pro DataChannel-Chunk
+var _fileTransfers = {};    // laufende Empfänge: name -> {name,mime,chunks:[],total}
 
 function _safeBase64(buffer) {
   var bytes = new Uint8Array(buffer), result = '', STEP = 8192;
@@ -6105,19 +6101,10 @@ function aoiSendFile(input) {
   if (!file) return;
   var name = currentIMBuddy;
   var peer = aoi_peers[name];
-  if (peer && peer.dc && peer.dc.readyState === 'open') {
-    _aoiSendFileDataChannel(file, name, peer);
-  } else if (_relayMode[name]) {
-    if (file.size > 20 * 1024 * 1024) {
-      if (!confirm('Die Datei ist ' + aoiFileSize(file.size) + ' groß. Via Relay kann das einige Minuten dauern. Trotzdem senden?')) return;
-    }
-    _aoiSendFileRelay(file, name);
-  } else {
-    alert('Keine Verbindung zu ' + name + '. Bitte warte bis der Buddy online ist.');
+  if (!peer || !peer.dc || peer.dc.readyState !== 'open') {
+    alert('Keine P2P-Verbindung zu ' + name + '. Bitte warte bis der Buddy verbunden ist.');
+    return;
   }
-}
-
-function _aoiSendFileDataChannel(file, name, peer) {
   var reader = new FileReader();
   reader.onload = function(e) {
     var buf = e.target.result;
@@ -6139,37 +6126,10 @@ function _aoiSendFileDataChannel(file, name, peer) {
     }
     sendNext();
     var log=document.getElementById('im-chat-log'), d=document.createElement('div');
-    d.innerHTML='<b style="color:#0000aa;">Ich:</b> <span style="background:#e8f4ff;border:1px solid #b0d0ff;border-radius:4px;padding:2px 6px;font-size:11px;">📎 '+escHtml(file.name)+' ('+aoiFileSize(buf.byteLength)+') wird gesendet… 🔗 P2P</span>';
+    d.innerHTML='<b style="color:#0000aa;">Ich:</b> <span style="background:#e8f4ff;border:1px solid #b0d0ff;border-radius:4px;padding:2px 6px;font-size:11px;">📎 '+escHtml(file.name)+' ('+aoiFileSize(buf.byteLength)+') wird gesendet…</span>';
     log.appendChild(d); log.scrollTop=log.scrollHeight;
   };
   reader.readAsArrayBuffer(file);
-}
-
-async function _aoiSendFileRelay(file, name) {
-  var buf = await file.arrayBuffer();
-  var total = Math.ceil(buf.byteLength / AOI_RELAY_CHUNK) || 1;
-  var tbar=document.getElementById('im-transfer-bar'), tprog=document.getElementById('im-transfer-progress'), tlabel=document.getElementById('im-transfer-label');
-  var log=document.getElementById('im-chat-log'), d=document.createElement('div');
-  var dId='ft-send-'+Date.now(); d.id=dId;
-  d.innerHTML='<b style="color:#0000aa;">Ich:</b> <span style="background:#e8f4ff;border:1px solid #b0d0ff;border-radius:4px;padding:2px 6px;font-size:11px;">📎 '+escHtml(file.name)+' ('+aoiFileSize(buf.byteLength)+') wird gesendet… ⚡ Relay</span>';
-  log.appendChild(d); log.scrollTop=log.scrollHeight;
-  if(tbar){ tbar.style.display='block'; tprog.style.width='0%'; tlabel.textContent=''; }
-  var r0 = await aoiRelaySend(name, JSON.stringify({aoi:'file',phase:'start',name:file.name,size:buf.byteLength,mime:file.type||'application/octet-stream',total:total}));
-  if (!r0.ok) { _aoiFileSendError(dId, file.name, r0.grund, tbar); return; }
-  for (var i = 0; i < total; i++) {
-    var r1 = await aoiRelaySend(name, JSON.stringify({aoi:'file',phase:'chunk',n:i,data:_safeBase64(buf.slice(i*AOI_RELAY_CHUNK,(i+1)*AOI_RELAY_CHUNK))}));
-    if (!r1.ok) { _aoiFileSendError(dId, file.name, r1.grund, tbar); return; }
-    if(tprog){ var pct=Math.round((i+1)/total*100); tprog.style.width=pct+'%'; tlabel.textContent=pct+'% – '+aoiFileSize(Math.min((i+1)*AOI_RELAY_CHUNK,buf.byteLength))+' / '+aoiFileSize(buf.byteLength)+' (Relay)'; }
-  }
-  await aoiRelaySend(name, JSON.stringify({aoi:'file',phase:'end',name:file.name}));
-  if(tbar){ tbar.style.display='none'; tprog.style.width='0%'; }
-  var el=document.getElementById(dId); if(el) el.querySelector('span').innerHTML='📎 '+escHtml(file.name)+' ('+aoiFileSize(buf.byteLength)+') ✅ gesendet (via Relay)';
-}
-
-function _aoiFileSendError(dId, fname, grund, tbar) {
-  if(tbar) tbar.style.display='none';
-  var el=document.getElementById(dId);
-  if(el) el.querySelector('span').innerHTML='📎 '+escHtml(fname)+' ❌ Fehler: '+escHtml(grund);
 }
 
 function aoiReceiveFileMsg(fromName, msg) {

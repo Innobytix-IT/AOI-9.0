@@ -1,4 +1,7 @@
 const { app, BrowserWindow, ipcMain, safeStorage, session, shell } = require('electron');
+// WebRTC ICE-Ports auf festen Bereich beschränken → Firewall-Regel reicht für 7777-7799
+app.commandLine.appendSwitch('webrtc-min-port', '7778');
+app.commandLine.appendSwitch('webrtc-max-port', '7799');
 // EPIPE-Schutz: verhindert Crash wenn stdout/stderr geschlossen ist (z.B. nach npm start | head)
 process.stdout.on('error', e => { if (e.code !== 'EPIPE') throw e; });
 process.stderr.on('error', e => { if (e.code !== 'EPIPE') throw e; });
@@ -628,7 +631,7 @@ ipcMain.handle('firewall-open-p2p', async () => {
           if (stdout && stdout.trim() !== '0') { resolve({ ok: true, already: true }); return; }
           // Regel per Prozess-Pfad einschränken: nur AOI-Pakete dürfen durch
           const exePath = process.execPath;
-          const script  = `New-NetFirewallRule -DisplayName 'AOI P2P' -Direction Inbound -Protocol UDP -Program '${exePath}' -Action Allow`;
+          const script  = `New-NetFirewallRule -DisplayName 'AOI P2P' -Direction Inbound -Protocol UDP -LocalPort 7777-7799 -Program '${exePath}' -Action Allow`;
           const tmp = path.join(os.tmpdir(), 'aoi_fw_setup.ps1');
           try { fs.writeFileSync(tmp, script, 'utf8'); } catch(e) { resolve({ ok: false, error: e.message }); return; }
           exec(`powershell -NoProfile -Command "Start-Process powershell -Verb RunAs -Wait -ArgumentList '-NoProfile -File \\"${tmp}\\"'"`,
@@ -644,12 +647,12 @@ ipcMain.handle('firewall-open-p2p', async () => {
       exec('which ufw', errUfw => {
         if (!errUfw) {
           // allow + enable (--force verhindert SSH-Rückfrage); beide Befehle idempotent
-          exec('pkexec sh -c "ufw allow 7777/udp; ufw --force enable"',
+          exec('pkexec sh -c "ufw allow 7777:7799/udp; ufw --force enable"',
             e => e ? resolve({ ok: false, error: e.message }) : linuxOk());
         } else {
           exec('which firewall-cmd', errFw => {
             if (!errFw) {
-              exec('pkexec firewall-cmd --add-port=7777/udp --permanent', e => {
+              exec('pkexec firewall-cmd --add-port=7777-7799/udp --permanent', e => {
                 if (e) { resolve({ ok: false, error: e.message }); return; }
                 exec('pkexec firewall-cmd --reload', e2 => e2 ? resolve({ ok: false, error: e2.message }) : linuxOk());
               });
