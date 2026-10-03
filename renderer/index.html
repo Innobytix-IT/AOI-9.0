@@ -4297,7 +4297,16 @@ function aoiGetOrCreatePC(name, initiator) {
     aoi_peers[name].dc = dc;
     aoiSetupDataChannel(dc, name);
   } else {
+    // Relay-Fallback für Responder: ondatachannel kommt nie wenn WebRTC scheitert
+    var _responderRelayTimer = setTimeout(function() {
+      if(!aoi_peers[name] || !aoi_peers[name].ready) {
+        _relayMode[name] = true;
+        aoiUpdateIMStatus(name);
+        aoiRelayDeliverPending(name);
+      }
+    }, 14000);
     pc.ondatachannel = function(e) {
+      clearTimeout(_responderRelayTimer);
       aoi_peers[name].dc = e.channel;
       aoiSetupDataChannel(e.channel, name);
     };
