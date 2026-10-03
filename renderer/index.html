@@ -6279,7 +6279,7 @@ async function aoiNoiseInit(name) {
       try { _aoiServerNoisePub = await crypto.subtle.importKey('raw', _noiseB64dec(pinnedKey), {name:'X25519'}, false, ['deriveBits']); } catch(e2) {}
     }
   }
-  if (!_aoiServerNoisePub) { aoiNoiseLock(); return; }
+  if (!_aoiServerNoisePub) return; // _aoiNoiseSpkPriv bleibt gesetzt – Relay-Entschlüsselung braucht es
 
 }
 
