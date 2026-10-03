@@ -593,27 +593,22 @@ ipcMain.handle('p2p-is-ready',    (_, name)                  => p2p.isReady(name
 
 ipcMain.handle('get-platform', () => process.platform);
 
+// Flag-Datei: merkt sich ob die Firewall-Regel je erfolgreich gesetzt wurde
+const fwFlagPath = path.join(app.getPath('userData'), 'p2p_fw_enabled');
+
 ipcMain.handle('firewall-check-p2p', async () => {
-  const { exec } = require('child_process');
   const plat = process.platform;
-  return new Promise(resolve => {
-    if (plat === 'win32') {
+  if (plat === 'darwin') return { ok: true, set: true, macos: true };
+  if (plat === 'win32') {
+    // Windows: sauber per PowerShell prüfbar ohne Root
+    return new Promise(resolve => {
       exec(`powershell -NoProfile -Command "Get-NetFirewallRule -DisplayName 'AOI P2P' -ErrorAction SilentlyContinue | Measure-Object | Select-Object -ExpandProperty Count"`,
         (_, stdout) => resolve({ ok: true, set: !!(stdout && stdout.trim() !== '0') })
       );
-    } else if (plat === 'linux') {
-      exec('ufw status 2>/dev/null | grep 7777', (err, stdout) => {
-        if (!err && stdout && stdout.includes('7777')) { resolve({ ok: true, set: true }); return; }
-        exec('iptables -C INPUT -p udp --dport 7777 -j ACCEPT 2>/dev/null', err2 =>
-          resolve({ ok: true, set: !err2 })
-        );
-      });
-    } else if (plat === 'darwin') {
-      resolve({ ok: true, set: true, macos: true });
-    } else {
-      resolve({ ok: true, set: false });
-    }
-  });
+    });
+  }
+  // Linux: Flag-Datei lesen (ufw status braucht Root, daher Flag-Ansatz)
+  return { ok: true, set: fs.existsSync(fwFlagPath) };
 });
 
 ipcMain.handle('firewall-open-p2p', async () => {
@@ -643,18 +638,18 @@ ipcMain.handle('firewall-open-p2p', async () => {
         }
       );
     } else if (plat === 'linux') {
+      const linuxOk = () => { try { fs.writeFileSync(fwFlagPath, '1', 'utf8'); } catch(_){} resolve({ ok: true }); };
       exec('which ufw', errUfw => {
         if (!errUfw) {
-          exec('pkexec ufw allow 7777/udp', e => resolve(e ? { ok: false, error: e.message } : { ok: true }));
+          exec('pkexec ufw allow 7777/udp', e => e ? resolve({ ok: false, error: e.message }) : linuxOk());
         } else {
           exec('which firewall-cmd', errFw => {
             if (!errFw) {
               exec('pkexec firewall-cmd --add-port=7777/udp --permanent', e => {
                 if (e) { resolve({ ok: false, error: e.message }); return; }
-                exec('pkexec firewall-cmd --reload', e2 => resolve(e2 ? { ok: false, error: e2.message } : { ok: true }));
+                exec('pkexec firewall-cmd --reload', e2 => e2 ? resolve({ ok: false, error: e2.message }) : linuxOk());
               });
             } else {
-              // Kein ufw, kein firewalld → manuelle Anleitung zeigen
               resolve({ ok: false, manual: true });
             }
           });
