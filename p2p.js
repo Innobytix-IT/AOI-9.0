@@ -164,6 +164,7 @@ let emit      = () => {};  // Callback → Electron main
 
 const byAddr = new Map(); // '[addr]:port' → PeerConn
 const byName = new Map(); // name          → PeerConn
+const unreachable = new Set(); // '[target]:port' → ENETUNREACH bekannt
 
 function pkey(addr, port) { return `[${addr}]:${port}`; }
 
@@ -188,9 +189,26 @@ function lanIPv4() {
 }
 
 function tx(buf, port, addr) {
-  // IPv4-mapped IPv6 wenn nötig
   const target = addr.includes(':') ? addr : `::ffff:${addr}`;
-  sock.send(buf, port, target, err => { if (err) try { console.error('[P2P] send', err.message); } catch(_){} });
+  const destKey = `[${target}]:${port}`;
+  if (unreachable.has(destKey)) return; // bekannt unerreichbar → stilles Drop
+  sock.send(buf, port, target, err => {
+    if (!err) return;
+    if (err.code === 'ENETUNREACH' || err.code === 'EHOSTUNREACH') {
+      if (unreachable.has(destKey)) return;
+      unreachable.add(destKey);
+      // Peer-Verbindungsversuch sofort beenden, nicht weiter wiederholen
+      const peer = byAddr.get(pkey(addr, port)) || byAddr.get(pkey(target, port));
+      if (peer) {
+        if (peer.timer) { clearInterval(peer.timer); clearTimeout(peer.timer); peer.timer = null; }
+        byAddr.delete(pkey(peer.addr, peer.port));
+        byName.delete(peer.name);
+        emit('p2p-error', { peer: peer.name, msg: 'unreachable' });
+      }
+    } else {
+      try { console.error('[P2P] send', err.message); } catch(_){}
+    }
+  });
 }
 
 function onPacket(buf, ri) {
