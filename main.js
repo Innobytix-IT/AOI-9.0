@@ -30,7 +30,7 @@ function createWindow() {
   });
 
   win.loadFile(path.join(__dirname, 'renderer', 'index.html'));
-
+  win.webContents.setBackgroundThrottling(false);
 }
 
 ipcMain.on('window-minimize', () => BrowserWindow.getFocusedWindow()?.minimize());
