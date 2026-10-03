@@ -6039,30 +6039,40 @@ function aoiToggleAtomUhr() {
 
 /* ===== SICHERHEITSCHECK LOGIN-PANEL ===== */
 function aoiLoginSecurityCheck() {
-  if (!window.electronAPI || !window.electronAPI.securityCheck) return;
-  window.electronAPI.securityCheck().then(function(r) {
-    // Firewall: true wenn mindestens eines aktiv
-    var fwEl  = document.getElementById('login-sec-fw');
-    var avEl  = document.getElementById('login-sec-av');
-    var avNameEl = document.getElementById('login-sec-av-name');
-    if (!fwEl || !avEl) return;
+  if (!window.electronAPI) return;
+  var fwEl     = document.getElementById('login-sec-fw');
+  var avEl     = document.getElementById('login-sec-av');
+  var avNameEl = document.getElementById('login-sec-av-name');
+  if (!fwEl || !avEl) return;
 
-    var fwActive = r.firewalls && r.firewalls.some(function(f){ return f.enabled; });
+  var p1 = window.electronAPI.securityCheck
+    ? window.electronAPI.securityCheck().catch(function(){ return {}; })
+    : Promise.resolve({});
+  var p2 = window.electronAPI.firewallCheckP2P
+    ? window.electronAPI.firewallCheckP2P().catch(function(){ return null; })
+    : Promise.resolve(null);
+
+  Promise.all([p1, p2]).then(function(res) {
+    var r  = res[0] || {};
+    var fw = res[1];
+
+    // Firewall aktiv wenn Systemfirewall ODER AOI-P2P-Regel gesetzt
+    var sysFwActive = r.firewalls && r.firewalls.some(function(f){ return f.enabled; });
+    var p2pFwActive = fw && (fw.set || fw.macos);
+    var fwActive = !!(sysFwActive || p2pFwActive);
     fwEl.textContent = fwActive ? 'Aktiv' : 'Inaktiv';
     fwEl.className   = fwActive ? 'status-on' : 'status-off';
 
     var avActive = r.antiviruses && r.antiviruses.some(function(a){ return a.enabled; });
     var avName   = r.antiviruses && r.antiviruses.find(function(a){ return a.enabled; });
     if (!avName && r.antiviruses && r.antiviruses.length > 0) avName = r.antiviruses[0];
-
     if (avNameEl && avName && avName.name && avName.name !== 'Kein AV gefunden') {
-      // Kürze langen Namen (max 14 Zeichen)
       var n = avName.name.replace(/Windows /i,'');
       avNameEl.textContent = n.length > 14 ? n.slice(0,13)+'…' : n;
     }
     avEl.textContent = avActive ? 'Aktiv' : 'Inaktiv';
     avEl.className   = avActive ? 'status-on' : 'status-off';
-  }).catch(function(){});
+  });
 }
 setTimeout(aoiLoginSecurityCheck, 800);
 
